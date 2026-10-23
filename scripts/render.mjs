@@ -6,7 +6,7 @@
 // out/<sample>-grid.jpg       1080×1350 grid crop
 // out/<sample>.sources.json   the API's source lines, release keys, locators and hashes (no text)
 // out/frames/<sample>-*.jpg   frames every 1.5 s and a contact sheet, for looking at
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { bundle } from "@remotion/bundler";
@@ -60,6 +60,18 @@ function moovFirst(file) {
   }
 }
 
+/**
+ * Speech levelled to -16 LUFS in two passes (measure, then one linear gain), so that a video
+ * that is mostly silence between its lines comes out as loud as one that is not.
+ */
+function levelFilter(file) {
+  const target = "I=-16:TP=-1.5:LRA=11";
+  const run = spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-i", file, "-vn", "-af", `loudnorm=${target}:print_format=json`, "-f", "null", "-"], { encoding: "utf8" });
+  const json = (run.stderr ?? "").slice((run.stderr ?? "").lastIndexOf("{"));
+  const m = JSON.parse(json.slice(0, json.indexOf("}") + 1));
+  return `loudnorm=${target}:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`;
+}
+
 const probe = (file) =>
   JSON.parse(execFileSync("ffprobe", ["-v", "error", "-show_entries", "stream=codec_type,codec_name,sample_rate,width,height,r_frame_rate:format=duration", "-of", "json", file]).toString());
 
@@ -95,7 +107,7 @@ for (const name of names) {
 
   // AAC at 48 kHz, speech levelled to -16 LUFS (no levelling of a silent track), moov at the front.
   const final = path.join(out, `${name}.mp4`);
-  const audioFilter = voice.lines.length ? ["-af", "loudnorm=I=-16:TP=-1.5:LRA=11"] : [];
+  const audioFilter = voice.lines.length ? ["-af", levelFilter(raw)] : [];
   execFileSync("ffmpeg", ["-y", "-v", "error", "-i", raw, "-c:v", "copy", ...audioFilter, "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", final]);
   fs.rmSync(raw);
 

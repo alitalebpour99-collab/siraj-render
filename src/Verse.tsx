@@ -17,6 +17,8 @@ const LEAD = 18;
 const TAIL = 30;
 const OUT = 12;
 const END = 165;
+/** A card stays at least this long, so a short ayah can still be read in calm (frames). */
+const MIN_CARD = 150;
 /** The cards stand between the header and the lowest line Instagram leaves free. */
 const H_BOTTOM = 1920 - SAFE.bottom + 20;
 
@@ -28,7 +30,7 @@ export function verseTimeline(p: VerseProps) {
     const line = byId.get(`a${a.ayahNumber}`);
     // without a voice, the time a calm reader needs for the translation and a look at the Arabic
     const speak = line ? frames(line.seconds) : Math.max(75, 24 + Math.ceil(a.translation.length * 2.4) + Math.ceil(a.text.length * 0.5));
-    const card = { ayah: a, from: at, dur: IN + LEAD + speak + TAIL + OUT, voiceAt: at + IN + LEAD, file: line?.file ?? null };
+    const card = { ayah: a, from: at, dur: Math.max(MIN_CARD, IN + LEAD + speak + TAIL + OUT), voiceAt: at + IN + LEAD, file: line?.file ?? null };
     at += card.dur;
     return card;
   });
@@ -51,8 +53,8 @@ const Hook: React.FC<{ p: VerseProps; dur: number }> = ({ p, dur }) => {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
           <Seal size={118} turn={turn} style={{ opacity: fadeIn(f, 20, 20) }} />
-          <Cartouche height={200} open={open}>
-            <div lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: 104, lineHeight: 1.5, color: C.star, paddingBottom: 14 }}>
+          <Cartouche height={216} open={open}>
+            <div lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: 100, lineHeight: 1.5, color: C.star, paddingBottom: 38 }}>
               {p.surah.nameArabic}
             </div>
           </Cartouche>
@@ -94,15 +96,15 @@ const Card: React.FC<{ p: VerseProps; ayahIndex: number; dur: number }> = ({ p, 
   const out = fadeOut(f, dur, OUT);
   const seal = fa ? faNum(a.ayahNumber) : arNum(a.ayahNumber);
   return (
-    <AbsoluteFill style={{ opacity: out }}>
+    <AbsoluteFill style={{ opacity: out, willChange: "opacity" }}>
       <div style={{ position: "absolute", top: SAFE.top + 90, bottom: H_BOTTOM, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
         <div style={{ opacity: fadeIn(f, 0, IN), transform: `translateY(${rise(f, 0)}px)`, display: "flex", flexDirection: "column", alignItems: "center" }}>
           {split ? (
-            <Fit width={860} maxHeight={124} max={64} min={34} measureKey={split.basmala} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.8, textAlign: "center", color: C.star, marginBottom: 14 }}>
+            <Fit width={860} maxHeight={136} max={72} min={34} measureKey={split.basmala} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.8, textAlign: "center", color: C.star, marginBottom: 14 }}>
               {split.basmala}
             </Fit>
           ) : null}
-          <Fit width={860} maxHeight={split ? 540 : 640} max={98} min={40} measureKey={a.text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.9, textAlign: "center", color: C.ink }}>
+          <Fit width={860} maxHeight={split ? 560 : 660} max={124} min={40} measureKey={a.text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.9, textAlign: "center", color: C.ink }}>
             {head}
             <span style={{ whiteSpace: "nowrap" }}>
               {tail}
@@ -115,8 +117,8 @@ const Card: React.FC<{ p: VerseProps; ayahIndex: number; dur: number }> = ({ p, 
         <div style={{ opacity: fadeIn(f, 8, IN + 4), transform: `translateY(${rise(f, 8)}px)` }}>
           <Fit
             width={860}
-            maxHeight={fa ? 420 : 400}
-            max={fa ? 50 : 56}
+            maxHeight={fa ? 440 : 420}
+            max={fa ? 56 : 64}
             min={28}
             measureKey={a.translation}
             lang={p.lang}

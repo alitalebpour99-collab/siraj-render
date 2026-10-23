@@ -12,7 +12,7 @@ export const SAMPLES = {
   "en-counts": {
     kind: "counts",
     lang: "en",
-    voice: { engine: "kokoro", voice: "am_michael", speed: 0.92 },
+    voice: { engine: "kokoro", voice: "am_michael", speed: 1.0 },
   },
   "fa-verse": {
     kind: "verse",

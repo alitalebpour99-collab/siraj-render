@@ -28,14 +28,14 @@ export const VerseCover: React.FC<VerseProps> = (p) => {
       <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", paddingBottom: tall ? 60 : 50 }}>
         <div dir={fa ? "rtl" : "ltr"} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: tall ? 44 : 34 }}>
           <div style={{ fontFamily: ui, fontSize: fa ? 70 : 64, fontWeight: 500, letterSpacing: fa ? 0 : "0.16em", textTransform: fa ? "none" : "uppercase", color: C.gold }}>{t.surah(p.surah.number)}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-            <Seal size={tall ? 130 : 112} />
-            <Cartouche height={tall ? 230 : 200}>
-              <div lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: tall ? 124 : 108, lineHeight: 1.5, color: C.star, paddingBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+            <Seal size={tall ? 104 : 92} />
+            <Cartouche height={tall ? 236 : 208}>
+              <div lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: tall ? 112 : 100, lineHeight: 1.5, color: C.star, paddingBottom: tall ? 42 : 36 }}>
                 {p.surah.nameArabic}
               </div>
             </Cartouche>
-            <Seal size={tall ? 130 : 112} />
+            <Seal size={tall ? 104 : 92} />
           </div>
           <div style={{ fontFamily: ui, fontStyle: fa ? "normal" : "italic", fontSize: fa ? 66 : 76, color: C.ink }}>{t.verses(p.surah.ayahCount)}</div>
           <Divider width={340} />

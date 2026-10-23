@@ -27,6 +27,10 @@ function roundRect(x: number, y: number, w: number, h: number, r: number) {
  * The night: lapis gradient, a lattice of eight-pointed stars and small crosses (generated,
  * one tile repeated), faint in the middle where the text stands, and a brass light that
  * breathes very slowly. The lattice drifts a few pixels a second.
+ *
+ * Every layer is drawn once: the lattice moves by a CSS transform and the light by its
+ * opacity, which the browser composites without painting again (an SVG mask redrawn on
+ * every frame made the first renders take forty minutes).
  */
 export const Night: React.FC<{ still?: boolean; glowY?: number }> = ({ still, glowY = 0.43 }) => {
   const frame = useCurrentFrame();
@@ -34,47 +38,36 @@ export const Night: React.FC<{ still?: boolean; glowY?: number }> = ({ still, gl
   const { width, height } = useVideoConfig();
   const T = 168;
   const R = T / 2;
-  const drift = f * 0.22;
-  const breathe = still ? 0 : Math.sin((f / 30) * ((2 * Math.PI) / 9)) * 0.025;
+  const drift = (f * 0.22) % T;
+  const breathe = still ? 1 : 0.84 + 0.16 * Math.sin((f / 30) * ((2 * Math.PI) / 9));
+  const cy = `${glowY * 100}%`;
+  const layer = { position: "absolute", left: 0, top: 0, width, height, willChange: "transform, opacity" } as const;
   return (
-    <AbsoluteFill style={{ background: `linear-gradient(180deg, ${C.night} 0%, ${C.night2} 52%, ${C.night} 100%)` }}>
-      <svg width={width} height={height} style={{ position: "absolute", inset: 0 }}>
-        <defs>
-          <pattern id="lattice" width={T} height={T} patternUnits="userSpaceOnUse" patternTransform={`translate(0 ${r2(drift % T)})`}>
-            <path d={starPath(R, R, R)} fill="none" stroke={C.gold} strokeWidth={1.6} strokeLinejoin="round" />
-            <path d={starPath(R, R, R * 0.72)} fill="none" stroke={C.gold} strokeWidth={1} strokeLinejoin="round" opacity={0.7} />
-            <circle cx={R} cy={R} r={T * 0.09} fill="none" stroke={C.gold} strokeWidth={1} opacity={0.8} />
-            {[
-              [0, 0],
-              [T, 0],
-              [0, T],
-              [T, T],
-            ].map(([x, y]) => (
-              <path key={`${x}-${y}`} d={`M${x} ${y! - T * 0.2}L${x! + T * 0.2} ${y}L${x} ${y! + T * 0.2}L${x! - T * 0.2} ${y}Z`} fill="none" stroke={C.gold} strokeWidth={1.3} />
-            ))}
-          </pattern>
-          <radialGradient id="latticeMask" cx="50%" cy={`${glowY * 100}%`} r="70%">
-            <stop offset="0%" stopColor="#fff" stopOpacity={0.18} />
-            <stop offset="55%" stopColor="#fff" stopOpacity={0.55} />
-            <stop offset="100%" stopColor="#fff" stopOpacity={1} />
-          </radialGradient>
-          <mask id="latticeFade">
-            <rect width={width} height={height} fill="url(#latticeMask)" />
-          </mask>
-          <radialGradient id="glow" cx="50%" cy={`${glowY * 100}%`} r="55%">
-            <stop offset="0%" stopColor={C.brass} stopOpacity={0.13 + breathe} />
-            <stop offset="60%" stopColor={C.brass} stopOpacity={0.03} />
-            <stop offset="100%" stopColor={C.brass} stopOpacity={0} />
-          </radialGradient>
-          <radialGradient id="vignette" cx="50%" cy="50%" r="75%">
-            <stop offset="65%" stopColor="#000" stopOpacity={0} />
-            <stop offset="100%" stopColor="#000" stopOpacity={0.45} />
-          </radialGradient>
-        </defs>
-        <rect width={width} height={height} fill="url(#lattice)" mask="url(#latticeFade)" opacity={0.12} />
-        <rect width={width} height={height} fill="url(#glow)" />
-        <rect width={width} height={height} fill="url(#vignette)" />
-      </svg>
+    <AbsoluteFill style={{ background: `linear-gradient(180deg, ${C.night} 0%, ${C.night2} 52%, ${C.night} 100%)`, overflow: "hidden" }}>
+      <div style={{ ...layer, height: height + T, top: -T, transform: `translateY(${r2(drift)}px)`, opacity: 0.15 }}>
+        <svg width={width} height={height + T}>
+          <defs>
+            <pattern id="lattice" width={T} height={T} patternUnits="userSpaceOnUse">
+              <path d={starPath(R, R, R)} fill="none" stroke={C.gold} strokeWidth={1.6} strokeLinejoin="round" />
+              <path d={starPath(R, R, R * 0.72)} fill="none" stroke={C.gold} strokeWidth={1} strokeLinejoin="round" opacity={0.7} />
+              <circle cx={R} cy={R} r={T * 0.09} fill="none" stroke={C.gold} strokeWidth={1} opacity={0.8} />
+              {[
+                [0, 0],
+                [T, 0],
+                [0, T],
+                [T, T],
+              ].map(([x, y]) => (
+                <path key={`${x}-${y}`} d={`M${x} ${y! - T * 0.2}L${x! + T * 0.2} ${y}L${x} ${y! + T * 0.2}L${x! - T * 0.2} ${y}Z`} fill="none" stroke={C.gold} strokeWidth={1.3} />
+              ))}
+            </pattern>
+          </defs>
+          <rect width={width} height={height + T} fill="url(#lattice)" />
+        </svg>
+      </div>
+      {/* the lattice fades towards the middle: the night laid over it, thick in the middle */}
+      <div style={{ ...layer, background: `radial-gradient(70% 55% at 50% ${cy}, ${C.night2}e6 0%, ${C.night2}99 45%, ${C.night2}00 100%)` }} />
+      <div style={{ ...layer, opacity: breathe, background: `radial-gradient(60% 42% at 50% ${cy}, ${C.brass}24 0%, ${C.brass}08 60%, ${C.brass}00 100%)` }} />
+      <div style={{ ...layer, background: "radial-gradient(85% 75% at 50% 50%, #0000 62%, #00000073 100%)" }} />
     </AbsoluteFill>
   );
 };
@@ -98,7 +91,7 @@ export const MushafFrame: React.FC<{ drawn?: boolean; inset?: number }> = ({ dra
   const clip = `inset(0 ${r2(50 * (1 - open))}% ${r2((height - strip) * (1 - down))}px ${r2(50 * (1 - open))}%)`;
   const t = band;
   return (
-    <AbsoluteFill style={{ clipPath: clip }}>
+    <AbsoluteFill style={{ clipPath: open >= 1 && down >= 1 ? undefined : clip, willChange: "transform" }}>
       <svg width={width} height={height}>
         <defs>
           <pattern id="band" width={t} height={t} patternUnits="userSpaceOnUse" x={b0} y={b0}>

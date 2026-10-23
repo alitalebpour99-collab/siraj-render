@@ -61,7 +61,7 @@ const Total: React.FC<{ p: CountsProps; s: Scene }> = ({ p, s }) => {
   const num = { fontFamily: FONT.en, fontWeight: 500, color: C.brass, lineHeight: 1, fontVariantNumeric: "lining-nums tabular-nums" } as const;
   const unit = { fontFamily: FONT.en, fontSize: 62, color: C.ink, letterSpacing: "0.04em", marginTop: 6 } as const;
   return (
-    <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", paddingTop: 110, paddingBottom: 420, opacity: out }}>
+    <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", paddingTop: 110, paddingBottom: 420, opacity: out, willChange: "opacity" }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 18 }}>
         <div style={{ opacity: fadeIn(f, 4), transform: `translateY(${rise(f, 4)}px)`, display: "flex", flexDirection: "column", alignItems: "center" }}>
           <div style={{ ...num, fontSize: 290 }}>{enNum(count(f, 6, p.totals.surahs, 40))}</div>
@@ -104,16 +104,16 @@ const Places: React.FC<{ p: CountsProps; s: Scene }> = ({ p, s }) => {
   const second = (s.lines[1]?.from ?? s.from + 90) - s.from;
   const { meccan, medinan } = p.totals;
   return (
-    <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", paddingTop: 110, paddingBottom: 420, opacity: out }}>
+    <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", paddingTop: 110, paddingBottom: 420, opacity: out, willChange: "opacity" }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 26 }}>
         <div style={{ opacity: fadeIn(f, 2), transform: `translateY(${rise(f, 2)}px)`, fontFamily: FONT.en, fontSize: 70, color: C.ink }}>Meccan and Medinan</div>
         <Rule opacity={fadeIn(f, 8)}>as labelled in the Tanzil metadata</Rule>
         <div style={{ height: 30 }} />
-        <div style={{ fontFamily: FONT.en, fontSize: 30, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold, alignSelf: "flex-start", opacity: fadeIn(f, 12) }}>Surahs</div>
+        <div style={{ fontFamily: FONT.en, fontSize: 30, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold, width: 780, opacity: fadeIn(f, 12) }}>Surahs</div>
         <Bar label="Meccan" value={meccan.surahs} of={p.totals.surahs} color={C.brass} f={f} at={16} unit="surahs" />
         <Bar label="Medinan" value={medinan.surahs} of={p.totals.surahs} color={C.turquoise} f={f} at={26} unit="surahs" />
         <div style={{ height: 26 }} />
-        <div style={{ fontFamily: FONT.en, fontSize: 30, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold, alignSelf: "flex-start", opacity: fadeIn(f, second - 6) }}>Verses</div>
+        <div style={{ fontFamily: FONT.en, fontSize: 30, letterSpacing: "0.16em", textTransform: "uppercase", color: C.gold, width: 780, opacity: fadeIn(f, second - 6) }}>Verses</div>
         <Bar label="Meccan" value={meccan.ayahs} of={p.totals.ayahs} color={C.brass} f={f} at={second} unit="verses" />
         <Bar label="Medinan" value={medinan.ayahs} of={p.totals.ayahs} color={C.turquoise} f={f} at={second + 10} unit="verses" />
         <div style={{ height: 14 }} />
@@ -150,8 +150,16 @@ const Chart: React.FC<{ p: CountsProps; s: Scene }> = ({ p, s }) => {
     return (
       <div style={{ position: "absolute", top: CALLOUT_TOP, ...(align === "left" ? { left: CHART.left } : { right: W - CHART.left - CHART.width }), opacity, display: "flex", flexDirection: "column", alignItems: align === "left" ? "flex-start" : "flex-end", gap: 4 }}>
         <div style={{ fontFamily: FONT.en, fontSize: 46, color: C.ink }}>{`${surahWord(list.length)} ${andList(list.map((s2) => String(s2.number)))}`}</div>
-        <div lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: 50, lineHeight: 1.5, color: C.star }}>
-          {list.map((s2) => s2.nameArabic).join(" · ")}
+        {/* each surah as number and name, in the order of the English line above */}
+        <div dir="ltr" style={{ display: "flex", gap: 26, alignItems: "baseline" }}>
+          {list.map((s2) => (
+            <div key={s2.number} style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+              <span style={{ fontFamily: FONT.en, fontSize: 30, color: C.quiet, fontVariantNumeric: "lining-nums" }}>{s2.number}</span>
+              <span lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: 50, lineHeight: 1.5, color: C.star }}>
+                {s2.nameArabic}
+              </span>
+            </div>
+          ))}
         </div>
         <div style={{ fontFamily: FONT.en, fontSize: 46, color: C.brass, fontVariantNumeric: "lining-nums" }}>
           {`${enNum(ayahs)} verses${list.length > 1 ? " each" : ""}`}
@@ -160,7 +168,7 @@ const Chart: React.FC<{ p: CountsProps; s: Scene }> = ({ p, s }) => {
     );
   };
   return (
-    <AbsoluteFill style={{ opacity: out }}>
+    <AbsoluteFill style={{ opacity: out, willChange: "opacity" }}>
       <div style={{ position: "absolute", top: SAFE.top + 70, width: W, display: "flex", flexDirection: "column", alignItems: "center", gap: 14, opacity: fadeIn(f, 0) }}>
         <div style={{ fontFamily: FONT.en, fontSize: 64, color: C.ink }}>Verses in each surah</div>
         <div style={{ display: "flex", gap: 34, fontFamily: FONT.en, fontSize: 32, color: C.quiet }}>
@@ -186,7 +194,7 @@ const Chart: React.FC<{ p: CountsProps; s: Scene }> = ({ p, s }) => {
           const s2 = p.surahs[num - 1]!;
           const top = CHART.base - Math.max(3, (s2.ayahCount / max) * CHART.height) - 16;
           const cx = x(num) + step / 2;
-          return <path key={`m${num}`} d={`M${cx} ${top}l-7 -12h14z`} fill={C.ink} opacity={o} />;
+          return <path key={`m${num}`} d={`M${cx} ${top}l-9 -16h18z`} fill={C.star} opacity={o} />;
         })}
         <line x1={CHART.left} x2={CHART.left + CHART.width} y1={CHART.base + 1} y2={CHART.base + 1} stroke={C.gold} strokeWidth={1.5} opacity={0.7} />
       </svg>
