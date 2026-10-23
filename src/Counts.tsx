@@ -264,7 +264,7 @@ const Subtitle: React.FC<{ text: string; len: number }> = ({ text, len }) => {
   const o = Math.min(fadeIn(f, 0, 8), fadeOut(f, len + GAP - 2, 8));
   return (
     <div style={{ position: "absolute", top: SAFE.bottom - 190, left: 0, width: W, display: "flex", justifyContent: "center", opacity: o }}>
-      <Fit width={840} maxHeight={170} max={40} min={26} measureKey={text} lang="en" dir="ltr" style={{ fontFamily: FONT.en, fontWeight: 500, lineHeight: 1.35, textAlign: "center", color: C.ink }}>
+      <Fit width={840} maxHeight={170} max={40} min={26} measureKey={text} lang="en" dir="ltr" style={{ fontFamily: FONT.en, fontWeight: 500, lineHeight: 1.35, textAlign: "center", textWrap: "balance", color: C.ink }}>
         {text}
       </Fit>
     </div>

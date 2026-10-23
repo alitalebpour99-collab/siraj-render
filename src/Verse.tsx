@@ -11,7 +11,7 @@ import { AyahSeal, Cartouche, Divider, MushafFrame, Night, Seal, SirajMark } fro
 import type { VerseProps } from "./props";
 import { C, FONT, SAFE, W, arNum, easeInOut, fadeIn, fadeOut, faNum, frames, rise } from "./theme";
 
-const HOOK = 84;
+const HOOK = 96;
 const IN = 15;
 const LEAD = 18;
 const TAIL = 30;
@@ -100,11 +100,11 @@ const Card: React.FC<{ p: VerseProps; ayahIndex: number; dur: number }> = ({ p, 
       <div style={{ position: "absolute", top: SAFE.top + 90, bottom: H_BOTTOM, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
         <div style={{ opacity: fadeIn(f, 0, IN), transform: `translateY(${rise(f, 0)}px)`, display: "flex", flexDirection: "column", alignItems: "center" }}>
           {split ? (
-            <Fit width={860} maxHeight={136} max={72} min={34} measureKey={split.basmala} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.8, textAlign: "center", color: C.star, marginBottom: 14 }}>
+            <Fit width={820} maxHeight={136} max={72} min={34} measureKey={split.basmala} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.8, textAlign: "center", textWrap: "balance", color: C.star, marginBottom: 14 }}>
               {split.basmala}
             </Fit>
           ) : null}
-          <Fit width={860} maxHeight={split ? 560 : 660} max={124} min={40} measureKey={a.text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.9, textAlign: "center", color: C.ink }}>
+          <Fit width={820} maxHeight={split ? 560 : 660} max={124} min={40} measureKey={a.text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.9, textAlign: "center", textWrap: "balance", color: C.ink }}>
             {head}
             <span style={{ whiteSpace: "nowrap" }}>
               {tail}
@@ -116,14 +116,14 @@ const Card: React.FC<{ p: VerseProps; ayahIndex: number; dur: number }> = ({ p, 
         <Divider width={320} style={{ marginBlock: 30, opacity: fadeIn(f, 4, IN) }} />
         <div style={{ opacity: fadeIn(f, 8, IN + 4), transform: `translateY(${rise(f, 8)}px)` }}>
           <Fit
-            width={860}
+            width={820}
             maxHeight={fa ? 440 : 420}
             max={fa ? 56 : 64}
             min={28}
             measureKey={a.translation}
             lang={p.lang}
             dir={fa ? "rtl" : "ltr"}
-            style={{ fontFamily: fa ? FONT.fa : FONT.en, fontWeight: fa ? 400 : 500, lineHeight: fa ? 1.95 : 1.42, textAlign: "center", color: C.translation }}
+            style={{ fontFamily: fa ? FONT.fa : FONT.en, fontWeight: fa ? 400 : 500, lineHeight: fa ? 1.95 : 1.42, textAlign: "center", textWrap: "balance", color: C.translation }}
           >
             {a.translation}
           </Fit>

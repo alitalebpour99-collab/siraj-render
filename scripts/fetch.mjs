@@ -189,8 +189,8 @@ async function countsProps(name) {
   const narration = [
     {
       id: "total",
-      show: `By the Kufan count used in the Tanzil text, the Quran has ${digits(surahs.length)} surahs and ${digits(total)} verses.`,
-      say: `By the Kufan count used in the Tanzil text, the Quran has ${words(surahs.length)} surahs, and ${words(total)} verses.`,
+      show: `By the Kufan count, the Quran has ${digits(surahs.length)} surahs and ${digits(total)} verses.`,
+      say: `By the Kufan count, the Quran has ${words(surahs.length)} surahs, and ${words(total)} verses.`,
     },
     {
       id: "places",
