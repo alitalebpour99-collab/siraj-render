@@ -1,0 +1,95 @@
+name: Samples
+
+# Renders the three sample videos of Siraj Social and their covers on GitHub's machines (free
+# for a public repository) and keeps them as the run's artifact «samples». Publishes nothing.
+#
+# The texts are fetched from Siraj's public API during the run (scripts/fetch.mjs) and never
+# committed; the voices are free open models (Kokoro for English, Mana-Persian-Piper for
+# Persian) and read the translation only. No secret is used.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: samples-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  samples:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      RENDER_GL: swangle
+      RENDER_CONCURRENCY: "4"
+      PYTHON: python
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: System packages (ffmpeg, espeak-ng, the libraries Chrome Headless Shell needs)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends ffmpeg espeak-ng libnss3 libdbus-1-3 libatk1.0-0 libgbm-dev libxrandr2 libxkbcommon-dev libxfixes3 libxcomposite1 libxdamage1 libatk-bridge2.0-0 libpango-1.0-0 libcairo2 libcups2
+          sudo apt-get install -y -qq --no-install-recommends libasound2t64 || sudo apt-get install -y -qq --no-install-recommends libasound2
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Voice packages
+        run: pip install -q -r scripts/requirements.txt
+
+      - name: Cache the voice models
+        uses: actions/cache@v4
+        with:
+          path: |
+            models
+            ~/.cache/huggingface
+          key: voices-kokoro-82m-mana-persian-piper-v1
+
+      - name: The Persian voice model (Mana-Persian-Piper, MIT)
+        run: |
+          mkdir -p models
+          base=https://huggingface.co/MahtaFetrat/Mana-Persian-Piper/resolve/main
+          for f in fa_IR-mana-medium.onnx fa_IR-mana-medium.onnx.json; do
+            test -s "models/$f" || curl -fsSL --retry 3 -o "models/$f" "$base/$f"
+          done
+          ls -la models
+
+      - name: Texts from Siraj's public API
+        run: node scripts/fetch.mjs all
+
+      - name: Voice tracks (the translation only)
+        run: node scripts/voice.mjs all
+
+      - name: Browser
+        run: node -e "import('@remotion/renderer').then((m) => m.ensureBrowser())"
+
+      - name: Render the videos, covers and check frames
+        run: node scripts/render.mjs all
+
+      - name: What was made
+        run: ls -la out out/frames
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: samples
+          path: out/
+          retention-days: 30
+          if-no-files-found: error

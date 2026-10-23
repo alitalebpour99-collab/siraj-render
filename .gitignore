@@ -1,0 +1,13 @@
+node_modules/
+# Everything below is made at build time from Siraj's API and never committed:
+# the texts (props), the voice tracks, the bundle and the rendered media.
+props/
+public/voice/
+models/
+bundle/
+out/
+*.mp4
+*.wav
+*.jpg
+*.png
+.work/
