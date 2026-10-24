@@ -91,7 +91,7 @@ function loudness(files) {
  * own time (an output -ss left the filters on the chapter's time and faded later verses to
  * silence in the first run). Every clip must then be heard: a quiet clip stops the run.
  */
-function cut(src, fromMs, toMs, gainDb, out) {
+function cut(src, fromMs, toMs, gainDb, out, fileMs) {
   const from = fromMs / 1000;
   const to = toMs / 1000;
   const dur = to - from;
@@ -106,10 +106,13 @@ function cut(src, fromMs, toMs, gainDb, out) {
   execFileSync("ffmpeg", ["-y", "-v", "error", "-i", src, "-af", chain, "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", out]);
   const got = durationMs(out) / 1000;
   const lufs = loudness([out]);
-  check(Math.abs(got - dur) < 0.05, `${path.basename(out)} is ${dur.toFixed(3)} s long (got ${got.toFixed(3)})`);
+  // a clip that runs to the end of the file may come out a little shorter than the file's header says
+  const atEnd = toMs >= fileMs - 150;
+  check(got <= dur + 0.05 && (got >= dur - 0.05 || atEnd), `${path.basename(out)} is ${dur.toFixed(3)} s long (got ${got.toFixed(3)})`);
   check(lufs > -30, `${path.basename(out)} is heard (${lufs.toFixed(1)} LUFS)`);
-  console.log(`  cut ${path.basename(out)}: ${fromMs}–${toMs} ms, ${got.toFixed(2)} s, ${lufs.toFixed(1)} LUFS`);
-  return Math.round(dur * 1000) / 1000;
+  const realTo = Math.min(toMs, fromMs + Math.round(got * 1000));
+  console.log(`  cut ${path.basename(out)}: ${fromMs}–${realTo} ms, ${got.toFixed(3)} s, ${lufs.toFixed(1)} LUFS`);
+  return { seconds: Math.round(((realTo - fromMs) / 1000) * 1000) / 1000, toMs: realTo };
 }
 
 /** A whole file (the narrator's MP3) as a levelled WAV. */
@@ -166,9 +169,9 @@ for (const name of names) {
     const text = i === 0 && split ? split.rest : a.text;
     const sirajWords = wordCount(text);
     const file = path.join(out, `q-${a.ayahNumber}.wav`);
-    const seconds = cut(ch.file, c.fromMs, c.toMs, ch.gain, file);
-    const al = alignClip({ sirajWords, segments: t.segments, fromMs: c.fromMs, toMs: c.toMs });
-    return { id: `q${a.ayahNumber}`, ayah: a.ayahNumber, file: `qari/${name}/q-${a.ayahNumber}.wav`, seconds, mode: al.mode, words: al.words, sirajWords, qfWords: al.qfWords, fromMs: c.fromMs, toMs: c.toMs, verseKey: t.verse_key };
+    const { seconds, toMs } = cut(ch.file, c.fromMs, c.toMs, ch.gain, file, ch.ms);
+    const al = alignClip({ sirajWords, segments: t.segments, fromMs: c.fromMs, toMs });
+    return { id: `q${a.ayahNumber}`, ayah: a.ayahNumber, file: `qari/${name}/q-${a.ayahNumber}.wav`, seconds, mode: al.mode, words: al.words, sirajWords, qfWords: al.qfWords, fromMs: c.fromMs, toMs, verseKey: t.verse_key };
   });
 
   // the basmala before ayah 1, from the reciter's recitation of 1:1
@@ -179,9 +182,9 @@ for (const name of names) {
     const c = one.cuts[0];
     const sirajWords = wordCount(split.basmala);
     const file = path.join(out, "q-basmala.wav");
-    const seconds = cut(one.file, c.fromMs, c.toMs, one.gain, file);
-    const al = alignClip({ sirajWords, segments: t.segments, fromMs: c.fromMs, toMs: c.toMs });
-    basmala = { id: "qb", ayah: null, file: `qari/${name}/q-basmala.wav`, seconds, mode: al.mode, words: al.words, sirajWords, qfWords: al.qfWords, fromMs: c.fromMs, toMs: c.toMs, verseKey: "1:1 (basmala)" };
+    const { seconds, toMs } = cut(one.file, c.fromMs, c.toMs, one.gain, file, one.ms);
+    const al = alignClip({ sirajWords, segments: t.segments, fromMs: c.fromMs, toMs });
+    basmala = { id: "qb", ayah: null, file: `qari/${name}/q-basmala.wav`, seconds, mode: al.mode, words: al.words, sirajWords, qfWords: al.qfWords, fromMs: c.fromMs, toMs, verseKey: "1:1 (basmala)" };
   }
 
   // the narrator: the committed MP3s must still match the API's translation

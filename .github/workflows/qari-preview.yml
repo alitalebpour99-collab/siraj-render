@@ -11,6 +11,11 @@ name: Qari preview (private)
 
 on:
   workflow_dispatch:
+    inputs:
+      samples:
+        description: 'Which previews, as JSON (e.g. ["en-qari"])'
+        required: false
+        default: '["en-qari","fa-qari"]'
   push:
     branches: [preview/qari-voice]
 
@@ -18,7 +23,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: qari-preview-${{ github.ref }}
+  group: qari-preview-${{ github.ref }}-${{ inputs.samples || 'all' }}
   cancel-in-progress: true
 
 jobs:
@@ -27,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        sample: [en-qari, fa-qari]
+        sample: ${{ fromJSON(inputs.samples || '["en-qari","fa-qari"]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 100
     env:
