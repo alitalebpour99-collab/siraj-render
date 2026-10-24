@@ -37,7 +37,7 @@ function wordLook(t: number, w: WordTime): React.CSSProperties {
   const color = mix(mix(DIM, SETTLED, lit), HOT, hot * lit * 0.85);
   return {
     color: rgba(color),
-    textShadow: `0 0 ${(6 + 26 * glow).toFixed(1)}px rgba(224,172,79,${(0.16 + 0.56 * glow).toFixed(3)}), 0 0 ${(2 + 7 * glow).toFixed(1)}px rgba(255,232,176,${(0.08 + 0.5 * glow).toFixed(3)})`,
+    textShadow: `0 0 ${(5 + 19 * glow).toFixed(1)}px rgba(224,172,79,${(0.16 + 0.56 * glow).toFixed(3)}), 0 0 ${(2 + 7 * glow).toFixed(1)}px rgba(255,232,176,${(0.08 + 0.5 * glow).toFixed(3)})`,
   };
 }
 
@@ -233,7 +233,8 @@ const World: React.FC<{ total: number; still?: boolean; seed: number }> = ({ tot
   const k = still ? 0 : f / Math.max(1, total);
   const scale = 1 + 0.05 * easeInOut(k);
   return (
-    <AbsoluteFill style={{ transform: `scale(${scale.toFixed(4)})`, transformOrigin: "50% 44%" }}>
+    // drawn once and scaled by the compositor (a re-drawn lattice per frame made the first render four times slower)
+    <AbsoluteFill style={{ transform: `scale(${scale.toFixed(4)})`, transformOrigin: "50% 44%", willChange: "transform" }}>
       <Night still={still} glowY={0.42} />
       <Rosette turn={still ? 0 : f * 0.02} opacity={0.085} cy={860} />
       <Motes seed={seed} still={still} />

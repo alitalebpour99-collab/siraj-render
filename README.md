@@ -57,4 +57,4 @@ No music and no background sound.
 | `scripts/narrate.mjs` | run on the owner's PC: the narrator's MP3s into `public/narration/<preview>/` (committed; the key never leaves the PC) |
 | `scripts/qari.mjs` | run on GitHub: downloads the recitation and its timings, cuts one clip per ayah, levels the audio (`public/qari/`, never committed) |
 | `src/Qari.tsx`, `src/light.tsx`, `src/qariTimeline.ts`, `src/words.ts` | the composition, the light, the timeline, the word cutting |
-| `.github/workflows/qari-preview.yml` | renders both previews; artifact `qari-preview` (kept two days) |
+| `.github/workflows/qari-preview.yml` | renders both previews side by side; artifacts `qari-preview-<preview>` (kept two days) |

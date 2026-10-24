@@ -23,8 +23,13 @@ concurrency:
 
 jobs:
   preview:
+    # one job per preview, side by side (the first run rendered one in 34 minutes and hit the limit)
+    strategy:
+      fail-fast: false
+      matrix:
+        sample: [en-qari, fa-qari]
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 100
     env:
       RENDER_GL: swangle
       RENDER_CONCURRENCY: "4"
@@ -66,23 +71,23 @@ jobs:
         run: node --experimental-strip-types --test scripts/qari.test.mjs
 
       - name: Texts from Siraj's public API
-        run: node scripts/fetch.mjs en-qari fa-qari
+        run: node scripts/fetch.mjs ${{ matrix.sample }}
 
       - name: The qari's clips and word timings, the narrator levelled
-        run: node --experimental-strip-types scripts/qari.mjs en-qari fa-qari
+        run: node --experimental-strip-types scripts/qari.mjs ${{ matrix.sample }}
 
       - name: Browser
         run: node -e "import('@remotion/renderer').then((m) => m.ensureBrowser())"
 
       - name: Render the previews, covers and frame sheets
-        run: node --experimental-strip-types scripts/render.mjs en-qari fa-qari
+        run: node --experimental-strip-types scripts/render.mjs ${{ matrix.sample }}
 
       - name: What was made
         run: ls -la out out/frames
 
       - uses: actions/upload-artifact@v4
         with:
-          name: qari-preview
+          name: qari-preview-${{ matrix.sample }}
           path: out/
           retention-days: 2
           if-no-files-found: error

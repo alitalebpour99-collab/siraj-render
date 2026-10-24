@@ -52,7 +52,7 @@ export const Motes: React.FC<{ count?: number; seed?: number; still?: boolean; b
   const t = still ? 0 : frame / fps;
   const margin = 120;
   return (
-    <AbsoluteFill style={{ overflow: "hidden", pointerEvents: "none" }}>
+    <AbsoluteFill style={{ overflow: "hidden", pointerEvents: "none", willChange: "transform" }}>
       {motes.map((m, i) => {
         const span = height + 2 * margin;
         const y = ((((m.y - m.rise * t + margin) % span) + span) % span) - margin;
@@ -87,7 +87,7 @@ export const Rosette: React.FC<{ size?: number; cx?: number; cy?: number; opacit
   const petals = Array.from({ length: 16 }, (_, i) => (i * Math.PI * 2) / 16);
   const rays = Array.from({ length: 32 }, (_, i) => (i * Math.PI * 2) / 32);
   return (
-    <div style={{ position: "absolute", left: cx - R, top: cy - R, width: size, height: size, opacity, transform: `rotate(${turn.toFixed(3)}deg)` }}>
+    <div style={{ position: "absolute", left: cx - R, top: cy - R, width: size, height: size, opacity, transform: `rotate(${turn.toFixed(3)}deg)`, willChange: "transform" }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <g fill="none" stroke={C.gold} strokeLinejoin="round">
           <circle cx={c} cy={c} r={R * 0.97} strokeWidth={1.6} />
