@@ -85,12 +85,30 @@ function loudness(files) {
   return Number(m[1]);
 }
 
-/** A WAV (48 kHz stereo) of [fromMs, toMs] of `src`, with `gainDb`, a peak limit and short fades. */
+/**
+ * A WAV (48 kHz stereo) of [fromMs, toMs] of `src`, with `gainDb`, a peak limit and short fades.
+ * The trim is the first filter and the clock is reset after it, so the fades run on the clip's
+ * own time (an output -ss left the filters on the chapter's time and faded later verses to
+ * silence in the first run). Every clip must then be heard: a quiet clip stops the run.
+ */
 function cut(src, fromMs, toMs, gainDb, out) {
   const from = fromMs / 1000;
-  const dur = (toMs - fromMs) / 1000;
-  const chain = [`volume=${gainDb.toFixed(2)}dB`, "alimiter=limit=0.891:attack=5:release=60:level=0", "afade=t=in:st=0:d=0.012", `afade=t=out:st=${Math.max(0, dur - 0.06).toFixed(3)}:d=0.06`].join(",");
-  execFileSync("ffmpeg", ["-y", "-v", "error", "-i", src, "-ss", from.toFixed(3), "-t", dur.toFixed(3), "-af", chain, "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", out]);
+  const to = toMs / 1000;
+  const dur = to - from;
+  const chain = [
+    `atrim=start=${from.toFixed(3)}:end=${to.toFixed(3)}`,
+    "asetpts=PTS-STARTPTS",
+    `volume=${gainDb.toFixed(2)}dB`,
+    "alimiter=limit=0.891:attack=5:release=60:level=0",
+    "afade=t=in:st=0:d=0.012",
+    `afade=t=out:st=${Math.max(0, dur - 0.06).toFixed(3)}:d=0.06`,
+  ].join(",");
+  execFileSync("ffmpeg", ["-y", "-v", "error", "-i", src, "-af", chain, "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", out]);
+  const got = durationMs(out) / 1000;
+  const lufs = loudness([out]);
+  check(Math.abs(got - dur) < 0.05, `${path.basename(out)} is ${dur.toFixed(3)} s long (got ${got.toFixed(3)})`);
+  check(lufs > -30, `${path.basename(out)} is heard (${lufs.toFixed(1)} LUFS)`);
+  console.log(`  cut ${path.basename(out)}: ${fromMs}–${toMs} ms, ${got.toFixed(2)} s, ${lufs.toFixed(1)} LUFS`);
   return Math.round(dur * 1000) / 1000;
 }
 

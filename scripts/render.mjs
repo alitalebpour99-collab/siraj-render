@@ -163,6 +163,14 @@ for (const name of names) {
     add("narrator outro", t.outro.from + t.outro.narrAt, lines.get("outro")?.seconds ?? 0);
     console.log(`${name}: who speaks when (s): ${segs.map((x) => `${x.who} ${x.from.toFixed(2)}-${x.to.toFixed(2)}`).join(", ")}`);
     for (let i = 1; i < segs.length; i++) if (segs[i].from < segs[i - 1].to - 0.001) throw new Error(`${name}: ${segs[i].who} begins before ${segs[i - 1].who} ends`);
+    // every voice must be heard in the finished video, where the timeline puts it
+    for (const x of segs) {
+      const run = spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-ss", x.from.toFixed(3), "-t", (x.to - x.from).toFixed(3), "-i", final, "-vn", "-af", "ebur128=framelog=quiet", "-f", "null", "-"], { encoding: "utf8" });
+      const m = [...(run.stderr ?? "").matchAll(/I:\s+(-?[\d.]+) LUFS/g)].pop();
+      x.lufs = m ? Number(m[1]) : null;
+      if (x.lufs === null || x.lufs < -32) throw new Error(`${name}: ${x.who} is not heard in the video (${x.lufs} LUFS)`);
+    }
+    console.log(`${name}: loudness of each voice in the video (LUFS): ${segs.map((x) => `${x.who} ${x.lufs.toFixed(1)}`).join(", ")}`);
 
     // a sheet of nine frames spread over the video, and a sheet of the moments that show the light:
     // the middle word of each clip while it is recited, the middle of each narration, intro, outro
