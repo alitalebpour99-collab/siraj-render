@@ -22,3 +22,51 @@ export const SAMPLES = {
     voice: { engine: "piper", model: "models/fa_IR-mana-medium.onnx", lengthScale: 1.12 },
   },
 };
+
+// The two PRIVATE previews of 24 October 2026 (branch preview/qari-voice, shown only to the
+// owner): the qari's own recitation of every ayah with each word lit as he recites it, then the
+// translation read by an ElevenLabs narrator. Only names, numbers and voice choices live here.
+// `all` in the scripts still means the three S1 samples above; a preview is named on its own.
+const ALAFASY = {
+  // Quran Foundation (quran.com) chapter recitation 7: Mishari Rashid al-`Afasy, Murattal, Hafs.
+  qfRecitationId: 7,
+  name: "Mishary Rashid Alafasy",
+  nameFa: "مشاری راشد العفاسی",
+};
+export const PREVIEWS = {
+  "en-qari": {
+    kind: "qari",
+    surah: 112,
+    lang: "en",
+    nameLatin: "Al-Ikhlas",
+    nameFa: "اخلاص",
+    reciter: ALAFASY,
+    narrator: {
+      engine: "elevenlabs",
+      model: "eleven_multilingual_v2",
+      // George, a premade ElevenLabs voice: warm, mature, British storyteller.
+      voiceId: "JBFqnCBsd6RMkjVDRZzb",
+      voiceName: "George",
+      settings: { stability: 0.6, similarity_boost: 0.8, style: 0.08, use_speaker_boost: true, speed: 0.92 },
+    },
+  },
+  "fa-qari": {
+    kind: "qari",
+    surah: 103,
+    lang: "fa",
+    nameLatin: "Al-Asr",
+    nameFa: "عصر",
+    reciter: ALAFASY,
+    narrator: {
+      engine: "elevenlabs",
+      model: "eleven_v3",
+      // Shahram, the Persian narrator Bidar's living book uses (with Bidar's settings).
+      voiceId: "rNb3hdSf0n4ROIbYC8Bl",
+      voiceName: "Shahram",
+      settings: { stability: 0.5, similarity_boost: 0.8, style: 0.12, use_speaker_boost: true },
+    },
+  },
+};
+
+/** Every sample and preview by name. */
+export const ALL = { ...SAMPLES, ...PREVIEWS };

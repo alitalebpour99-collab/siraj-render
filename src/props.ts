@@ -80,4 +80,53 @@ export type CountsProps = {
   voice: Voice;
 };
 
-export type AnyProps = VerseProps | CountsProps;
+// ---------- the private qari previews (en-qari, fa-qari) ----------
+
+/** When a word (or the whole verse, in a fallback) is recited, in seconds from the clip's start. */
+export type WordTime = { start: number; end: number };
+
+/** One recited clip (an ayah, or the basmala before ayah 1), cut by scripts/qari.mjs at build time. */
+export type QariClip = {
+  id: string;
+  /** null for the basmala */
+  ayah: number | null;
+  /** public/ path of the cut WAV (never committed) */
+  file: string;
+  seconds: number;
+  /** "word": one timing per word of Siraj's text; "verse": the counts differ, the whole verse is lit */
+  mode: "word" | "verse";
+  words: WordTime[];
+  sirajWords: number;
+  qfWords: number;
+  /** where in the reciter's chapter file the clip was cut (ms) */
+  fromMs: number;
+  toMs: number;
+  verseKey: string;
+};
+
+export type NarrationLine = {
+  id: string;
+  /** "intro" | "translation" | "outro" */
+  reads: string;
+  ayah: number | null;
+  /** public/ path of the levelled WAV made at build time from the committed MP3 */
+  file: string;
+  seconds: number;
+};
+
+export type QariManifest = {
+  reciter: { name: string; nameFa: string; qfRecitationId: number; qfName: string; style: string | null; qirat: string | null };
+  source: { timingsApi: string[]; audio: string[]; credit: string };
+  basmala: QariClip | null;
+  verses: QariClip[];
+  narration: { engine: string; model: string; voiceId: string; voiceName: string; lines: NarrationLine[] };
+  fallbacks: { verseKey: string; sirajWords: number; qfWords: number }[];
+};
+
+export type QariProps = Omit<VerseProps, "kind" | "voice"> & {
+  kind: "qari";
+  meta: { nameLatin: string; nameFa: string; surahTotal: number };
+  qari: QariManifest;
+};
+
+export type AnyProps = VerseProps | CountsProps | QariProps;

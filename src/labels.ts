@@ -20,6 +20,28 @@ export function firstUrl(text: string | null | undefined) {
   return m ? m[0] : null;
 }
 
+/** The words of the private qari previews (names and credits only; no sacred or translated text). */
+export const Q = {
+  en: {
+    of: (n: number, total: number) => `Surah ${n} of ${total}`,
+    verses: (n: number) => `${n} ${n === 1 ? "verse" : "verses"}`,
+    ref: (name: string, n: number, k: number) => `${name} ${n}:${k}`,
+    sourceLine: "Tanzil · Pickthall 1930 · siraj.ahura.cloud",
+    recitation: (qari: string) => `Recitation: ${qari} · Quran Foundation`,
+    narration: "Narration: synthetic voice",
+    recitedBy: (qari: string) => `Recited by ${qari}`,
+  },
+  fa: {
+    of: (n: number, total: number) => `سورهٔ ${faNum(n)} از ${faNum(total)}`,
+    verses: (n: number) => `${faGrouped(n)} آیه`,
+    ref: (name: string, _n: number, k: number) => `سورهٔ ${name} · آیهٔ ${faNum(k)}`,
+    sourceLine: "تنزیل · ترجمهٔ آیت‌الله مکارم شیرازی · siraj.ahura.cloud",
+    recitation: (qari: string) => `تلاوت: ${qari} · Quran Foundation`,
+    narration: "صدای راوی: مصنوعی",
+    recitedBy: (qari: string) => `با تلاوت ${qari}`,
+  },
+};
+
 export const L = {
   en: {
     surah: (n: number) => `Surah ${n}`,

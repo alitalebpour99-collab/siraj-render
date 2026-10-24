@@ -11,3 +11,9 @@ out/
 *.jpg
 *.png
 .work/
+# The qari previews: the recitation audio is downloaded and cut during the GitHub run and is
+# NEVER committed (only the narrator's MP3s under public/narration/ are).
+public/qari/
+*.m4a
+*.ogg
+*.flac

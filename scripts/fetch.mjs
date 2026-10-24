@@ -1,6 +1,7 @@
 // Writes props/<sample>.json from Siraj's public API, at build time.
 //   node scripts/fetch.mjs en-verse        one sample
 //   node scripts/fetch.mjs all             every sample in SAMPLES
+//   node scripts/fetch.mjs en-qari fa-qari one or more samples or previews by name
 //
 // Every sacred or translated string in a props file is a string the API served, kept exactly
 // as served: nothing here types, trims, joins, "fixes" or translates one. This file holds no
@@ -9,16 +10,16 @@
 // numbers the API's metadata gives (sentence templates below, in English).
 import fs from "node:fs";
 import path from "node:path";
-import { SAMPLES } from "./samples.mjs";
+import { ALL, SAMPLES } from "./samples.mjs";
 
 const API = process.env.SIRAJ_API ?? "https://siraj.ahura.cloud";
-const want = process.argv[2];
-if (!want) {
-  console.error("usage: node scripts/fetch.mjs <sample|all>");
+const wants = process.argv.slice(2);
+if (!wants.length) {
+  console.error("usage: node scripts/fetch.mjs <sample|all> [more samples]");
   process.exit(2);
 }
-const names = want === "all" ? Object.keys(SAMPLES) : [want];
-for (const name of names) if (!SAMPLES[name]) throw new Error(`unknown sample ${name}`);
+const names = wants[0] === "all" ? Object.keys(SAMPLES) : wants;
+for (const name of names) if (!ALL[name]) throw new Error(`unknown sample ${name}`);
 
 async function getJson(pathAndQuery) {
   const url = `${API}${pathAndQuery}`;
@@ -106,9 +107,11 @@ async function verseProps(name, sample) {
 
   const tr = passage.translation;
   const props = {
-    kind: "verse",
+    kind: sample.kind === "qari" ? "qari" : "verse",
     sample: name,
     lang: sample.lang,
+    // the private qari previews: the surah's names for the cards, and how many surahs there are
+    ...(sample.kind === "qari" ? { meta: { nameLatin: sample.nameLatin, nameFa: sample.nameFa, surahTotal: idx.surahs.length } } : {}),
     surah: {
       number: surah.surahNumber,
       ayahCount: surah.ayahCount,
@@ -241,7 +244,7 @@ async function countsProps(name) {
 
 fs.mkdirSync("props", { recursive: true });
 for (const name of names) {
-  const sample = SAMPLES[name];
+  const sample = ALL[name];
   const props = sample.kind === "counts" ? await countsProps(name) : await verseProps(name, sample);
   const file = path.join("props", `${name}.json`);
   fs.writeFileSync(file, JSON.stringify(props, null, 1) + "\n");

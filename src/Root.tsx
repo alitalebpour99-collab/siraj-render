@@ -6,7 +6,9 @@ import { Composition } from "remotion";
 import { CountsReel, countsTimeline } from "./Counts";
 import { CountsCover, VerseCover } from "./Cover";
 import "./fonts";
-import type { CountsProps, MetadataSource, Release, VerseProps } from "./props";
+import type { CountsProps, MetadataSource, QariProps, Release, VerseProps } from "./props";
+import { QariCover, QariReel } from "./Qari";
+import { qariTimeline } from "./qariTimeline";
 import { FPS, H, W } from "./theme";
 import { VerseReel, verseTimeline } from "./Verse";
 
@@ -58,6 +60,23 @@ const emptyCounts: CountsProps = {
   voice: emptyVoice,
 };
 
+const emptyQari = (lang: "en" | "fa"): QariProps => {
+  const { voice: _voice, kind: _kind, ...rest } = emptyVerse(lang);
+  return {
+    ...rest,
+    kind: "qari",
+    meta: { nameLatin: "", nameFa: "", surahTotal: 0 },
+    qari: {
+      reciter: { name: "", nameFa: "", qfRecitationId: 0, qfName: "", style: null, qirat: null },
+      source: { timingsApi: [], audio: [], credit: "" },
+      basmala: null,
+      verses: [],
+      narration: { engine: "", model: "", voiceId: "", voiceName: "", lines: [] },
+      fallbacks: [],
+    },
+  };
+};
+
 const reel = { width: W, height: H, fps: FPS };
 const grid = { width: 1080, height: 1350, fps: FPS };
 
@@ -70,6 +89,15 @@ export const Root: React.FC = () => (
           <Composition id={id} component={VerseReel} {...reel} durationInFrames={300} defaultProps={emptyVerse(lang)} calculateMetadata={({ props }) => ({ durationInFrames: verseTimeline(props).total })} />
           <Composition id={`${id}-cover`} component={VerseCover} {...reel} durationInFrames={1} defaultProps={emptyVerse(lang)} />
           <Composition id={`${id}-grid`} component={VerseCover} {...grid} durationInFrames={1} defaultProps={emptyVerse(lang)} />
+        </React.Fragment>
+      );
+    })}
+    {(["en-qari", "fa-qari"] as const).map((id) => {
+      const lang = id.startsWith("fa") ? "fa" : "en";
+      return (
+        <React.Fragment key={id}>
+          <Composition id={id} component={QariReel} {...reel} durationInFrames={300} defaultProps={emptyQari(lang)} calculateMetadata={({ props }) => ({ durationInFrames: qariTimeline(props).total })} />
+          <Composition id={`${id}-cover`} component={QariCover} {...reel} durationInFrames={1} defaultProps={emptyQari(lang)} />
         </React.Fragment>
       );
     })}

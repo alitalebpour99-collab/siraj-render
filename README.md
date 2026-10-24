@@ -42,3 +42,19 @@ node scripts/fetch.mjs all && node scripts/voice.mjs all && node scripts/render.
 Fonts: Amiri Quran © The Amiri Quran Project Authors; Vazirmatn © The Vazirmatn Project
 Authors; EB Garamond © The EB Garamond Project Authors — all under the SIL Open Font License
 1.1 (`public/fonts/OFL-*.txt`).
+
+## Private qari preview (branch `preview/qari-voice` only)
+
+Two preview videos for the owner, never published: `en-qari` (Surah 112) and `fa-qari`
+(Surah 103). Each ayah is heard in the recitation of Mishary Rashid Alafasy (Quran Foundation,
+chapter recitation 7) while each Arabic word lights up in time with his voice (the Quran
+Foundation's word segments; where Siraj's word count differs from theirs the whole verse is lit
+instead and the text is left as it is). Then the translation is read by an ElevenLabs narrator.
+No music and no background sound.
+
+| path | what |
+|---|---|
+| `scripts/narrate.mjs` | run on the owner's PC: the narrator's MP3s into `public/narration/<preview>/` (committed; the key never leaves the PC) |
+| `scripts/qari.mjs` | run on GitHub: downloads the recitation and its timings, cuts one clip per ayah, levels the audio (`public/qari/`, never committed) |
+| `src/Qari.tsx`, `src/light.tsx`, `src/qariTimeline.ts`, `src/words.ts` | the composition, the light, the timeline, the word cutting |
+| `.github/workflows/qari-preview.yml` | renders both previews; artifact `qari-preview` (kept two days) |
