@@ -106,19 +106,25 @@ export const durationMs = (file) => Math.round(Number(execFileSync("ffprobe", ["
 /** Integrated loudness (LUFS) of one file, of several played one after another, or of a window [fromS, toS] of one file. */
 export function loudness(files, window = null) {
   const list = Array.isArray(files) ? files : [files];
+  if (list.length > 1) {
+    // Several files as if played one after another: the energy mean of each file's loudness,
+    // weighted by its length (no concat graph: one simple filter per file is the sure path).
+    let energy = 0;
+    let total = 0;
+    for (const f of list) {
+      const d = durationMs(f) / 1000;
+      energy += d * 10 ** (loudness(f) / 10);
+      total += d;
+    }
+    return Math.round(10 * Math.log10(energy / total) * 10) / 10;
+  }
   const seek = window ? ["-ss", window[0].toFixed(3), "-to", window[1].toFixed(3)] : [];
-  const inputs = list.flatMap((f) => [...seek, "-i", f]);
-  // every input resampled to one format first, so that files of different rates concatenate
-  const norm = "aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo";
-  const filter =
-    list.length > 1
-      ? ["-filter_complex", `${list.map((_, i) => `[${i}:a]${norm}[a${i}]`).join(";")};${list.map((_, i) => `[a${i}]`).join("")}concat=n=${list.length}:v=0:a=1,ebur128=framelog=quiet`]
-      : ["-af", `${norm},ebur128=framelog=quiet`];
-  const run = spawnSync("ffmpeg", ["-hide_banner", "-nostats", ...inputs, ...filter, "-f", "null", "-"], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  // resampled to one format first (ebur128 on a mono 22 kHz file gave no reading on the runner)
+  const run = spawnSync("ffmpeg", ["-hide_banner", "-nostats", ...seek, "-i", list[0], "-af", "aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,ebur128=framelog=quiet", "-f", "null", "-"], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   const m = [...(run.stderr ?? "").matchAll(/I:\s+(-?[\d.]+) LUFS/g)].pop();
-  // ffmpeg's own last line names files and filters only (never a text)
-  if (!m) console.log(`loudness: ffmpeg exit ${run.status}: ${(run.stderr ?? "").trim().split("\n").slice(-2).join(" | ").slice(0, 300)}`);
-  check(m, `loudness of ${list.map((f) => path.basename(f)).join(", ")}`);
+  // ffmpeg's own last lines name files and filters only (never a text)
+  if (!m) console.log(`loudness: ffmpeg exit ${run.status} ${run.signal ?? ""} ${run.error?.code ?? ""}: ${(run.stderr ?? "").trim().split("\n").slice(-2).join(" | ").slice(0, 300)}`);
+  check(m, `loudness of ${path.basename(list[0])}`);
   return Number(m[1]);
 }
 
