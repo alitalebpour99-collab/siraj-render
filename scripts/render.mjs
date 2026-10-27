@@ -52,6 +52,8 @@ function levelFilter(file) {
   const run = spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-i", file, "-vn", "-af", `loudnorm=${target}:print_format=json`, "-f", "null", "-"], { encoding: "utf8" });
   const json = (run.stderr ?? "").slice((run.stderr ?? "").lastIndexOf("{"));
   const m = JSON.parse(json.slice(0, json.indexOf("}") + 1));
+  // a track with nothing heard (a trial whose narrator lines are placeholders) is left as it is
+  if (!Number.isFinite(Number(m.input_i)) || Number(m.input_i) < -70) return "anull";
   return `loudnorm=${target}:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`;
 }
 
