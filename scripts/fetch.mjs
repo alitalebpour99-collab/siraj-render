@@ -14,6 +14,7 @@ import { INSIGHTS, episodeOf, insightIds } from "./episodes.mjs";
 import { ALPHABET, OPENING_LETTER_SURAHS, firstLetterWords, formWords, model, wordsOf } from "./insights.mjs";
 import { API, DataChanged, UA, check, checkTrust, jobArg, releaseOf, runMain, same, sha256, siraj, sleep } from "./lib.mjs";
 import { cardNumbers, countNumbers, juzOf, loadTanzil } from "./tanzil.mjs";
+import { WAITING_FORMATS, waitingProps } from "./waiting.mjs";
 import { CARD_SCENES, COUNT_SCENES, planIds } from "../src/timelines.ts";
 
 /** The surah index of the exposed text release, checked as the service checks it. */
@@ -348,7 +349,7 @@ async function insightProps(job) {
 /** props/<id>.json for one job; returns the props. */
 export async function fetchJob(job) {
   const format = job.props?.format;
-  const props = format === "verse" ? await verseProps(job) : format === "counts" ? await countsProps(job) : format === "surah-card" ? await cardProps(job) : INSIGHTS[format] ? await insightProps(job) : null;
+  const props = format === "verse" ? await verseProps(job) : format === "counts" ? await countsProps(job) : format === "surah-card" ? await cardProps(job) : INSIGHTS[format] ? await insightProps(job) : WAITING_FORMATS.has(format) ? await waitingProps(job) : null;
   check(props, `a format this renderer draws (${format})`);
   props.sourceApi = API;
   props.fetchedAt = new Date().toISOString();

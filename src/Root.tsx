@@ -15,6 +15,7 @@ import { DEFAULT_STUDIO } from "./studio";
 import { FPS, H, W } from "./theme";
 import { cardTimeline, countsTimeline, insightTimeline, verseTimeline } from "./timelines";
 import { VerseReel } from "./Verse";
+import { WaitingCompositions } from "./Waiting";
 
 const release: Release = {
   releaseKey: "",
@@ -138,5 +139,6 @@ export const Root: React.FC = () => (
         ))}
       </React.Fragment>
     ))}
+    <WaitingCompositions />
   </>
 );
