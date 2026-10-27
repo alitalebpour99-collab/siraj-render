@@ -108,9 +108,16 @@ export function loudness(files, window = null) {
   const list = Array.isArray(files) ? files : [files];
   const seek = window ? ["-ss", window[0].toFixed(3), "-to", window[1].toFixed(3)] : [];
   const inputs = list.flatMap((f) => [...seek, "-i", f]);
-  const graph = list.length > 1 ? `${list.map((_, i) => `[${i}:a]`).join("")}concat=n=${list.length}:v=0:a=1,ebur128=framelog=quiet` : "ebur128=framelog=quiet";
-  const run = spawnSync("ffmpeg", ["-hide_banner", "-nostats", ...inputs, "-filter_complex", graph, "-f", "null", "-"], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  // every input resampled to one format first, so that files of different rates concatenate
+  const norm = "aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo";
+  const filter =
+    list.length > 1
+      ? ["-filter_complex", `${list.map((_, i) => `[${i}:a]${norm}[a${i}]`).join(";")};${list.map((_, i) => `[a${i}]`).join("")}concat=n=${list.length}:v=0:a=1,ebur128=framelog=quiet`]
+      : ["-af", `${norm},ebur128=framelog=quiet`];
+  const run = spawnSync("ffmpeg", ["-hide_banner", "-nostats", ...inputs, ...filter, "-f", "null", "-"], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   const m = [...(run.stderr ?? "").matchAll(/I:\s+(-?[\d.]+) LUFS/g)].pop();
+  // ffmpeg's own last line names files and filters only (never a text)
+  if (!m) console.log(`loudness: ffmpeg exit ${run.status}: ${(run.stderr ?? "").trim().split("\n").slice(-2).join(" | ").slice(0, 300)}`);
   check(m, `loudness of ${list.map((f) => path.basename(f)).join(", ")}`);
   return Number(m[1]);
 }
