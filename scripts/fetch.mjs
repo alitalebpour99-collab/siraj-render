@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { splitLeadingBasmala } from "../src/basmala.ts";
 import { INSIGHTS, episodeOf, insightIds } from "./episodes.mjs";
-import { ALPHABET, OPENING_LETTER_SURAHS, firstLetterWords, formWords, model, wordsOf } from "./insights.mjs";
+import { ALPHABET, OPENING_LETTER_SURAHS, endingFacts, firstLetterWords, formWords, model, wordsOf } from "./insights.mjs";
 import { API, DataChanged, UA, check, checkTrust, jobArg, releaseOf, runMain, same, sha256, siraj, sleep } from "./lib.mjs";
 import { cardNumbers, countNumbers, juzOf, loadTanzil } from "./tanzil.mjs";
 import { WAITING_FORMATS, waitingProps } from "./waiting.mjs";
@@ -305,6 +305,7 @@ async function insightProps(job) {
   if (p.format === "every-letter" && !data.alphabet) data.alphabet = ALPHABET;
   const spans = { form: null, groups: [] };
   if (m && data.form) spans.form = formWords(m, data.form).text;
+  if (m && data.ending) spans.form = endingFacts(m, data.ending).text;
   if (m && p.format === "opening-letters") {
     const seen = new Set();
     for (const n of OPENING_LETTER_SURAHS) {

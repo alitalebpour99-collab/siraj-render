@@ -492,6 +492,21 @@ const Hero: React.FC<{ p: InsightProps; f: number; cover?: boolean }> = ({ p, f,
     }
     case "every-letter":
       return <Alphabet p={p} f={f} lit={() => (cover ? 1 : 0.18 + 0.1 * Math.sin(f / 9))} size={98} />;
+    case "names":
+    case "closing-names":
+      return (
+        <div style={box}>
+          {p.spans.form ? (
+            <div style={{ position: "relative", display: "grid", placeItems: "center" }}>
+              <Seal size={300} turn={f * 0.2} style={{ position: "absolute", opacity: 0.35 }} />
+              <div lang="ar" dir="rtl" style={{ position: "relative", fontFamily: FONT.quran, fontSize: p.format === "names" ? 120 : 84, lineHeight: 1.6, color: C.star, opacity: cover ? 1 : ramp(f, -6, 20), textShadow: flags.glow ? "0 0 28px rgba(224,172,79,0.5)" : undefined }}>
+                {p.spans.form}
+              </div>
+            </div>
+          ) : null}
+          <BigNumber lang={p.lang} value={Number(p.format === "names" ? n.occurrences : n.verses)} f={f} at={at + 8} size={200} suffix={p.format === "names" ? "×" : undefined} />
+        </div>
+      );
     case "quiz":
       return <Options p={p} f={f} at={cover ? -999 : 6} reveal={0} />;
     default:
@@ -580,6 +595,20 @@ const StripView: React.FC<ViewProps> = ({ p, s }) => {
         <div dir="ltr" style={{ fontFamily: ui(p.lang), fontSize: 50, color: C.translation, fontVariantNumeric: "lining-nums", opacity: ramp(f, 30, 16) }}>
           {`${nIn(p.lang, Number(n.openings))} + ${nIn(p.lang, strs(n.inside).length)}`}
         </div>
+      </div>
+    );
+  } else if (p.format === "names" || p.format === "closing-names") {
+    const flagsLit = bools(d.lit);
+    lit = (num) => (flagsLit[num - 1] ? 1 : 0);
+    head = (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+        {p.spans.form ? (
+          <div lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: 70, lineHeight: 1.6, color: C.star }}>
+            {p.spans.form}
+          </div>
+        ) : null}
+        <BigNumber lang={p.lang} value={Number(p.format === "names" ? n.occurrences : n.verses)} f={f} at={-30} size={150} />
+        <Label lang={p.lang} size={36}>{p.format === "names" ? `${nIn(p.lang, Number(n.verses))} ${w.verses} · ${nIn(p.lang, Number(n.surahs))} ${w.surahs}` : `${w.verses} · ${nIn(p.lang, Number(n.surahs))} ${w.surahs}`}</Label>
       </div>
     );
   } else if (p.format === "opening-letters") {

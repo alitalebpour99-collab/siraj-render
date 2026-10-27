@@ -103,7 +103,7 @@ const emptyInsight = (lang: Lang, format: InsightFormat): InsightProps => ({
 });
 
 /** The insight formats of S3b (one composition each per language, with covers and slides). */
-export const INSIGHT_FORMATS: InsightFormat[] = ["only", "myth-fact", "meccan-medinan", "counted", "mushaf-map", "middle", "revelation-order", "one-line", "opening-letters", "every-letter", "quiz"];
+export const INSIGHT_FORMATS: InsightFormat[] = ["only", "myth-fact", "meccan-medinan", "counted", "mushaf-map", "middle", "revelation-order", "one-line", "opening-letters", "every-letter", "names", "closing-names", "quiz"];
 
 const reel = { width: W, height: H, fps: FPS };
 const grid = { width: 1080, height: 1350, fps: FPS };

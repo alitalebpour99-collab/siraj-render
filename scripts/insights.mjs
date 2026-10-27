@@ -153,6 +153,22 @@ export function formFacts(m, form) {
   };
 }
 
+/** Names that close verses: the verses whose last `last` words (R2) are those of the form's verse. */
+export function endingFacts(m, form) {
+  const [s, a] = form.verse.split(":").map(Number);
+  const v = m.at(s, a);
+  if (!v || v.words.length < form.last) throw new Error(`ending ${form.verse}: no such verse or too short`);
+  const key = v.words.slice(-form.last).map((w) => w.plain).join(" ");
+  const hits = m.verses.filter((x) => x.words.length >= form.last && x.words.slice(-form.last).map((w) => w.plain).join(" ") === key);
+  return {
+    verses: hits.length,
+    surahs: uniq(hits.map((h) => h.s)),
+    perSurah: Array.from({ length: 114 }, (_, i) => hits.filter((h) => h.s === i + 1).length),
+    first: hits.length ? ref(hits[0]) : null,
+    text: v.body.slice(v.words[v.words.length - form.last].at, v.words[v.words.length - 1].end),
+  };
+}
+
 /** The Only… · a name: surahs where no verse body holds it, and surahs where every verse does. */
 export function nameFacts(m, form) {
   const { hits } = findForm(m, { ...form, prefixes: true });

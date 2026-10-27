@@ -192,7 +192,7 @@ export type Studio = {
 
 /* ---------- The insight formats (S3b) ---------- */
 
-export type InsightFormat = "only" | "myth-fact" | "meccan-medinan" | "counted" | "mushaf-map" | "middle" | "revelation-order" | "one-line" | "opening-letters" | "every-letter" | "quiz";
+export type InsightFormat = "only" | "myth-fact" | "meccan-medinan" | "counted" | "mushaf-map" | "middle" | "revelation-order" | "one-line" | "opening-letters" | "every-letter" | "names" | "closing-names" | "quiz";
 
 /** One scene of an insight video: the narration ids it carries, its shortest length (frames). */
 export type ScenePlan = { id: string; lines: string[]; min: number };

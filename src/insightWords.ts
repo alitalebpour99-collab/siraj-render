@@ -17,6 +17,8 @@ export const FORMAT_NAME: Record<InsightFormat, Words> = {
   "one-line": { en: "One Line, Many Times", fa: "یک جمله، چند بار" },
   "opening-letters": { en: "The Opening Letters", fa: "حروف آغاز سوره‌ها" },
   "every-letter": { en: "Every Letter", fa: "همهٔ حروف" },
+  names: { en: "Named in the Quran", fa: "نام‌ها در قرآن" },
+  "closing-names": { en: "Names that close verses", fa: "نام‌های پایان آیه" },
   quiz: { en: "Quiz", fa: "مسابقه" },
 };
 
@@ -72,6 +74,10 @@ export function ruleOf(format: InsightFormat, episode: string, lang: Lang, numbe
       return fa
         ? j([TANZIL.fa, "هر ۲۸ حرف، دست‌کم یک بار", "الف با همزه همان الف، تای گرد همان ت، الف مقصوره همان ی", NO_BASMALA.fa])
         : j([TANZIL.en, "each of the 28 letters at least once", "alif with hamza counts as alif, ta marbuta as ta, alif maqsura as ya", NO_BASMALA.en]);
+    case "names":
+      return fa ? j([TANZIL.fa, "نام با شکل دقیقش، با پیشوندهای چسبیده؛ نه ریشه", NO_BASMALA.fa]) : j([TANZIL.en, "the name in its exact written form, with attached prefixes; not the root", NO_BASMALA.en]);
+    case "closing-names":
+      return fa ? j([TANZIL.fa, "دو کلمهٔ پایانی هر آیه، بی اعتنا به اعراب"]) : j([TANZIL.en, "the last two words of each verse, vowel marks ignored"]);
     case "quiz":
       return fa ? "از متن و فرادادهٔ تنزیل" : "From the Tanzil text and metadata";
     default:

@@ -7,7 +7,7 @@
 //
 // The research behind the list: siraj-social/research/viral-insights.md (top 12, §6); its
 // approve-first ideas are marked `needsApproval` and are never planned by the clock.
-import { OPENING_LETTER_SURAHS, basmalaFacts, everyLetterFacts, formFacts, middleFacts, nameFacts, onlyFacts, openingFacts, orderFacts, placeFacts, repeatFacts } from "./insights.mjs";
+import { OPENING_LETTER_SURAHS, basmalaFacts, endingFacts, everyLetterFacts, findForm, formFacts, middleFacts, nameFacts, onlyFacts, openingFacts, orderFacts, placeFacts, repeatFacts } from "./insights.mjs";
 
 /* ---------- Forms (locators, never typed words; research R5) ---------- */
 
@@ -20,6 +20,27 @@ export const FORMS = {
   /** the call to mankind: the first three words of 2:21 */
   mankind: { verse: "2:21", from: 0, to: 2 },
 };
+
+/**
+ * The search forms of «Named in the Quran» and «Names that close verses» (exact form + R5
+ * prefixes; a verse ending). PROPOSED, NOT APPROVED: the lead approves this list before any
+ * post (the formats are needsApproval: the clock never plans them). Counts on 2026-10-27:
+ * Maryam 34 (research #5: 34), Muhammad 4 (#4: 4), the pair closing 2:173: 42 verses (#33: 42).
+ */
+export const NAME_FORMS = {
+  maryam: { verse: "19:16", from: 3, to: 3, prefixes: true },
+  muhammad: { verse: "48:29", from: 0, to: 0, prefixes: true },
+};
+export const ENDING_FORMS = {
+  "ghafur-rahim": { verse: "2:173", last: 2 },
+};
+
+/** A name's facts: occurrences, verses, surahs lit on the strip. */
+function namedFacts(m, form) {
+  const { hits } = findForm(m, form);
+  const per = Array.from({ length: 114 }, (_, i) => hits.filter((h) => h.s === i + 1).length);
+  return { occurrences: hits.length, verses: new Set(hits.map((h) => `${h.s}:${h.a}`)).size, surahs: per.filter((k) => k > 0).length, refs: hits.length <= 6 ? hits.map((h) => `${h.s}:${h.a}`) : [], per };
+}
 
 /* ---------- Numbers in words of each language ---------- */
 
@@ -454,6 +475,64 @@ export const INSIGHTS = {
         },
       },
     },
+  },
+
+  names: {
+    needsApproval: true,
+    scenes: [
+      { id: "hook", lines: ["hook"], min: 75 },
+      { id: "strip", lines: ["where", "rule"], min: 165 },
+      { id: "end", lines: ["end"], min: 75 },
+    ],
+    episodes: Object.fromEntries(
+      Object.entries(NAME_FORMS).map(([key, form]) => [
+        key,
+        {
+          facts: ({ m }) => {
+            const f = namedFacts(m, form);
+            return { numbers: { name: key, occurrences: f.occurrences, verses: f.verses, surahs: f.surahs, refs: f.refs }, data: { lit: f.per.map((k) => k > 0), form } };
+          },
+          lines: (lang, n) =>
+            lang === "fa"
+              ? [
+                  line("hook", `این نام را شمردیم: ${N(lang, n.occurrences)} بار در قرآن.`),
+                  line("where", n.refs.length ? `در آیه‌های ${n.refs.map((r) => refShow(lang, r)).join("، ")}.` : `در ${N(lang, n.verses)} آیه، از ${N(lang, n.surahs)} سوره.`, n.refs.length ? `در ${n.refs.map((r) => refSay(lang, r)).join("، ")}.` : `در ${N(lang, n.verses)} آیه، از ${N(lang, n.surahs)} سوره.`),
+                  line("rule", "با شکل دقیق کلمه، و با پیشوندهای چسبیده؛ نه ریشه."),
+                  line("end", "شمرده از متن تنزیل؛ قاعده روی صفحه است."),
+                ]
+              : [
+                  line("hook", `This name, counted: ${N(lang, n.occurrences)} times in the Quran.`),
+                  line("where", n.refs.length ? `In ${n.refs.map((r) => refShow(lang, r)).join(", ")}.` : `In ${N(lang, n.verses)} verses of ${N(lang, n.surahs)} surahs.`, n.refs.length ? `In ${n.refs.map((r) => refSay(lang, r)).join(", ")}.` : `In ${N(lang, n.verses)} verses of ${N(lang, n.surahs)} surahs.`),
+                  line("rule", "The exact written form, with attached prefixes; not the root."),
+                  line("end", "Counted from the Tanzil text, with the rule on screen."),
+                ],
+        },
+      ]),
+    ),
+  },
+
+  "closing-names": {
+    needsApproval: true,
+    scenes: [
+      { id: "hook", lines: ["hook"], min: 75 },
+      { id: "strip", lines: ["where"], min: 150 },
+      { id: "end", lines: ["end"], min: 75 },
+    ],
+    episodes: Object.fromEntries(
+      Object.entries(ENDING_FORMS).map(([key, form]) => [
+        key,
+        {
+          facts: ({ m }) => {
+            const f = endingFacts(m, form);
+            return { numbers: { pair: key, verses: f.verses, surahs: f.surahs.length }, data: { lit: f.perSurah.map((k) => k > 0), ending: form } };
+          },
+          lines: (lang, n) =>
+            lang === "fa"
+              ? [line("hook", `${N(lang, n.verses)} آیه با این دو نام تمام می‌شوند.`), line("where", `در ${N(lang, n.surahs)} سوره.`), line("end", "دو کلمهٔ پایانی هر آیه در متن تنزیل، بی اعتنا به اعراب.")]
+              : [line("hook", `${N(lang, n.verses)} verses close with this pair of Names.`), line("where", `In ${N(lang, n.surahs)} surahs.`), line("end", "The last two words of each verse in the Tanzil text, vowel marks ignored.")],
+        },
+      ]),
+    ),
   },
 
   quiz: {
