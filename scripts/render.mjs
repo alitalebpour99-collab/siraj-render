@@ -16,6 +16,7 @@ import path from "node:path";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, renderStill, selectComposition } from "@remotion/renderer";
 import { safeFrame } from "../src/layout.ts";
+import { textBoxes } from "../src/waitingPlan.ts";
 import { cardTimeline, countsTimeline, insightTimeline, speakerWindows, verseTimeline, wordTable } from "../src/timelines.ts";
 import { check, jobArg, runMain } from "./lib.mjs";
 import { manifestOf } from "./manifest.mjs";
@@ -72,13 +73,16 @@ const readJson = (file) => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(fil
 export function inputsOf(job) {
   const props = readJson(path.join("props", `${job.id}.json`));
   check(props, `props/${job.id}.json`);
-  const voice = readJson(path.join("public", "voice", job.id, "manifest.json")) ?? { engine: "none", voice: null, lines: [] };
+  // a waiting template the service wants silent (the tafsir carousel, a silent dhikr Story) has no narrator, whatever was voiced
+  const voice = props.silent ? { engine: "none", voice: null, lines: [] } : (readJson(path.join("public", "voice", job.id, "manifest.json")) ?? { engine: "none", voice: null, lines: [] });
   const recited = props.kind === "verse" || Boolean(props.recite);
   const qari = recited ? readJson(path.join("public", "qari", job.id, "manifest.json")) : null;
-  const inputProps = { ...props, voice, ...(recited || props.kind === "insight" ? { qari } : {}) };
+  // the waiting templates (src/Waiting.tsx) are timed as the insight videos are, over their own scenes
+  const scened = props.kind === "insight" || props.kind === "waiting";
+  const inputProps = { ...props, voice, ...(recited || scened ? { qari } : {}) };
   const loop = (props.studio?.ending ?? "loop") === "loop";
   const timeline =
-    props.kind === "verse" ? verseTimeline(inputProps) : props.kind === "counts" ? countsTimeline(inputProps) : props.kind === "insight" ? insightTimeline({ ...inputProps, loop }) : cardTimeline(inputProps);
+    props.kind === "verse" ? verseTimeline(inputProps) : props.kind === "counts" ? countsTimeline(inputProps) : scened ? insightTimeline({ ...inputProps, loop }) : cardTimeline(inputProps);
   return { props, voice, qari, inputProps, timeline };
 }
 
@@ -114,7 +118,8 @@ function moments(props, inputProps, timeline) {
 
 export async function renderJob(job, { stills = false, frames = process.env.FRAMES === "1" } = {}) {
   const { props, voice, qari, inputProps, timeline } = inputsOf(job);
-  const want = props.kind === "insight" ? `${props.lang}-${props.format}` : `${props.lang}-${props.kind}`;
+  // an insight or a waiting template is named by its format (fa-nahj-hikma, en-mirror …)
+  const want = props.kind === "insight" || props.kind === "waiting" ? `${props.lang}-${props.format}` : `${props.lang}-${props.kind}`;
   check(job.composition === want, `the job's composition ${job.composition} is ${want}`);
   const out = path.resolve("out");
   const frameDir = path.join(out, "frames");
@@ -144,6 +149,17 @@ export async function renderJob(job, { stills = false, frames = process.env.FRAM
     }
     console.log(`${job.id}: 3 carousel slides written`);
   }
+  // the short tafsir IS a carousel (waiting template): every slide, always — 1 the verse, then the record's paragraphs
+  const tafsir = props.kind === "waiting" && props.format === "tafsir";
+  if (tafsir) {
+    const id = `${job.composition}-slide`;
+    const n = 1 + props.tafsir.paragraphs.length;
+    for (let k = 1; k <= n; k++) {
+      const still = await selectComposition({ ...common, id, inputProps: { ...inputProps, slide: k } });
+      await renderStill({ ...common, composition: still, inputProps: { ...inputProps, slide: k }, imageFormat: "jpeg", jpegQuality: 92, output: path.join(out, `${job.id}-slide${k}.jpg`) });
+    }
+    console.log(`${job.id}: ${n} carousel slides written`);
+  }
 
   if (stills) {
     for (const [i, frame] of marks.entries()) {
@@ -151,6 +167,13 @@ export async function renderJob(job, { stills = false, frames = process.env.FRAM
     }
     console.log(`${job.id}: ${marks.length} stills at ${marks.map((n) => (n / fps).toFixed(2)).join(", ")} s; ${composition.durationInFrames} frames in all`);
     return null;
+  }
+  // ... and no video: its manifest names the verse of slide 1 (shown, never recited)
+  if (tafsir) {
+    const manifest = { ...manifestOf({ ...props, recite: props.tafsir.verse }, voice, null, 0), checks: { audio: true, safeFrame: safeFrame(textBoxes("tafsir")) } };
+    fs.writeFileSync(path.join(out, `${job.id}.manifest.json`), `${JSON.stringify(manifest, null, 1)}\n`);
+    console.log(`${job.id}: a carousel, no video; done in ${Math.round((Date.now() - t0) / 1000)} s`);
+    return manifest;
   }
 
   const s0 = Date.now();
