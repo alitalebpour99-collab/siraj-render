@@ -200,7 +200,13 @@ const Intro: React.FC<{ p: VerseProps; dur: number }> = ({ p, dur }) => {
   const t = fa ? L.fa : L.en;
   const ui = fa ? FONT.fa : FONT.en;
   const out = fadeOut(f, dur, VT.XF);
-  const open = interpolate(f, [6, 26], [0, 1], { ...clamp, easing: easeInOut });
+  // the studio's first second: «Surah n of 114», a short fact, or a question that the name answers
+  const hook = p.studio?.hook ?? "name-number";
+  const place = p.surah.revelationPlace === "meccan" ? t.meccan : t.medinan;
+  const verses = t.verses(p.surah.ayahCount);
+  const top = hook === "fact" ? `${place} · ${verses}` : hook === "question" ? (fa ? `${place} · ${verses}؛ کدام سوره؟` : `${place} · ${verses}: which surah?`) : t.of(p.surah.number, p.surahTotal);
+  const late = hook === "question" ? 30 : 0;
+  const open = interpolate(f, [6 + late, 26 + late], [0, 1], { ...clamp, easing: easeInOut });
   const turn = interpolate(f, [6, dur], [-40, 6], { ...clamp, easing: easeInOut });
   const warm = interpolate(f, [4, 30], [0, 1], { ...clamp, easing: easeInOut });
   const push = interpolate(f, [0, dur], [0.97, 1.02], clamp);
@@ -211,7 +217,7 @@ const Intro: React.FC<{ p: VerseProps; dur: number }> = ({ p, dur }) => {
       <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", paddingBottom: 140, transform: `scale(${push.toFixed(4)})` }}>
         <div dir={fa ? "rtl" : "ltr"} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 32 }}>
           <div style={{ opacity: fadeIn(f, 2), transform: `translateY(${rise(f, 2)}px)`, fontFamily: ui, fontSize: fa ? 52 : 56, fontWeight: 500, letterSpacing: fa ? 0 : "0.2em", fontVariantCaps: fa ? "normal" : "all-small-caps", fontVariantNumeric: "lining-nums", color: C.gold }}>
-            {t.of(p.surah.number, p.surahTotal)}
+            {top}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
             <Seal size={112} turn={turn} style={{ opacity: fadeIn(f, 8, 16) }} />
