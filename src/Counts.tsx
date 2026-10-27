@@ -300,7 +300,7 @@ const Sajdas: React.FC<{ p: CountsProps; s: Scene }> = ({ p, s }) => {
           {w.sajdaRule}
         </Rule>
       </div>
-      <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: 600, left: 120, width: W - 240, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 18 }}>
+      <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: 570, left: 120, width: W - 240, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
         {p.sajdas.map((x, i) => {
           const s2 = p.surahs[x.sura - 1];
           const ob = x.type === "obligatory";
@@ -314,7 +314,7 @@ const Sajdas: React.FC<{ p: CountsProps; s: Scene }> = ({ p, s }) => {
                 flexDirection: "column",
                 alignItems: "center",
                 gap: 2,
-                padding: "10px 6px 8px",
+                padding: "8px 6px 6px",
                 borderRadius: 14,
                 border: `1.5px solid ${C.gold}${ob ? "" : "99"}`,
                 background: lit > 0 ? `rgba(224,172,79,${(0.85 * lit).toFixed(3)})` : "rgba(243,234,214,0.04)",
@@ -322,11 +322,11 @@ const Sajdas: React.FC<{ p: CountsProps; s: Scene }> = ({ p, s }) => {
                 boxShadow: lit > 0 ? `0 0 ${(28 * lit).toFixed(1)}px rgba(227,192,120,${(0.6 * lit).toFixed(3)})` : "none",
               }}
             >
-              <span dir="ltr" style={{ fontFamily: uiFont(p.lang), fontSize: 40, fontVariantNumeric: "lining-nums", color: lit > 0.5 ? C.night : C.ink }}>
+              <span dir="ltr" style={{ fontFamily: uiFont(p.lang), fontSize: fa ? 34 : 38, lineHeight: 1.25, fontVariantNumeric: "lining-nums", color: lit > 0.5 ? C.night : C.ink }}>
                 {ref(x.sura, x.aya)}
               </span>
               {s2 ? (
-                <span lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: 32, lineHeight: 1.6, color: lit > 0.5 ? C.night : C.star }}>
+                <span lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: 30, lineHeight: 1.45, color: lit > 0.5 ? C.night : C.star }}>
                   {s2.nameArabic}
                 </span>
               ) : null}
@@ -334,7 +334,7 @@ const Sajdas: React.FC<{ p: CountsProps; s: Scene }> = ({ p, s }) => {
           );
         })}
       </div>
-      <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: 1330, width: W, display: "flex", justifyContent: "center", gap: 40, fontFamily: uiFont(p.lang), fontSize: 30, color: C.quiet, opacity: fadeIn(f, atObligatory) }}>
+      <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: 1268, width: W, display: "flex", justifyContent: "center", gap: 40, fontFamily: uiFont(p.lang), fontSize: 30, color: C.quiet, opacity: fadeIn(f, atObligatory) }}>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
           <span style={{ width: 22, height: 22, borderRadius: 5, background: C.brass, display: "inline-block" }} />
           {`${w.obligatory} · ${numIn(p.lang, n1(p, "obligatory"))}`}
