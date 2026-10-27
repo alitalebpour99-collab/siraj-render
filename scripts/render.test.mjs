@@ -1,4 +1,4 @@
-// node --experimental-strip-types --test scripts/
+// node --experimental-strip-types --test scripts/render.test.mjs
 // Placeholders only: no text of the Quran or of a translation is used here.
 import assert from "node:assert/strict";
 import test from "node:test";
