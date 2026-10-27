@@ -54,4 +54,6 @@ export const arNum = (n: number) => String(n).replace(/\d/g, (d) => AR[Number(d)
 /** 6,236 */
 export const enNum = (n: number) => new Intl.NumberFormat("en-US").format(Math.round(n));
 /** ۶٬۲۳۶ */
-export const faGrouped = (n: number) => faNum(Math.round(n)).replace(/\B(?=([۰-۹]{3})+(?![۰-۹]))/g, "٬");
+// (\B would also match before the first Persian digit, which is not a word character for a
+// regular expression, and put a separator in front of «۶۰۴»: only between two digits.)
+export const faGrouped = (n: number) => faNum(Math.round(n)).replace(/(?<=[۰-۹])(?=([۰-۹]{3})+(?![۰-۹]))/g, "٬");
