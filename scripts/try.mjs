@@ -5,7 +5,7 @@
 // It keeps only stills and frames (JPEG), the manifest and the check record (JSON) for looking
 // at: never the video or any sound (the recitation must not be downloadable from this public
 // repository).
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 
 if (!process.features?.typescript && !process.execArgv.includes("--experimental-strip-types")) {
@@ -32,5 +32,14 @@ if (stills) {
 }
 const manifest = await renderJob(job, { stills, frames: true });
 if (manifest) console.log(`try ${job.id}: manifest ${JSON.stringify({ ...manifest, ayahs: manifest.ayahs.length })}`);
-// nothing that holds sound may leave the run
-for (const f of fs.readdirSync("out")) if (/\.(mp4|wav|mp3|m4a|aac)$/i.test(f)) fs.rmSync(`out/${f}`);
+// Nothing that holds the recitation may leave the run: every sound file and every video goes,
+// but the picture-only copy (checked: no audio stream at all); the narrator's own lines are in
+// out/voice/ (render.mjs, SAMPLE_PARTS=1), never a clip of the qari.
+for (const f of fs.readdirSync("out")) {
+  if (!/\.(mp4|wav|mp3|m4a|aac)$/i.test(f)) continue;
+  if (/\.picture\.mp4$/.test(f)) {
+    const streams = execFileSync("ffprobe", ["-v", "error", "-show_entries", "stream=codec_type", "-of", "csv=p=0", `out/${f}`]).toString();
+    if (!/audio/.test(streams)) continue;
+  }
+  fs.rmSync(`out/${f}`);
+}

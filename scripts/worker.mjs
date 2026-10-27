@@ -88,7 +88,7 @@ try {
   await fetchJob(job);
   await voiceJob(job);
   const { qari, reason } = await qariJob(job);
-  if (!qari && reason !== "not a verse") console.log(`job ${job.id}: rendered without a recitation`);
+  if (!qari && reason !== "nothing recited") console.log(`job ${job.id}: rendered without a recitation`);
   const manifest = await renderJob(job);
   const files = { video: `out/${job.id}.mp4`, cover: `out/${job.id}-cover.jpg`, grid: `out/${job.id}-grid.jpg` };
   for (const kind of job.files) {
@@ -96,6 +96,17 @@ try {
     if (!file) throw new Error(`no ${kind} file`);
     const bytes = fs.readFileSync(file);
     await call(up(kind), { method: "POST", headers: { "content-type": kind === "video" ? "video/mp4" : "image/jpeg" }, body: bytes });
+    console.log(`job ${job.id}: ${kind} up (${bytes.length} bytes)`);
+  }
+  // what else the service takes for this post when it was made (§4.9): the Story cut, the carousel twin
+  const optional = job.optional ?? [];
+  const extra = [];
+  if (optional.includes("story")) extra.push(["story", `out/${job.id}-story.mp4`, "video/mp4"]);
+  if (optional.some((k) => /slide/.test(k))) for (let k = 1; k <= 10; k++) extra.push([`slide${k}`, `out/${job.id}-slide${k}.jpg`, "image/jpeg"]);
+  for (const [kind, file, type] of extra) {
+    if (!fs.existsSync(file)) continue;
+    const bytes = fs.readFileSync(file);
+    await call(up(kind), { method: "POST", headers: { "content-type": type }, body: bytes });
     console.log(`job ${job.id}: ${kind} up (${bytes.length} bytes)`);
   }
   const done = await call(job.upload.done, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(manifest) });

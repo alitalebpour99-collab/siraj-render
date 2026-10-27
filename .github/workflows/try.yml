@@ -1,9 +1,11 @@
 name: Try (by hand)
 
 # Renders jobs written as the service writes them, WITHOUT the service: no claim, no upload,
-# nothing posted. Kept for looking at: stills and frames (JPEG), covers, the manifest and the
-# check record (JSON) only, for one day. Never the video or any sound: the recitation must not
-# be downloadable from this public repository (scripts/try.mjs deletes every sound file).
+# nothing posted. Kept for looking at, for one day: stills and frames (JPEG), covers, slides, the
+# manifest and the check record (JSON), the PICTURE of the video with no sound track at all, the
+# narrator lines and where each voice goes. Never the recitation: it must not be downloadable
+# from this public repository (scripts/try.mjs deletes every other sound file and video); a
+# sample is mixed again on the owner PC from the public chapter files (scripts/sample-mux.mjs).
 
 on:
   workflow_dispatch:
@@ -31,6 +33,7 @@ jobs:
       RENDER_GL: swangle
       RENDER_CONCURRENCY: "4"
       PYTHON: python
+      SAMPLE_PARTS: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -75,13 +78,21 @@ jobs:
           mkdir -p jobs
           printf '%s' "$JOB" > jobs/try.json
           node scripts/try.mjs jobs/try.json ${{ inputs.stills && '--stills' || '' }}
-      - name: Only pictures and JSON leave the run
+      - name: Only pictures, JSON and the narrator's lines leave the run (never the qari)
         if: always()
         run: |
           mkdir -p keep
           cp out/frames/*.jpg out/*.jpg out/*.json keep/ 2>/dev/null || true
+          cp out/*.picture.mp4 keep/ 2>/dev/null || true
+          if [ -d out/voice ]; then cp -r out/voice keep/voice; fi
           ls -la keep
-          if ls keep | grep -iqE '\.(mp4|wav|mp3|m4a|aac)$'; then echo "a sound file in keep/"; exit 1; fi
+          for v in keep/*.mp4; do
+            [ -e "$v" ] || continue
+            case "$v" in *.picture.mp4) ;; *) echo "a video in keep/: $v"; exit 1 ;; esac
+            if ffprobe -v error -show_entries stream=codec_type -of csv=p=0 "$v" | grep -q audio; then echo "sound in $v"; exit 1; fi
+          done
+          if find keep -type f \( -iname '*.wav' -o -iname '*.mp3' -o -iname '*.m4a' -o -iname '*.aac' \) -not -path 'keep/voice/*' | grep -q .; then echo "a sound file outside keep/voice"; exit 1; fi
+          if find keep -name 'q-*' | grep -q .; then echo "a qari clip in keep/"; exit 1; fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:

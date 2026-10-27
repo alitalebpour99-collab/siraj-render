@@ -5,6 +5,7 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
 import { Night, starPath } from "./ornament";
+import { flags, motion } from "./studio";
 import { C, easeInOut } from "./theme";
 
 /** A small fixed-seed random generator (mulberry32). */
@@ -49,7 +50,7 @@ export const Motes: React.FC<{ count?: number; seed?: number; still?: boolean; b
   const frame = useCurrentFrame();
   const { width, height, fps } = useVideoConfig();
   const motes = React.useMemo(() => makeMotes(count, seed, width, height), [count, seed, width, height]);
-  const t = still ? 0 : frame / fps;
+  const t = still ? 0 : (frame / fps) * motion.drift;
   const margin = 120;
   return (
     <AbsoluteFill style={{ overflow: "hidden", pointerEvents: "none", willChange: "transform" }}>
@@ -112,7 +113,8 @@ export const Rosette: React.FC<{ size?: number; cx?: number; cy?: number; opacit
 };
 
 /** The lamp glow behind the Arabic; `warm` (0–1) is how much the recitation lights it. */
-export const Lamp: React.FC<{ warm: number; cy?: number }> = ({ warm, cy = 0.42 }) => (
+export const Lamp: React.FC<{ warm: number; cy?: number }> = ({ warm, cy = 0.42 }) =>
+  flags.glow ? (
   <AbsoluteFill
     style={{
       pointerEvents: "none",
@@ -120,7 +122,7 @@ export const Lamp: React.FC<{ warm: number; cy?: number }> = ({ warm, cy = 0.42 
       background: `radial-gradient(46% 26% at 50% ${cy * 100}%, ${C.brass}38 0%, ${C.brass}14 55%, ${C.brass}00 100%)`,
     }}
   />
-);
+  ) : null;
 
 /** The night that moves: lattice, rosette and motes under a slow camera push. */
 export const World: React.FC<{ total: number; still?: boolean; seed: number; muted?: boolean }> = ({ total, still, seed, muted }) => {
@@ -131,8 +133,8 @@ export const World: React.FC<{ total: number; still?: boolean; seed: number; mut
     // drawn once and scaled by the compositor (a re-drawn lattice per frame made the first render four times slower)
     <AbsoluteFill style={{ transform: `scale(${scale.toFixed(4)})`, transformOrigin: "50% 44%", willChange: "transform" }}>
       <Night still={still} glowY={0.42} />
-      <Rosette turn={still ? 0 : f * 0.02} opacity={muted ? 0.05 : 0.085} cy={860} />
-      <Motes seed={seed} still={still} count={muted ? 28 : 56} />
+      <Rosette turn={still ? 0 : f * 0.02 * motion.drift} opacity={(muted ? 0.05 : 0.085) * (flags.paper ? 1.6 : 1)} cy={860} />
+      {flags.motes ? <Motes seed={seed} still={still} count={muted ? 28 : 56} boost={flags.paper ? 0.6 : 1} /> : null}
     </AbsoluteFill>
   );
 };

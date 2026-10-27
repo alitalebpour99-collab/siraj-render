@@ -52,7 +52,7 @@ function timesFor(clip: QariClip, count: number): WordTime[] {
  * Stored text set word by word, each word lit by its own timing (or, with no recitation, set
  * plainly in ink); `after` (the ayah's seal) stays on one line with the last word, as in S1.
  */
-const LitText: React.FC<{ text: string; clip: QariClip | null | undefined; t: number; after?: React.ReactNode; plain?: string }> = ({ text, clip, t, after, plain = C.ink }) => {
+export const LitText: React.FC<{ text: string; clip: QariClip | null | undefined; t: number; after?: React.ReactNode; plain?: string }> = ({ text, clip, t, after, plain = C.ink }) => {
   const { parts, count } = wordParts(text);
   const times = clip ? timesFor(clip, count) : null;
   let last = -1;

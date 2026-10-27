@@ -15,7 +15,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, renderStill, selectComposition } from "@remotion/renderer";
-import { cardTimeline, countsTimeline, speakerWindows, verseTimeline, wordTable } from "../src/timelines.ts";
+import { safeFrame } from "../src/layout.ts";
+import { cardTimeline, countsTimeline, insightTimeline, speakerWindows, verseTimeline, wordTable } from "../src/timelines.ts";
 import { check, jobArg, runMain } from "./lib.mjs";
 import { manifestOf } from "./manifest.mjs";
 
@@ -70,9 +71,12 @@ export function inputsOf(job) {
   const props = readJson(path.join("props", `${job.id}.json`));
   check(props, `props/${job.id}.json`);
   const voice = readJson(path.join("public", "voice", job.id, "manifest.json")) ?? { engine: "none", voice: null, lines: [] };
-  const qari = props.kind === "verse" ? readJson(path.join("public", "qari", job.id, "manifest.json")) : null;
-  const inputProps = { ...props, voice, ...(props.kind === "verse" ? { qari } : {}) };
-  const timeline = props.kind === "verse" ? verseTimeline(inputProps) : props.kind === "counts" ? countsTimeline(inputProps) : cardTimeline(inputProps);
+  const recited = props.kind === "verse" || Boolean(props.recite);
+  const qari = recited ? readJson(path.join("public", "qari", job.id, "manifest.json")) : null;
+  const inputProps = { ...props, voice, ...(recited || props.kind === "insight" ? { qari } : {}) };
+  const loop = (props.studio?.ending ?? "loop") === "loop";
+  const timeline =
+    props.kind === "verse" ? verseTimeline(inputProps) : props.kind === "counts" ? countsTimeline(inputProps) : props.kind === "insight" ? insightTimeline({ ...inputProps, loop }) : cardTimeline(inputProps);
   return { props, voice, qari, inputProps, timeline };
 }
 
@@ -95,9 +99,11 @@ function moments(props, inputProps, timeline) {
     }
     out.push(timeline.outro.from + timeline.outro.dur - 30);
   } else {
+    out.push(0);
     for (const s of timeline.scenes) {
-      if (!s.lines.length) out.push(s.from + Math.round(s.dur / 2));
+      if (!s.lines.length && !(s.clips ?? []).length) out.push(s.from + Math.round(s.dur / 2));
       for (const l of s.lines) out.push(Math.round(l.from + l.len * 0.6));
+      for (const c of s.clips ?? []) out.push(Math.round(c.from + c.len * 0.5));
     }
     out.push(timeline.total - 30);
   }
@@ -106,7 +112,7 @@ function moments(props, inputProps, timeline) {
 
 export async function renderJob(job, { stills = false, frames = process.env.FRAMES === "1" } = {}) {
   const { props, voice, qari, inputProps, timeline } = inputsOf(job);
-  const want = `${props.lang}-${props.kind}`;
+  const want = props.kind === "insight" ? `${props.lang}-${props.format}` : `${props.lang}-${props.kind}`;
   check(job.composition === want, `the job's composition ${job.composition} is ${want}`);
   const out = path.resolve("out");
   const frameDir = path.join(out, "frames");
@@ -127,6 +133,15 @@ export async function renderJob(job, { stills = false, frames = process.env.FRAM
     await renderStill({ ...common, composition: still, inputProps, imageFormat: "jpeg", jpegQuality: 92, output: path.join(out, `${job.id}-${kind}.jpg`) });
   }
   console.log(`${job.id}: covers written`);
+  // the quiz's carousel twin (1080×1350): when the studio asks for it, and always in a trial
+  if (props.kind === "insight" && props.format === "quiz" && (props.studio?.carousel || job.claim === "try")) {
+    const id = `${job.composition}-slide`;
+    for (let k = 1; k <= 3; k++) {
+      const still = await selectComposition({ ...common, id, inputProps: { ...inputProps, slide: k } });
+      await renderStill({ ...common, composition: still, inputProps: { ...inputProps, slide: k }, imageFormat: "jpeg", jpegQuality: 92, output: path.join(out, `${job.id}-slide${k}.jpg`) });
+    }
+    console.log(`${job.id}: 3 carousel slides written`);
+  }
 
   if (stills) {
     for (const [i, frame] of marks.entries()) {
@@ -188,10 +203,46 @@ export async function renderJob(job, { stills = false, frames = process.env.FRAM
   const { segs, overlap } = speakerWindows(timeline.speakers);
   check(!overlap, overlap ?? "");
   for (const x of segs) {
+    // a trial's placeholder lines are silence here; they are heard after the mix on the PC
+    if (voice.placeholder && x.kind === "narrator") {
+      x.lufs = null;
+      continue;
+    }
     x.lufs = windowLufs(final, x.from, x.to);
     check(x.lufs !== null && x.lufs >= -32, `${x.who} is heard in the video (${x.lufs} LUFS)`);
   }
-  console.log(`${job.id}: who speaks when (s, LUFS): ${segs.map((x) => `${x.who} ${x.from.toFixed(2)}-${x.to.toFixed(2)} ${x.lufs.toFixed(1)}`).join(", ") || "nobody (no sound)"}`);
+  console.log(`${job.id}: who speaks when (s, LUFS): ${segs.map((x) => `${x.who} ${x.from.toFixed(2)}-${x.to.toFixed(2)} ${x.lufs === null ? "placeholder" : x.lufs.toFixed(1)}`).join(", ") || "nobody (no sound)"}`);
+
+  // the Story cut (studio.story): the first seconds, faded out, at most 15 s
+  if (props.studio?.story) {
+    const len = Math.min(10, seconds);
+    execFileSync("ffmpeg", ["-y", "-v", "error", "-i", final, "-t", len.toFixed(2), "-vf", `fade=t=out:st=${(len - 0.5).toFixed(2)}:d=0.5`, "-af", `afade=t=out:st=${(len - 0.5).toFixed(2)}:d=0.5`, "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-movflags", "+faststart", path.join(out, `${job.id}-story.mp4`)]);
+    console.log(`${job.id}: story cut, ${len.toFixed(1)} s`);
+  }
+
+  // A trial for the owner's PC (try.yml): the picture without any sound, the narrator's own lines
+  // and where every voice goes. The recitation never leaves the run; it is cut again on the PC
+  // from the public chapter file (scripts/sample-mux.mjs).
+  if (process.env.SAMPLE_PARTS === "1") {
+    execFileSync("ffmpeg", ["-y", "-v", "error", "-i", final, "-an", "-c:v", "copy", "-movflags", "+faststart", path.join(out, `${job.id}.picture.mp4`)]);
+    const vdir = path.join(out, "voice", job.id);
+    fs.mkdirSync(vdir, { recursive: true });
+    const clips = qari ? [qari.basmala, ...qari.verses].filter(Boolean) : [];
+    const place = timeline.speakers.map((sp) => {
+      if (sp.kind === "narrator") {
+        const id = sp.who.replace(/^narrator /, "");
+        const line = voice.lines.find((l) => l.id === id || l.id === `a${id}`);
+        if (line && !voice.placeholder) fs.copyFileSync(path.join("public", line.file), path.join(vdir, path.basename(line.file)));
+        return { kind: "narrator", line: line?.id ?? id, at: sp.frame / 30, seconds: sp.seconds, file: line && !voice.placeholder ? `voice/${job.id}/${path.basename(line.file)}` : null };
+      }
+      const key = sp.who.replace(/^qari /, "");
+      const clip = clips.find((c) => (key === "basmala" ? c.ayah === null : String(c.ayah) === key));
+      return { kind: "qari", clip: clip?.verseKey ?? key, at: sp.frame / 30, seconds: sp.seconds, src: clip?.src ?? null };
+    });
+    fs.writeFileSync(path.join(out, `${job.id}.sound.json`), `${JSON.stringify({ job: job.id, seconds, placeholder: Boolean(voice.placeholder), place }, null, 1)}
+`);
+    console.log(`${job.id}: sample parts written (picture only, ${place.length} voice places)`);
+  }
   const table = props.kind === "verse" ? wordTable(inputProps) : [];
   if (table.length) {
     console.log(`${job.id}: when each word is lit (seconds of the video; no text)`);
@@ -206,7 +257,7 @@ export async function renderJob(job, { stills = false, frames = process.env.FRAM
     console.log(`${job.id}: frames at ${marks.map((n) => (n / fps).toFixed(2)).join(", ")} s`);
   }
 
-  const manifest = manifestOf(props, voice, qari, seconds);
+  const manifest = { ...manifestOf(props, voice, qari, seconds), checks: { audio: !overlap, safeFrame: props.kind === "insight" ? safeFrame() : true } };
   fs.writeFileSync(path.join(out, `${job.id}.manifest.json`), `${JSON.stringify(manifest, null, 1)}\n`);
   const record = {
     job: job.id,

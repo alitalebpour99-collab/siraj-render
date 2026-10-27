@@ -185,6 +185,62 @@ export function scenesTimeline(plan: ScenePlan[], narration: Narration[], voice:
 export const countsTimeline = (p: Pick<CountsProps, "metric" | "narration" | "voice">) => scenesTimeline(COUNT_SCENES[p.metric], p.narration, p.voice);
 export const cardTimeline = (p: Pick<CardProps, "narration" | "voice">) => scenesTimeline(CARD_SCENES, p.narration, p.voice);
 
+/* ---------- Insight videos (S3b) ---------- */
+
+type ClipLite = { id: string; ayah: number | null; file: string; seconds: number };
+/** One recited clip in an insight scene: absolute frame and length. */
+export type ReciteClip = { id: string; ayah: number | null; from: number; len: number; file: string; seconds: number };
+export type InsightScene = Scene & { clips: ReciteClip[] };
+export type InsightTimeline = { scenes: InsightScene[]; total: number; speakers: Speaker[]; loopFrames: number };
+
+/** The first narrated line starts this early, so the hook is heard within the first second. */
+export const IT = { FIRST: 8, CLIP_GAP: 6, CLIP_IN: 16, LOOP: 15 };
+
+/**
+ * The scenes of an insight video, from the plan the job's format carries: narrated lines one
+ * after another (never two at once), the qari's clips in the «recite» scene (after the
+ * narrator, never over him), a silent «think» scene of the quiz, and the frames of the loop
+ * back to the opening at the very end.
+ */
+export function insightTimeline(p: { scenes: ScenePlan[]; narration: Narration[]; voice: Voice | null | undefined; qari?: { basmala?: ClipLite | null; verses: ClipLite[] } | null; loop?: boolean }): InsightTimeline {
+  const voiced = byId(p.voice);
+  const said = new Map(p.narration.map((n) => [n.id, n]));
+  const speakers: Speaker[] = [];
+  let at = 0;
+  const scenes = p.scenes.map((s, si): InsightScene => {
+    let cursor = at + (si === 0 ? IT.FIRST : ST.IN + ST.LEAD);
+    const clips: ReciteClip[] = [];
+    if (s.id === "recite" && p.qari) {
+      cursor = at + IT.CLIP_IN;
+      for (const c of [p.qari.basmala ?? null, ...p.qari.verses].filter((x): x is NonNullable<typeof x> => Boolean(x))) {
+        const len = fr(c.seconds);
+        clips.push({ id: c.id, ayah: c.ayah, from: cursor, len, file: c.file, seconds: c.seconds });
+        speakers.push({ who: `qari ${c.ayah ?? "basmala"}`, kind: "qari", frame: cursor, seconds: c.seconds });
+        cursor += len + IT.CLIP_GAP;
+      }
+      cursor += ST.GAP - IT.CLIP_GAP;
+    }
+    const lines = s.lines
+      .filter((id) => said.has(id))
+      .map((id): SceneLine => {
+        const n = said.get(id)!;
+        const line = voiced.get(id);
+        const words = n.say.split(/\s+/).filter(Boolean).length;
+        const len = line ? fr(line.seconds) : Math.max(45, Math.ceil(words * 0.42 * FPS));
+        if (line) speakers.push({ who: `narrator ${id}`, kind: "narrator", frame: cursor, seconds: line.seconds });
+        const item = { id, from: cursor, len, file: line?.file ?? null, show: n.show, words: line?.words?.length ? line.words : null };
+        cursor += len + ST.GAP;
+        return item;
+      });
+    const dur = Math.max(s.min, cursor - ST.GAP + ST.TAIL + ST.OUT - at);
+    const scene = { id: s.id, from: at, dur, lines, clips };
+    at += dur;
+    return scene;
+  });
+  const loopFrames = p.loop ? IT.LOOP : 0;
+  return { scenes, total: at + loopFrames, speakers, loopFrames };
+}
+
 /* ---------- The sound check ---------- */
 
 /**
