@@ -1,13 +1,21 @@
 node_modules/
-# Everything below is made at build time from Siraj's API and never committed:
-# the texts (props), the voice tracks, the bundle and the rendered media.
+# Everything below is made in a run from Siraj's API and the service's job and never
+# committed: the jobs, the texts (props), the voice tracks, the qari's clips, the bundle and
+# the rendered media. The recitation audio is downloaded and cut during the run only.
+jobs/
 props/
 public/voice/
+public/qari/
 models/
 bundle/
 out/
+keep/
 *.mp4
 *.wav
+*.mp3
 *.jpg
 *.png
+*.m4a
+*.ogg
+*.flac
 .work/

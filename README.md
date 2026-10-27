@@ -1,43 +1,63 @@
 # siraj-render
 
 The social videos of [Siraj](https://siraj.ahura.cloud) (Ahura), as a Remotion project
-(1080×1920, 30 fps), rendered free on GitHub's machines.
+(1080×1920, 30 fps), rendered free on GitHub's machines for the Siraj Social service: the
+service plans each video, this repository takes one job at a time, renders it and hands the
+files back (the contract: the service's `docs/renderer-handoff.md`). Nothing is published from
+here and no artifact of a job is kept here.
 
 **No text lives in this repository.** The Arabic text of the Quran (Tanzil Project), the
-translations (Pickthall 1930 for English, Makarem for Persian) and the surah metadata are
-fetched from Siraj's public API during each run (`scripts/fetch.mjs`) and rendered exactly as
-served, with their source lines. The log shows counts and keys only.
+translations (Pickthall 1930 for English, Makarem for Persian) and the surah index come from
+Siraj's public API during each run, the surah metadata (sections, parts, pages, prostrations)
+from the Tanzil metadata file whose SHA-256 the API names; all are rendered exactly as served,
+with their source lines, and checked against what the service planned. The log shows ids,
+counts, keys and seconds only.
 
-**No music, no recitation, no figures.** Only the *translation* is read aloud, by a free
-synthetic voice: [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (Apache-2.0) for
-English, [Mana-Persian-Piper](https://huggingface.co/MahtaFetrat/Mana-Persian-Piper) (MIT) for
-Persian. The Arabic text is never synthesised. Pictures are generated geometry only.
+**The sound** (owner, 2026-10-24): every ayah is heard only from a real qari, each Arabic word
+lit in brass as he recites it, the basmala line from his recitation of 1:1; then the narrator
+reads the translation, after the qari and never over him. The narrator is the service's
+ElevenLabs voice when the job carries its lines, else a free voice made here:
+[Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (Apache-2.0) for English,
+[Mana-Persian-Piper](https://huggingface.co/MahtaFetrat/Mana-Persian-Piper) (MIT) for Persian.
+The Arabic is never synthesised. No music, no bed, no sound effects. The recitation is
+downloaded and cut during the run only and is never committed or uploaded here: from the
+licensed Quran Foundation route once the owner is registered, until then from the public
+api.quran.com chapter files, and such a video is **preview only** (the service shows it to the
+owner and never publishes it). Pictures are generated geometry only, no figures.
+
+## Formats (`CAN` in `worker.yml`)
+
+| composition | what |
+|---|---|
+| `en-verse`, `fa-verse` (`…:range`) | «Verse & meaning»: a whole surah or its opening section, the qari with the word light, the translation and its narrator, the sources |
+| `en-counts`, `fa-counts` (`:overview`, `:revelation-order`, `:prostrations`, `:divisions`) | numbers counted from the Tanzil metadata, each with its counting rule |
+| `en-surah-card`, `fa-surah-card` | «Surah n of 114»: verses, Meccan or Medinan, revelation order, sections, parts, pages, prostration |
+
+Each has `<id>-cover` (1080×1920) and `<id>-grid` (1080×1350). The quiz carousel is not drawn,
+so the service does not plan it.
 
 | path | what |
 |---|---|
-| `scripts/samples.mjs` | the samples: which surah, which language, which voice |
-| `scripts/fetch.mjs` | `props/<sample>.json` from the API (checked: verbatim flag, hash check, whole surah, same release) |
-| `scripts/voice.mjs`, `scripts/tts.py` | one WAV per translated line into `public/voice/<sample>/` |
-| `scripts/render.mjs` | MP4 (H.264, AAC 48 kHz, fast start), covers 1080×1920 and 1080×1350, check frames, `<sample>.sources.json` |
-| `src/Verse.tsx` | «Verse & meaning»: hook, each ayah with its translation, sources |
-| `src/Counts.tsx` | «Counts»: totals, Meccan / Medinan, longest and shortest, from the Tanzil metadata |
-| `src/Cover.tsx` | the covers |
-| `src/ornament.tsx` | the night with its star lattice, the mushaf frame, cartouche, seals, Siraj's lamp mark |
-| `src/basmala.ts` | the basmala on its own line, as Siraj's reader sets it (same characters, two lines) |
+| `scripts/worker.mjs` | claims ONE job from the service, runs the steps below, uploads the video and covers, then the manifest (`failed=1` with one line on any error) |
+| `scripts/fetch.mjs` | `props/<job>.json` from Siraj's API and the Tanzil metadata, checked against the job's `expect` |
+| `scripts/voice.mjs`, `scripts/tts.py`, `scripts/spoken.mjs` | the narrator's lines, levelled, into `public/voice/<job>/` |
+| `scripts/qari.mjs`, `scripts/align.mjs` | the qari's clips and word timings into `public/qari/<job>/` |
+| `scripts/render.mjs`, `scripts/manifest.mjs` | the MP4, the covers, the sound checks (never two voices at once, every voice heard) and the manifest |
+| `scripts/tanzil.mjs` | the metadata: parsed, hash-checked, cross-checked and counted as the service counts it |
+| `src/Verse.tsx`, `src/Counts.tsx`, `src/Card.tsx`, `src/Cover.tsx` | the compositions |
+| `src/timelines.ts` | when everything happens, shared by the compositions and the checks |
+| `src/ornament.tsx`, `src/light.tsx` | the night, the mushaf frame, the cartouche, the seals, the moving light |
 | `public/fonts/` | Amiri Quran, Vazirmatn, EB Garamond, each with its SIL Open Font License |
 
-## Run
+## Runs
 
-`.github/workflows/samples.yml` runs on every push to `main` and by hand; the videos and
-covers are the run's artifact `samples`. Nothing is published anywhere.
-
-By hand on a machine with Node 22, Python 3.11, ffmpeg and espeak-ng (and enough memory for
-Chrome):
-
-```bash
-npm ci && pip install -r scripts/requirements.txt
-node scripts/fetch.mjs all && node scripts/voice.mjs all && node scripts/render.mjs all
-```
+- `.github/workflows/worker.yml` — every 30 minutes and by hand: looks first (a run with nothing
+  to do ends in seconds), then takes one job. Repository secret `SIRAJ_RENDER_SECRET`, variable
+  `SIRAJ_SOCIAL_URL`. No artifact.
+- `.github/workflows/try.yml` — by hand: renders jobs written as the service writes them, without
+  the service; keeps stills, frames, covers and the JSON records (never a video or a sound) for
+  one day.
+- `.github/workflows/check.yml` — typecheck and the unit tests (placeholders only) on every push.
 
 Fonts: Amiri Quran © The Amiri Quran Project Authors; Vazirmatn © The Vazirmatn Project
 Authors; EB Garamond © The EB Garamond Project Authors — all under the SIL Open Font License

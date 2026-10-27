@@ -1,14 +1,18 @@
-// One composition per sample, plus its two covers. The default props are empty on purpose:
-// a render always gets its content from props/<sample>.json (scripts/fetch.mjs, Siraj's API)
-// and its voice from public/voice/<sample>/manifest.json; no text lives in this code.
+// One composition per format and language (the ids the service names a job by: en-verse,
+// fa-verse, en-counts, fa-counts, en-surah-card, fa-surah-card), each with its two covers
+// (<id>-cover 1080×1920, <id>-grid 1080×1350). The default props are empty on purpose: a render
+// always gets its content from props/<job>.json (scripts/fetch.mjs, Siraj's API) and its sound
+// from public/voice/<job>/ and public/qari/<job>/; no text lives in this code.
 import React from "react";
 import { Composition } from "remotion";
-import { CountsReel, countsTimeline } from "./Counts";
-import { CountsCover, VerseCover } from "./Cover";
+import { CardReel } from "./Card";
+import { CountsReel } from "./Counts";
+import { CardCover, CountsCover, VerseCover } from "./Cover";
 import "./fonts";
-import type { CountsProps, MetadataSource, Release, VerseProps } from "./props";
+import type { CardProps, CountsProps, Lang, MetadataSource, Release, VerseProps } from "./props";
 import { FPS, H, W } from "./theme";
-import { VerseReel, verseTimeline } from "./Verse";
+import { cardTimeline, countsTimeline, verseTimeline } from "./timelines";
+import { VerseReel } from "./Verse";
 
 const release: Release = {
   releaseKey: "",
@@ -26,55 +30,72 @@ const release: Release = {
   recordCount: 0,
   orthography: null,
 };
-const metadata: MetadataSource = { title: "", url: "https://siraj.ahura.cloud", licenseName: "", licenseUrl: "" };
-const emptyVoice = { engine: "none" as const, voice: null, lines: [] };
+const metadata: MetadataSource = { title: "", url: "https://siraj.ahura.cloud", licenseName: "", licenseUrl: "", sha256: "" };
+const voice = { engine: "none" as const, voice: null, lines: [] };
+const surah = { number: 1, ayahCount: 0, nameArabic: "", revelationPlace: "meccan" as const, revelationOrder: 0, tname: "", ename: "", rukus: 0 };
 
-const emptyVerse = (lang: "en" | "fa"): VerseProps => ({
+const emptyVerse = (lang: Lang): VerseProps => ({
   kind: "verse",
-  sample: "",
+  id: "",
   lang,
-  surah: { number: 0, ayahCount: 0, nameArabic: "", revelationPlace: "meccan", revelationOrder: null },
+  surah,
+  surahTotal: 114,
+  whole: true,
+  from: 1,
+  to: 1,
   opening: null,
   ayahs: [],
-  source: {
-    api: {},
-    fetchedAt: "",
-    quran: release,
-    translation: { title: "", translatorName: "", language: lang, termsText: null, release },
-    translationNote: null,
-    surahMetadata: metadata,
-  },
-  voice: emptyVoice,
+  source: { quran: release, translation: { title: "", translatorName: "", language: lang, termsText: null, release }, translationNote: null, surahMetadata: metadata },
+  voice,
+  qari: null,
 });
 
-const emptyCounts: CountsProps = {
+const emptyCounts = (lang: Lang): CountsProps => ({
   kind: "counts",
-  sample: "",
-  lang: "en",
+  id: "",
+  lang,
+  metric: "overview",
   surahs: [],
-  totals: { surahs: 0, ayahs: 0, meccan: { surahs: 0, ayahs: 0 }, medinan: { surahs: 0, ayahs: 0 }, longest: { ayahs: 1, surahs: [] }, shortest: { ayahs: 0, surahs: [] } },
+  numbers: {},
+  sajdas: [],
+  divisions: { surahs: 0, juz: 0, rukus: 0, pages: 0 },
   narration: [],
-  source: { api: {}, fetchedAt: "", quran: release, surahMetadata: metadata },
-  voice: emptyVoice,
-};
+  source: { quran: release, surahMetadata: metadata },
+  voice,
+});
+
+const emptyCard = (lang: Lang): CardProps => ({
+  kind: "surah-card",
+  id: "",
+  lang,
+  surah,
+  series: { n: 1, of: 114 },
+  juz: [1, 1],
+  pages: [1, 1],
+  sajdas: [],
+  narration: [],
+  source: { quran: release, surahMetadata: metadata },
+  voice,
+});
 
 const reel = { width: W, height: H, fps: FPS };
 const grid = { width: 1080, height: 1350, fps: FPS };
+const LANGS = ["en", "fa"] as const;
 
 export const Root: React.FC = () => (
   <>
-    {(["en-verse", "fa-verse"] as const).map((id) => {
-      const lang = id.startsWith("fa") ? "fa" : "en";
-      return (
-        <React.Fragment key={id}>
-          <Composition id={id} component={VerseReel} {...reel} durationInFrames={300} defaultProps={emptyVerse(lang)} calculateMetadata={({ props }) => ({ durationInFrames: verseTimeline(props).total })} />
-          <Composition id={`${id}-cover`} component={VerseCover} {...reel} durationInFrames={1} defaultProps={emptyVerse(lang)} />
-          <Composition id={`${id}-grid`} component={VerseCover} {...grid} durationInFrames={1} defaultProps={emptyVerse(lang)} />
-        </React.Fragment>
-      );
-    })}
-    <Composition id="en-counts" component={CountsReel} {...reel} durationInFrames={300} defaultProps={emptyCounts} calculateMetadata={({ props }) => ({ durationInFrames: countsTimeline(props).total })} />
-    <Composition id="en-counts-cover" component={CountsCover} {...reel} durationInFrames={1} defaultProps={emptyCounts} />
-    <Composition id="en-counts-grid" component={CountsCover} {...grid} durationInFrames={1} defaultProps={emptyCounts} />
+    {LANGS.map((lang) => (
+      <React.Fragment key={lang}>
+        <Composition id={`${lang}-verse`} component={VerseReel} {...reel} durationInFrames={300} defaultProps={emptyVerse(lang)} calculateMetadata={({ props }) => ({ durationInFrames: verseTimeline(props).total })} />
+        <Composition id={`${lang}-verse-cover`} component={VerseCover} {...reel} durationInFrames={1} defaultProps={emptyVerse(lang)} />
+        <Composition id={`${lang}-verse-grid`} component={VerseCover} {...grid} durationInFrames={1} defaultProps={emptyVerse(lang)} />
+        <Composition id={`${lang}-counts`} component={CountsReel} {...reel} durationInFrames={300} defaultProps={emptyCounts(lang)} calculateMetadata={({ props }) => ({ durationInFrames: countsTimeline(props).total })} />
+        <Composition id={`${lang}-counts-cover`} component={CountsCover} {...reel} durationInFrames={1} defaultProps={emptyCounts(lang)} />
+        <Composition id={`${lang}-counts-grid`} component={CountsCover} {...grid} durationInFrames={1} defaultProps={emptyCounts(lang)} />
+        <Composition id={`${lang}-surah-card`} component={CardReel} {...reel} durationInFrames={300} defaultProps={emptyCard(lang)} calculateMetadata={({ props }) => ({ durationInFrames: cardTimeline(props).total })} />
+        <Composition id={`${lang}-surah-card-cover`} component={CardCover} {...reel} durationInFrames={1} defaultProps={emptyCard(lang)} />
+        <Composition id={`${lang}-surah-card-grid`} component={CardCover} {...grid} durationInFrames={1} defaultProps={emptyCard(lang)} />
+      </React.Fragment>
+    ))}
   </>
 );

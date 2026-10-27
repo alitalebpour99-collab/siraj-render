@@ -1,0 +1,98 @@
+name: Worker
+
+# Takes ONE job from the Siraj Social service, renders it and hands the files back
+# (the service's docs/renderer-handoff.md §7–8). Every 30 minutes and by hand. A look that
+# finds nothing ends in seconds, before anything is installed. Nothing secret is printed; no
+# text of the content is logged; NOTHING is uploaded as an artifact (this repository is public
+# and the recitation must not be downloadable here): the files go to the service only.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "7,37 * * * *"
+    - cron: "23 4 1 * *"   # monthly: keeps the schedule of a quiet public repo alive
+
+concurrency:
+  group: worker
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  alive:
+    if: github.event.schedule == '23 4 1 * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "Keep the schedule alive"
+          git push
+
+  render:
+    if: github.repository == 'alitalebpour99-collab/siraj-render' && github.event.schedule != '23 4 1 * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      SIRAJ_SOCIAL_URL: ${{ vars.SIRAJ_SOCIAL_URL }}
+      SIRAJ_RENDER_SECRET: ${{ secrets.SIRAJ_RENDER_SECRET }}
+      # what this renderer draws (the service plans nothing else); no quiz carousel yet
+      CAN: en-verse,fa-verse,en-verse:range,fa-verse:range,en-counts:overview,en-counts:revelation-order,en-counts:prostrations,en-counts:divisions,fa-counts:overview,fa-counts:revelation-order,fa-counts:prostrations,fa-counts:divisions,en-surah-card,fa-surah-card
+      RENDER_GL: swangle
+      RENDER_CONCURRENCY: "4"
+      PYTHON: python
+    steps:
+      - name: Anything to render?
+        id: look
+        run: |
+          n=$(curl -fsS --retry 3 --retry-delay 5 -H "authorization: Bearer $SIRAJ_RENDER_SECRET" "$SIRAJ_SOCIAL_URL/api/render/work?peek=1&can=$CAN" | jq -r '.waiting // 0')
+          echo "waiting: $n"
+          echo "waiting=$n" >> "$GITHUB_OUTPUT"
+      - if: steps.look.outputs.waiting != '0'
+        uses: actions/checkout@v4
+      - if: steps.look.outputs.waiting != '0'
+        uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - if: steps.look.outputs.waiting != '0'
+        uses: actions/setup-python@v5
+        with: { python-version: "3.11", cache: pip, cache-dependency-path: scripts/requirements.txt }
+      - if: steps.look.outputs.waiting != '0'
+        name: System packages (ffmpeg, espeak-ng, the libraries Chrome Headless Shell needs)
+        timeout-minutes: 12
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo rm -f /var/lib/man-db/auto-update
+          apt="-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Dpkg::Use-Pty=0"
+          for i in 1 2 3; do timeout 240 sudo -E apt-get $apt update && break; echo "apt update attempt $i failed"; done
+          timeout 420 sudo -E apt-get $apt install -y --no-install-recommends ffmpeg espeak-ng libnss3 libdbus-1-3 libatk1.0-0 libgbm-dev libxrandr2 libxkbcommon-dev libxfixes3 libxcomposite1 libxdamage1 libatk-bridge2.0-0 libpango-1.0-0 libcairo2 libcups2 | grep -E "^(Setting up|E:)" || true
+          sudo -E apt-get $apt install -y --no-install-recommends libasound2t64 >/dev/null || sudo -E apt-get $apt install -y --no-install-recommends libasound2 >/dev/null
+          ffmpeg -version | head -1
+      - if: steps.look.outputs.waiting != '0'
+        run: npm ci --no-audit --no-fund && pip install -q -r scripts/requirements.txt
+      - if: steps.look.outputs.waiting != '0'
+        uses: actions/cache@v4
+        with:
+          path: |
+            models
+            ~/.cache/huggingface
+          key: voices-kokoro-82m-mana-persian-piper-v1
+      - if: steps.look.outputs.waiting != '0'
+        name: The Persian voice model (Mana-Persian-Piper, MIT)
+        run: |
+          mkdir -p models
+          base=https://huggingface.co/MahtaFetrat/Mana-Persian-Piper/resolve/main
+          for f in fa_IR-mana-medium.onnx fa_IR-mana-medium.onnx.json; do
+            test -s "models/$f" || curl -fsSL --retry 3 -o "models/$f" "$base/$f"
+          done
+      - if: steps.look.outputs.waiting != '0'
+        name: Browser
+        run: node -e "import('@remotion/renderer').then((m) => m.ensureBrowser())"
+      - if: steps.look.outputs.waiting != '0'
+        name: Take one job, render it, hand it back
+        run: node scripts/worker.mjs

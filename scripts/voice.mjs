@@ -1,26 +1,26 @@
-// Makes the voice track of a sample: one WAV per line into public/voice/<sample>/, and
-// public/voice/<sample>/manifest.json with the length of each (no text in it).
-//   node scripts/voice.mjs en-verse          one sample (props/<sample>.json must exist)
-//   node scripts/voice.mjs all
+// The narrator of one job: one levelled WAV per line into public/voice/<job>/ and its
+// manifest.json (ids, files, seconds, word timings; no text):
+//   node scripts/voice.mjs --job jobs/<id>.json      (props/<id>.json must exist)
 //
-// What is read aloud: for a verse sample the TRANSLATION of each ayah, exactly as the API
-// served it; for the counts sample the narration's `say` lines. The Arabic text is never voiced.
-// The speech engine runs in scripts/tts.py with its whole output kept in .work/ (never shown):
-// an engine may echo what it reads, and no sacred or translated text may reach a log. Only
-// counts, ids and seconds are printed here.
+// What is read aloud: for a verse the TRANSLATION of each ayah, exactly as the API served it;
+// for counts and surah cards the job's factual sentences (`say`). Never the Arabic.
+//   - ElevenLabs (the job's voice.engine): the service made the lines with its key; each one is
+//     downloaded from the job's address (no key here, no TTS run).
+//   - Kokoro (en) / Mana-Persian-Piper (fa): read here by scripts/tts.py, its whole output kept
+//     in .work/ (an engine may echo what it reads; no text may reach a log).
+// Every line is levelled to the same loudness. The log shows ids, counts and seconds only.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { SAMPLES } from "./samples.mjs";
+import { check, download, jobArg, level, loudness, runMain } from "./lib.mjs";
+import { spoken } from "./spoken.mjs";
 
-const want = process.argv[2];
-if (!want) {
-  console.error("usage: node scripts/voice.mjs <sample|all>");
-  process.exit(2);
-}
-const names = want === "all" ? Object.keys(SAMPLES) : [want];
-const python = process.env.PYTHON || "python";
-fs.mkdirSync(".work", { recursive: true });
+const NARRATOR_LUFS = -17;
+/** The free voices (the service's fallback voices, used too when an ElevenLabs file cannot be had). */
+export const FREE = {
+  en: { engine: "kokoro", voice: "am_michael", speed: 0.9 },
+  fa: { engine: "piper", voice: "fa_IR-mana-medium", lengthScale: 1.12 },
+};
 
 /** Only the shape of a failure: the names of the files and of the error, never its message. */
 function failureShape(log) {
@@ -32,45 +32,100 @@ function failureShape(log) {
     .join("\n");
 }
 
-for (const name of names) {
-  const sample = SAMPLES[name];
-  if (!sample) throw new Error(`unknown sample ${name}`);
-  const props = JSON.parse(fs.readFileSync(path.join("props", `${name}.json`), "utf8"));
-  const lines =
-    props.kind === "counts"
-      ? props.narration.map((n) => ({ id: n.id, text: n.say }))
-      : props.ayahs.map((a) => ({ id: `a${a.ayahNumber}`, text: a.translation }));
+/** The lines to voice, with their texts in memory only. */
+export function linesOf(props, free) {
+  if (props.kind === "verse") return props.ayahs.map((a) => ({ id: `a${a.ayahNumber}`, text: a.translation }));
+  return props.narration.map((n) => ({ id: n.id, text: free ? spoken(n.say, props.lang) : n.say }));
+}
 
-  const outDir = path.join("public", "voice", name);
+/** Levels raw files (one gain for all, so the lines keep their relation) into public/voice/<id>/. */
+function levelAll(id, raws) {
+  const dir = path.join("public", "voice", id);
+  const lufs = loudness(raws.map((r) => r.file));
+  const gain = NARRATOR_LUFS - lufs;
+  const lines = raws.map((r) => {
+    const out = path.join(dir, `n-${r.id}.wav`);
+    const seconds = level(r.file, gain, out);
+    check(seconds > 0.2, `narration ${r.id} has sound`);
+    return { id: r.id, file: `voice/${id}/n-${r.id}.wav`, seconds: Math.round(seconds * 1000) / 1000, ...(r.words?.length ? { words: r.words } : {}) };
+  });
+  console.log(`${id}: narrator ${lines.length} lines, ${lufs.toFixed(1)} LUFS → gain ${gain.toFixed(1)} dB (${lines.map((l) => `${l.id} ${l.seconds.toFixed(2)}s`).join(", ")})`);
+  return lines;
+}
+
+async function fromElevenLabs(job, wanted) {
+  const v = job.props.voice;
+  const given = new Map((v.lines ?? []).map((l) => [l.id, l]));
+  const raws = [];
+  for (const line of wanted) {
+    const l = given.get(line.id);
+    check(l && typeof l.url === "string" && /^https:\/\//.test(l.url), `ElevenLabs line ${line.id} has an address`);
+    const file = path.resolve(".work", "voice", job.id, `${line.id}.mp3`);
+    await download(l.url, file, 1000);
+    raws.push({ id: line.id, file, words: Array.isArray(l.words) ? l.words : [] });
+  }
+  return raws;
+}
+
+function fromFreeVoice(job, voice, lines) {
+  const python = process.env.PYTHON || "python";
+  const work = path.resolve(".work", "voice", job.id);
+  fs.rmSync(work, { recursive: true, force: true });
+  fs.mkdirSync(work, { recursive: true });
+  const conf = voice.engine === "piper" ? { engine: "piper", model: `models/${voice.voice}.onnx`, lengthScale: voice.lengthScale ?? 1.0 } : { engine: "kokoro", voice: voice.voice, speed: voice.speed ?? 1.0 };
+  if (conf.engine === "piper") check(fs.existsSync(conf.model), `the Piper model ${path.basename(conf.model)}`);
+  const jobFile = path.join(work, "tts-job.json");
+  fs.writeFileSync(jobFile, JSON.stringify({ voice: conf, lines }));
+  const t0 = Date.now();
+  const run = spawnSync(python, ["scripts/tts.py", jobFile, work], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  fs.writeFileSync(path.join(".work", `tts-${job.id}.log`), `${run.stdout ?? ""}\n${run.stderr ?? ""}`);
+  fs.rmSync(jobFile, { force: true });
+  if (run.status !== 0 || !fs.existsSync(path.join(work, "tts.json"))) {
+    console.log(`${job.id}: the ${conf.engine} voice failed (exit ${run.status ?? run.signal ?? run.error?.code}); its output stays in .work/, shape:`);
+    console.log(failureShape(`${run.stdout ?? ""}\n${run.stderr ?? ""}`) || "(no traceback)");
+    return null;
+  }
+  const made = JSON.parse(fs.readFileSync(path.join(work, "tts.json"), "utf8"));
+  console.log(`${job.id}: ${conf.engine} read ${made.length} lines in ${Math.round((Date.now() - t0) / 1000)} s`);
+  return made.map((m) => ({ id: m.id, file: path.join(work, m.file) }));
+}
+
+const label = (v) =>
+  v.engine === "kokoro" ? `kokoro-82m:${v.voice}:${v.speed ?? 1}` : v.engine === "piper" ? `mana-persian-piper:${v.voice}:length_scale=${v.lengthScale ?? 1}` : v.engine === "elevenlabs" ? `${v.model}:${v.voiceId}` : null;
+
+/** public/voice/<id>/manifest.json for one job; returns it. */
+export async function voiceJob(job) {
+  const props = JSON.parse(fs.readFileSync(path.join("props", `${job.id}.json`), "utf8"));
+  const lang = props.lang;
+  const outDir = path.join("public", "voice", job.id);
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(outDir, { recursive: true });
-  const job = path.resolve(".work", `job-${name}.json`);
-  const logFile = path.resolve(".work", `tts-${name}.log`);
-  fs.writeFileSync(job, JSON.stringify({ voice: sample.voice, lines }));
-
-  const t0 = Date.now();
-  const run = spawnSync(python, ["scripts/tts.py", job, outDir], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
-  fs.writeFileSync(logFile, `${run.stdout ?? ""}\n${run.stderr ?? ""}`);
-  fs.rmSync(job, { force: true });
-
-  const manifestFile = path.join(outDir, "manifest.json");
-  let manifest;
-  if (run.status === 0 && fs.existsSync(path.join(outDir, "tts.json"))) {
-    const made = JSON.parse(fs.readFileSync(path.join(outDir, "tts.json"), "utf8"));
-    fs.rmSync(path.join(outDir, "tts.json"));
-    manifest = {
-      engine: sample.voice.engine,
-      voice: sample.voice.engine === "kokoro" ? `kokoro-82m:${sample.voice.voice}:${sample.voice.speed}` : `mana-persian-piper:fa_IR-mana-medium:length_scale=${sample.voice.lengthScale}`,
-      lines: made.map((m) => ({ id: m.id, file: `voice/${name}/${m.file}`, seconds: m.seconds })),
-    };
-    console.log(`${name}: ${manifest.voice}, ${manifest.lines.length} lines (${manifest.lines.map((l) => `${l.id} ${l.seconds.toFixed(2)}s`).join(", ")}) in ${Math.round((Date.now() - t0) / 1000)} s`);
-  } else {
-    console.log(`${name}: the ${sample.voice.engine} voice failed (exit ${run.status ?? run.signal ?? run.error?.code}); its output stays in .work/, shape:`);
-    console.log(failureShape(`${run.stdout ?? ""}\n${run.stderr ?? ""}`) || "(no traceback)");
-    // Only the Persian sample may go without a voice (brief S1): on-screen timing then.
-    if (sample.voice.engine !== "piper") process.exit(1);
-    manifest = { engine: "none", voice: null, reason: `${sample.voice.engine} failed on this machine`, lines: [] };
-    console.log(`${name}: no voice; the video is timed by reading length`);
+  const asked = job.props.voice ?? FREE[lang];
+  let manifest = null;
+  if (asked.engine === "elevenlabs") {
+    try {
+      const raws = await fromElevenLabs(job, linesOf(props, false));
+      manifest = { engine: "elevenlabs", voice: label(asked), lines: levelAll(job.id, raws) };
+    } catch (error) {
+      // the free voice reads instead; the manifest says what really read
+      console.log(`${job.id}: the ElevenLabs lines could not be used (${String(error.message).split("\n")[0].slice(0, 160)}); the free voice reads`);
+    }
   }
-  fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 1) + "\n");
+  if (!manifest) {
+    const voice = asked.engine === "kokoro" || asked.engine === "piper" ? asked : FREE[lang];
+    const raws = fromFreeVoice(job, voice, linesOf(props, true));
+    if (raws) manifest = { engine: voice.engine, voice: label(voice), ...(asked.reason ? { reason: asked.reason } : {}), lines: levelAll(job.id, raws) };
+    // Only the Persian voice may be missing (S1's rule): the video is then timed by reading length.
+    else if (voice.engine === "piper") manifest = { engine: "none", voice: null, reason: "the piper voice failed on this machine", lines: [] };
+    else throw new Error(`the ${voice.engine} voice failed`);
+  }
+  const ids = new Set(manifest.lines.map((l) => l.id));
+  for (const l of linesOf(props, false)) if (manifest.engine !== "none") check(ids.has(l.id), `narration line ${l.id} was made`);
+  fs.writeFileSync(path.join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 1)}\n`);
+  console.log(`${job.id}: voice ${manifest.engine} (${manifest.voice ?? "none"}), ${manifest.lines.length} lines`);
+  return manifest;
 }
+
+runMain(import.meta, async (args) => {
+  await voiceJob(jobArg(args));
+});
