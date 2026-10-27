@@ -36,6 +36,16 @@ if (!/^https:\/\//.test(BASE) || SECRET.length < 24) {
 }
 const auth = { authorization: `Bearer ${SECRET}` };
 
+// The tools must be there before a job is taken: a machine without them would only spend one of
+// the job's three attempts (27 October: an apt install that hung left no ffprobe).
+for (const tool of ["ffmpeg", "ffprobe"]) {
+  const r = spawnSync(tool, ["-version"], { stdio: "ignore" });
+  if (r.status !== 0) {
+    console.error(`worker: ${tool} is missing on this machine; no job is taken`);
+    process.exit(1);
+  }
+}
+
 /** A call to the service; its errors name the path and the status only. */
 async function call(pathAndQuery, init = {}) {
   for (let attempt = 1; ; attempt++) {
