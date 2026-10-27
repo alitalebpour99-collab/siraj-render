@@ -39,6 +39,8 @@ const lineAt = (s: InsightScene, id: string, fallback: number) => {
   const l = s.lines.find((x) => x.id === id);
   return l ? l.from - s.from : fallback;
 };
+/** Between two parts of a label: a middle dot in English; in Persian a comma (a dot beside Persian digits reads as zero). */
+const sep = (lang: Lang) => (lang === "fa" ? "، " : " · ");
 const refIn = (lang: Lang, r: string) => (lang === "fa" ? r.split(":").map((x) => faNum(Number(x))).join(":") : r);
 
 /* ---------- kinetic type ---------- */
@@ -475,7 +477,7 @@ const Hero: React.FC<{ p: InsightProps; f: number; cover?: boolean }> = ({ p, f,
       return (
         <div style={box}>
           <BigNumber lang={p.lang} value={Number(n.times)} f={f} at={at + 4} size={300} suffix="×" />
-          <Label lang={p.lang} size={46} color={C.translation}>{`${w.surah(Number(n.surah))} · ${nIn(p.lang, Number(n.verses))} ${w.verses}`}</Label>
+          <Label lang={p.lang} size={46} color={C.translation}>{`${w.surah(Number(n.surah))}${sep(p.lang)}${nIn(p.lang, Number(n.verses))} ${w.verses}`}</Label>
         </div>
       );
     case "opening-letters": {
@@ -578,11 +580,11 @@ const StripView: React.FC<ViewProps> = ({ p, s }) => {
         <div style={{ display: "flex", gap: 90, alignItems: "flex-end" }} dir={p.lang === "fa" ? "rtl" : "ltr"}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
             <BigNumber lang={p.lang} value={Number(n.with)} f={f} at={6} size={170} />
-            <Label lang={p.lang} size={38}>{`${w.surah(Number(n.surah))} · ${nIn(p.lang, Number(n.verses))} ${w.verses}`}</Label>
+            <Label lang={p.lang} size={38}>{`${w.surah(Number(n.surah))}${sep(p.lang)}${nIn(p.lang, Number(n.verses))} ${w.verses}`}</Label>
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, opacity: ramp(f, second - 4, 16) }}>
             <BigNumber lang={p.lang} value={Number(n.closestWith)} f={f} at={second} size={170} color={C.turquoise} />
-            <Label lang={p.lang} size={38}>{`${w.surah(Number(n.closest))} · ${nIn(p.lang, Number(n.closestVerses))} ${w.verses}`}</Label>
+            <Label lang={p.lang} size={38}>{`${w.surah(Number(n.closest))}${sep(p.lang)}${nIn(p.lang, Number(n.closestVerses))} ${w.verses}`}</Label>
           </div>
         </div>
       );
@@ -611,7 +613,7 @@ const StripView: React.FC<ViewProps> = ({ p, s }) => {
           </div>
         ) : null}
         <BigNumber lang={p.lang} value={Number(p.format === "names" ? n.occurrences : n.verses)} f={f} at={-30} size={150} />
-        <Label lang={p.lang} size={36}>{p.format === "names" ? `${nIn(p.lang, Number(n.verses))} ${w.verses} · ${nIn(p.lang, Number(n.surahs))} ${w.surahs}` : `${w.verses} · ${nIn(p.lang, Number(n.surahs))} ${w.surahs}`}</Label>
+        <Label lang={p.lang} size={36}>{p.format === "names" ? `${nIn(p.lang, Number(n.verses))} ${w.verses}${sep(p.lang)}${nIn(p.lang, Number(n.surahs))} ${w.surahs}` : `${w.verses}${sep(p.lang)}${nIn(p.lang, Number(n.surahs))} ${w.surahs}`}</Label>
       </div>
     );
   } else if (p.format === "opening-letters") {
@@ -712,7 +714,7 @@ const MythCountView: React.FC<ViewProps> = ({ p, s }) => {
           {w.count}
         </Label>
         <BigNumber lang={p.lang} value={Number(n.ayahs)} f={f} at={22} size={260} len={48} />
-        <Label lang={p.lang} size={44}>{`${w.verses} · ${nIn(p.lang, Number(n.surahs))} ${w.surahs}`}</Label>
+        <Label lang={p.lang} size={44}>{`${w.verses}${sep(p.lang)}${nIn(p.lang, Number(n.surahs))} ${w.surahs}`}</Label>
         <Label lang={p.lang} size={34} color={C.quiet} style={{ opacity: ramp(f, 60, 16) }}>
           {w.kufan}
         </Label>
@@ -733,7 +735,7 @@ const VerdictView: React.FC<ViewProps> = ({ p, s }) => {
   const pulse = interpolate(f, [at + 6, at + 16, at + 34], [0, 1, 0], clamp);
   return (
     <AbsoluteFill style={{ opacity: out }}>
-      <div style={{ position: "absolute", top: BAND.visTop + 110, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", gap: 80 }} dir={p.lang === "fa" ? "rtl" : "ltr"}>
+      <div style={{ position: "absolute", top: BAND.visTop + 230, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", gap: 80 }} dir={p.lang === "fa" ? "rtl" : "ltr"}>
         <div style={{ display: "flex", gap: 80, alignItems: "center" }}>
           {[
             [Number(n.claim), w.claim, C.quiet],
@@ -904,7 +906,7 @@ const MapView: React.FC<ViewProps> = ({ p, s }) => {
           ].map(([color, label, v]) => (
             <span key={String(label)} style={{ display: "inline-flex", alignItems: "center", gap: 12, fontFamily: ui(p.lang), fontSize: 36, color: C.ink }}>
               <span style={{ width: 24, height: 24, borderRadius: 5, background: String(color), display: "inline-block" }} />
-              {`${String(label)} · ${nIn(p.lang, Number(v))}`}
+              {`${String(label)}${sep(p.lang)}${nIn(p.lang, Number(v))}`}
             </span>
           ))}
         </div>
@@ -945,7 +947,7 @@ const LadderView: React.FC<ViewProps> = ({ p, s }) => {
   const places = arr(p.data.places);
   const verses = Number(p.data.verses);
   const out = c01((s.dur - f) / ST.OUT);
-  const top = BAND.visTop + 150;
+  const top = BAND.visTop + 215;
   const height = BAND.visBottom - top;
   const step = height / Math.max(1, verses);
   const run = interpolate(f, [6, 6 + mk(70)], [0, verses + 2], clamp);
@@ -955,7 +957,7 @@ const LadderView: React.FC<ViewProps> = ({ p, s }) => {
     <AbsoluteFill style={{ opacity: out }}>
       {line ? (
         <div style={{ position: "absolute", top: BAND.visTop - 10, left: 0, width: W, display: "flex", justifyContent: "center" }}>
-          <Fit width={860} maxHeight={140} max={64} min={30} measureKey={line} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.7, textAlign: "center", color: C.star }}>
+          <Fit width={860} maxHeight={130} max={60} min={30} measureKey={line} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.6, textAlign: "center", color: C.star }}>
             {line}
           </Fit>
         </div>
@@ -980,8 +982,8 @@ const LadderView: React.FC<ViewProps> = ({ p, s }) => {
           </div>
         );
       })}
-      <div style={{ position: "absolute", top: top - 70, width: W, display: "flex", justifyContent: "center" }}>
-        <Label lang={p.lang} size={44} color={C.ink}>
+      <div style={{ position: "absolute", top: top - 66, width: W, display: "flex", justifyContent: "center" }}>
+        <Label lang={p.lang} size={42} color={C.ink}>
           <span style={{ color: C.brass }}>{nIn(p.lang, Math.min(places.length, Math.round(places.filter((a) => a <= run).length)))}</span>
           {` / ${nIn(p.lang, Number(n.times))}`}
         </Label>
@@ -1052,7 +1054,7 @@ const ReciteView: React.FC<ViewProps> = ({ p, s }) => {
         <div style={{ position: "absolute", top: BAND.visTop - 6, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
           <Alphabet p={p} f={f} lit={(i) => c01((f - (litAt[i] ?? 1e9)) / 6)} size={70} />
           <Label lang={p.lang} size={40} color={C.gold}>
-            <span dir="ltr">{`${nIn(p.lang, done)} / ${nIn(p.lang, fw.length)} · ${refText}`}</span>
+            <span dir="ltr">{`${nIn(p.lang, done)} / ${nIn(p.lang, fw.length)}${sep(p.lang)}${refText}`}</span>
           </Label>
         </div>
         <div style={{ position: "absolute", top: 820, left: 0, width: W, display: "flex", justifyContent: "center" }}>
