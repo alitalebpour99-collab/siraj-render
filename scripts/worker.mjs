@@ -84,14 +84,17 @@ fs.writeFileSync(path.join("jobs", `${job.id}.json`), JSON.stringify(job));
 const up = (kind) => job.upload.file.replace("<kind>", encodeURIComponent(kind));
 
 try {
-  if (job.kind !== "video") throw new Error(`a ${job.kind} job is not drawn by this renderer`);
+  if (job.kind !== "video" && job.kind !== "carousel") throw new Error(`a ${job.kind} job is not drawn by this renderer`);
   await fetchJob(job);
   await voiceJob(job);
   const { qari, reason } = await qariJob(job);
   if (!qari && reason !== "nothing recited") console.log(`job ${job.id}: rendered without a recitation`);
   const manifest = await renderJob(job);
   const files = { video: `out/${job.id}.mp4`, cover: `out/${job.id}-cover.jpg`, grid: `out/${job.id}-grid.jpg` };
-  for (const kind of job.files) {
+  for (let k = 1; k <= 10; k++) files[`slide${k}`] = `out/${job.id}-slide${k}.jpg`;
+  // a carousel job names its slides as slide1 … slideN (the service writes «…slide10»): the ones made
+  const wanted = job.kind === "carousel" ? Object.keys(files).filter((k) => k.startsWith("slide") && fs.existsSync(files[k])) : job.files;
+  for (const kind of wanted) {
     const file = files[kind];
     if (!file) throw new Error(`no ${kind} file`);
     const bytes = fs.readFileSync(file);

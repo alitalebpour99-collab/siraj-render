@@ -128,6 +128,14 @@ export async function voiceJob(job) {
   const asked = job.props.voice ?? FREE[lang];
   const pace = job.props.studio?.pace ?? "normal";
   let manifest = null;
+  // nothing to read (a silent carousel, a silent Story): no narrator at all
+  if (props.silent || asked.engine === "none" || !linesOf(props, false).length) {
+    manifest = { engine: "none", voice: null, reason: "nothing to read", lines: [] };
+    fs.writeFileSync(path.join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 1)}
+`);
+    console.log(`${job.id}: no narrator (nothing to read)`);
+    return manifest;
+  }
   if (asked.engine === "placeholder") {
     manifest = { engine: "elevenlabs", voice: label({ ...asked, engine: "elevenlabs" }), placeholder: true, lines: placeholders(job, asked, linesOf(props, false)) };
   }
