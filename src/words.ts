@@ -28,3 +28,16 @@ export function wordParts(text: string): { parts: Part[]; count: number } {
 
 /** The number of words by the rule above. */
 export const wordCount = (text: string) => wordParts(text).count;
+
+/**
+ * A translation line cut at its spaces, for lighting each word as the narrator says it. Here
+ * every space-separated piece is a word (as the service counts the ElevenLabs word timings);
+ * joining the `text` of every part gives the line back exactly.
+ */
+export function pieces(text: string): Part[] {
+  let count = 0;
+  return text
+    .split(/(\s+)/u)
+    .filter((piece) => piece.length > 0)
+    .map((piece): Part => (/^\s+$/u.test(piece) ? { text: piece, word: null } : { text: piece, word: count++ }));
+}

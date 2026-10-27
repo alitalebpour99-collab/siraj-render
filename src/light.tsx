@@ -1,11 +1,11 @@
-// The light of the qari previews, all generated (no picture, no figure): brass motes drifting
+// The light of the videos, all generated (no picture, no figure): brass motes drifting
 // up through the night, a large girih rosette turning very slowly behind the text, and the
 // lamp glow that warms while the qari recites. Every mote is placed by a fixed seed, so each
 // frame is the same on every render.
 import React from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
-import { starPath } from "./ornament";
-import { C } from "./theme";
+import { Night, starPath } from "./ornament";
+import { C, easeInOut } from "./theme";
 
 /** A small fixed-seed random generator (mulberry32). */
 function seeded(seed: number) {
@@ -121,3 +121,18 @@ export const Lamp: React.FC<{ warm: number; cy?: number }> = ({ warm, cy = 0.42 
     }}
   />
 );
+
+/** The night that moves: lattice, rosette and motes under a slow camera push. */
+export const World: React.FC<{ total: number; still?: boolean; seed: number; muted?: boolean }> = ({ total, still, seed, muted }) => {
+  const f = useCurrentFrame();
+  const k = still ? 0 : f / Math.max(1, total);
+  const scale = 1 + 0.05 * easeInOut(k);
+  return (
+    // drawn once and scaled by the compositor (a re-drawn lattice per frame made the first render four times slower)
+    <AbsoluteFill style={{ transform: `scale(${scale.toFixed(4)})`, transformOrigin: "50% 44%", willChange: "transform" }}>
+      <Night still={still} glowY={0.42} />
+      <Rosette turn={still ? 0 : f * 0.02} opacity={muted ? 0.05 : 0.085} cy={860} />
+      <Motes seed={seed} still={still} count={muted ? 28 : 56} />
+    </AbsoluteFill>
+  );
+};

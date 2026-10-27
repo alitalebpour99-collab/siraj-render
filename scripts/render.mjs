@@ -1,45 +1,23 @@
-// Renders a sample: its video, its two covers, check frames and its source record, into out/.
-//   node scripts/render.mjs en-verse         (props/en-verse.json and public/voice/en-verse/ must exist)
-//   node scripts/render.mjs all
-//   node --experimental-strip-types scripts/render.mjs en-qari fa-qari   (the private qari previews:
-//     props/<preview>.json and public/qari/<preview>/ must exist; one cover, two frame sheets, and
-//     the table of when each word is lit, in seconds of the video, in the log and the record)
-// out/<sample>.mp4            1080×1920, 30 fps, H.264 + AAC 48 kHz, moov at the front
-// out/<sample>-cover.jpg      1080×1920 Reel cover
-// out/<sample>-grid.jpg       1080×1350 grid crop
-// out/<sample>.sources.json   the API's source lines, release keys, locators and hashes (no text)
-// out/frames/<sample>-*.jpg   frames every 1.5 s and a contact sheet, for looking at
+// Renders one job: its video, its two covers, the sound checks and the manifest, into out/.
+//   node scripts/render.mjs --job jobs/<id>.json            (after fetch, voice and qari)
+//   node scripts/render.mjs --job jobs/<id>.json --stills   (stills only, for looking at a layout)
+// out/<id>.mp4             1080×1920, 30 fps, H.264 + AAC 48 kHz, moov at the front
+// out/<id>-cover.jpg       1080×1920 Reel cover (<composition>-cover)
+// out/<id>-grid.jpg        1080×1350 grid crop (<composition>-grid)
+// out/<id>.manifest.json   what the video is made of, for the service (§5 of the hand-off; no text)
+// out/<id>.check.json      who speaks when and how loud, the lit words (seconds; no text)
+// out/frames/<id>-*.jpg    with FRAMES=1: the moments that show the light, and a sheet
+//
+// The sound rule is checked in the finished video: the qari and the narrator never overlap,
+// and every window where one of them speaks is heard. A video that breaks it is not handed in.
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, renderStill, selectComposition } from "@remotion/renderer";
-import { ALL, SAMPLES } from "./samples.mjs";
-
-const wants = process.argv.slice(2);
-if (!wants.length) {
-  console.error("usage: node scripts/render.mjs <sample|all> [more samples]");
-  process.exit(2);
-}
-const names = wants[0] === "all" ? Object.keys(SAMPLES) : wants;
-for (const name of names) if (!ALL[name]) throw new Error(`unknown sample ${name}`);
-const out = path.resolve("out");
-fs.mkdirSync(path.join(out, "frames"), { recursive: true });
-
-const t0 = Date.now();
-const serveUrl = await bundle({
-  entryPoint: path.resolve("src/index.ts"),
-  publicDir: path.resolve("public"),
-  outDir: path.resolve("bundle"),
-  enableCaching: false,
-});
-console.log(`bundled in ${Math.round((Date.now() - t0) / 1000)} s`);
-const common = {
-  serveUrl,
-  timeoutInMilliseconds: 180000,
-  chromiumOptions: { gl: process.env.RENDER_GL || "swangle" },
-  logLevel: "warn",
-};
+import { cardTimeline, countsTimeline, speakerWindows, verseTimeline, wordTable } from "../src/timelines.ts";
+import { check, jobArg, runMain } from "./lib.mjs";
+import { manifestOf } from "./manifest.mjs";
 
 /** True when the file's top-level `moov` box comes before its `mdat` box (fast start). */
 function moovFirst(file) {
@@ -76,24 +54,90 @@ function levelFilter(file) {
   return `loudnorm=${target}:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`;
 }
 
-const probe = (file) =>
-  JSON.parse(execFileSync("ffprobe", ["-v", "error", "-show_entries", "stream=codec_type,codec_name,sample_rate,width,height,r_frame_rate:format=duration", "-of", "json", file]).toString());
+const probe = (file) => JSON.parse(execFileSync("ffprobe", ["-v", "error", "-show_entries", "stream=codec_type,codec_name,sample_rate,width,height,r_frame_rate:format=duration", "-of", "json", file]).toString());
 
-for (const name of names) {
-  const props = JSON.parse(fs.readFileSync(path.join("props", `${name}.json`), "utf8"));
-  const isQari = props.kind === "qari";
-  const voiceFile = path.join("public", "voice", name, "manifest.json");
-  const qari = isQari ? JSON.parse(fs.readFileSync(path.join("public", "qari", name, "manifest.json"), "utf8")) : null;
-  const voice = isQari
-    ? { engine: qari.narration.engine, voice: `${qari.narration.voiceName} (${qari.narration.voiceId}, ${qari.narration.model})`, lines: qari.narration.lines }
-    : fs.existsSync(voiceFile)
-      ? JSON.parse(fs.readFileSync(voiceFile, "utf8"))
-      : { engine: "none", voice: null, lines: [] };
-  const inputProps = isQari ? { ...props, qari } : { ...props, voice };
+/** LUFS of the window [from, to] (seconds) of the finished video, or null when nothing is heard. */
+function windowLufs(file, from, to) {
+  const run = spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-ss", from.toFixed(3), "-t", Math.max(0.05, to - from).toFixed(3), "-i", file, "-vn", "-af", "ebur128=framelog=quiet", "-f", "null", "-"], { encoding: "utf8" });
+  const m = [...(run.stderr ?? "").matchAll(/I:\s+(-?[\d.]+) LUFS/g)].pop();
+  return m ? Number(m[1]) : null;
+}
+
+const readJson = (file) => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : null);
+
+/** The inputs of one job: props, the narrator and the qari, and its timeline. */
+export function inputsOf(job) {
+  const props = readJson(path.join("props", `${job.id}.json`));
+  check(props, `props/${job.id}.json`);
+  const voice = readJson(path.join("public", "voice", job.id, "manifest.json")) ?? { engine: "none", voice: null, lines: [] };
+  const qari = props.kind === "verse" ? readJson(path.join("public", "qari", job.id, "manifest.json")) : null;
+  const inputProps = { ...props, voice, ...(props.kind === "verse" ? { qari } : {}) };
+  const timeline = props.kind === "verse" ? verseTimeline(inputProps) : props.kind === "counts" ? countsTimeline(inputProps) : cardTimeline(inputProps);
+  return { props, voice, qari, inputProps, timeline };
+}
+
+/** The moments worth looking at (frames): the light of each clip, the middle of each line, the ends. */
+function moments(props, inputProps, timeline) {
+  const out = [];
+  if (props.kind === "verse") {
+    out.push(Math.round(timeline.intro.dur / 2));
+    for (const c of timeline.cards) {
+      const clip = inputProps.qari?.verses.find((v) => v.ayah === c.ayah);
+      if (c.index === 0 && c.basmalaAt !== null && inputProps.qari?.basmala?.words.length) {
+        const w = inputProps.qari.basmala.words[Math.floor((inputProps.qari.basmala.words.length - 1) / 2)];
+        out.push(Math.round(c.from + c.basmalaAt + ((w.start + w.end) / 2) * 30));
+      }
+      if (clip?.words.length) {
+        const w = clip.words[Math.floor((clip.words.length - 1) / 2)];
+        out.push(Math.round(c.from + c.verseAt + ((w.start + w.end) / 2) * 30));
+      } else out.push(c.from + c.verseAt + 20);
+      out.push(Math.round(c.from + (c.narrAt + c.narrEnd) / 2));
+    }
+    out.push(timeline.outro.from + timeline.outro.dur - 30);
+  } else {
+    for (const s of timeline.scenes) {
+      if (!s.lines.length) out.push(s.from + Math.round(s.dur / 2));
+      for (const l of s.lines) out.push(Math.round(l.from + l.len * 0.6));
+    }
+    out.push(timeline.total - 30);
+  }
+  return [...new Set(out.map((n) => Math.max(0, Math.min(timeline.total - 1, n))))].sort((a, b) => a - b);
+}
+
+export async function renderJob(job, { stills = false, frames = process.env.FRAMES === "1" } = {}) {
+  const { props, voice, qari, inputProps, timeline } = inputsOf(job);
+  const want = `${props.lang}-${props.kind}`;
+  check(job.composition === want, `the job's composition ${job.composition} is ${want}`);
+  const out = path.resolve("out");
+  const frameDir = path.join(out, "frames");
+  fs.mkdirSync(frameDir, { recursive: true });
+
+  const t0 = Date.now();
+  const serveUrl = await bundle({ entryPoint: path.resolve("src/index.ts"), publicDir: path.resolve("public"), outDir: path.resolve("bundle"), enableCaching: false });
+  console.log(`${job.id}: bundled in ${Math.round((Date.now() - t0) / 1000)} s`);
+  const common = { serveUrl, timeoutInMilliseconds: 180000, chromiumOptions: { gl: process.env.RENDER_GL || "swangle" }, logLevel: "warn" };
+  const composition = await selectComposition({ ...common, id: job.composition, inputProps });
+  const fps = composition.fps;
+  const marks = moments(props, inputProps, timeline);
+
+  // the covers
+  const covers = job.covers ?? { cover: `${job.composition}-cover`, grid: `${job.composition}-grid` };
+  for (const [kind, id] of Object.entries(covers)) {
+    const still = await selectComposition({ ...common, id, inputProps });
+    await renderStill({ ...common, composition: still, inputProps, imageFormat: "jpeg", jpegQuality: 92, output: path.join(out, `${job.id}-${kind}.jpg`) });
+  }
+  console.log(`${job.id}: covers written`);
+
+  if (stills) {
+    for (const [i, frame] of marks.entries()) {
+      await renderStill({ ...common, composition, inputProps, frame, imageFormat: "jpeg", jpegQuality: 85, scale: 0.5, output: path.join(frameDir, `${job.id}-m${String(i + 1).padStart(2, "0")}.jpg`) });
+    }
+    console.log(`${job.id}: ${marks.length} stills at ${marks.map((n) => (n / fps).toFixed(2)).join(", ")} s; ${composition.durationInFrames} frames in all`);
+    return null;
+  }
+
   const s0 = Date.now();
-
-  const composition = await selectComposition({ ...common, id: name, inputProps });
-  const raw = path.join(out, `${name}.raw.mp4`);
+  const raw = path.join(out, `${job.id}.raw.mp4`);
   let last = -1;
   await renderMedia({
     ...common,
@@ -110,128 +154,63 @@ for (const name of names) {
     outputLocation: raw,
     onProgress: ({ progress }) => {
       const step = Math.floor(progress * 4);
-      if (step > last) console.log(`${name}: ${step * 25}%`);
+      if (step > last) console.log(`${job.id}: ${step * 25}%`);
       last = Math.max(last, step);
     },
   });
 
   // AAC at 48 kHz, speech levelled to -16 LUFS (no levelling of a silent track), moov at the front.
-  const final = path.join(out, `${name}.mp4`);
-  const audioFilter = voice.lines.length ? ["-af", levelFilter(raw)] : [];
-  execFileSync("ffmpeg", ["-y", "-v", "error", "-i", raw, "-c:v", "copy", ...audioFilter, "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", final]);
+  const final = path.join(out, `${job.id}.mp4`);
+  const audible = timeline.speakers.length > 0;
+  execFileSync("ffmpeg", ["-y", "-v", "error", "-i", raw, "-c:v", "copy", ...(audible ? ["-af", levelFilter(raw)] : []), "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", final]);
   fs.rmSync(raw);
-
   const info = probe(final);
   const v = info.streams.find((s) => s.codec_type === "video");
   const a = info.streams.find((s) => s.codec_type === "audio");
+  const seconds = Number(info.format.duration);
   const ok = v?.codec_name === "h264" && v.width === 1080 && v.height === 1920 && a?.codec_name === "aac" && a.sample_rate === "48000" && moovFirst(final);
-  console.log(
-    `${name}: ${Number(info.format.duration).toFixed(2)} s, video ${v?.codec_name} ${v?.width}x${v?.height} ${v?.r_frame_rate}, audio ${a?.codec_name} ${a?.sample_rate} Hz, moov first ${moovFirst(final)}, voice ${voice.voice ?? "none"}, in ${Math.round((Date.now() - s0) / 1000)} s`,
-  );
-  if (!ok) throw new Error(`${name}: the video is not H.264 1080x1920 with AAC 48 kHz and moov at the front`);
+  console.log(`${job.id}: ${seconds.toFixed(2)} s, video ${v?.codec_name} ${v?.width}x${v?.height} ${v?.r_frame_rate}, audio ${a?.codec_name} ${a?.sample_rate} Hz, moov first ${moovFirst(final)}, voice ${voice.voice ?? "none"}, in ${Math.round((Date.now() - s0) / 1000)} s`);
+  check(ok, "the video is H.264 1080x1920 with AAC 48 kHz and moov at the front");
 
-  // the covers
-  const covers = isQari ? [["cover", `${name}-cover`]] : [["cover", `${name}-cover`], ["grid", `${name}-grid`]];
-  for (const [kind, id] of covers) {
-    const still = await selectComposition({ ...common, id, inputProps });
-    await renderStill({ ...common, composition: still, inputProps, imageFormat: "jpeg", jpegQuality: 92, output: path.join(out, `${name}-${kind}.jpg`) });
+  // who speaks when: never two at once, and everyone is heard where the timeline puts them
+  const { segs, overlap } = speakerWindows(timeline.speakers);
+  check(!overlap, overlap ?? "");
+  for (const x of segs) {
+    x.lufs = windowLufs(final, x.from, x.to);
+    check(x.lufs !== null && x.lufs >= -32, `${x.who} is heard in the video (${x.lufs} LUFS)`);
   }
-  console.log(`${name}: covers written`);
+  console.log(`${job.id}: who speaks when (s, LUFS): ${segs.map((x) => `${x.who} ${x.from.toFixed(2)}-${x.to.toFixed(2)} ${x.lufs.toFixed(1)}`).join(", ") || "nobody (no sound)"}`);
+  const table = props.kind === "verse" ? wordTable(inputProps) : [];
+  if (table.length) {
+    console.log(`${job.id}: when each word is lit (seconds of the video; no text)`);
+    for (const r of table) console.log(`  ${r.clip.padEnd(15)} ${r.mode.padEnd(6)} ${String(r.word).padStart(4)}  ${r.start.toFixed(3).padStart(7)}  ${r.end.toFixed(3).padStart(7)}`);
+  }
 
-  // frames to look at: one every 1.5 s, and all of them on one sheet
-  const frames = path.join(out, "frames");
-  if (isQari) {
-    const { qariTimeline, wordTable } = await import("../src/qariTimeline.ts");
-    const t = qariTimeline(inputProps);
-    const fps = composition.fps;
-    const table = wordTable(inputProps);
-    console.log(`${name}: when each word is lit (seconds of the video; no text)`);
-    console.log("  clip            mode   word   start     end");
-    for (const r of table) console.log(`  ${r.clip.padEnd(15)} ${r.mode.padEnd(6)} ${String(r.word).padStart(4)}  ${r.start.toFixed(3).padStart(6)}  ${r.end.toFixed(3).padStart(6)}`);
-
-    // who speaks when; the qari and the narrator must never overlap
-    const lines = new Map(qari.narration.lines.map((l) => [l.id, l]));
-    const segs = [];
-    const add = (who, frame, seconds) => segs.push({ who, from: Math.round((frame / fps) * 1000) / 1000, to: Math.round((frame / fps + seconds) * 1000) / 1000 });
-    add("narrator intro", t.intro.from + t.intro.narrAt, lines.get("intro")?.seconds ?? 0);
-    for (const c of t.cards) {
-      const clip = qari.verses.find((v) => v.ayah === c.ayah);
-      if (c.basmalaAt !== null && qari.basmala) add("qari basmala", c.from + c.basmalaAt, qari.basmala.seconds);
-      add(`qari ${c.ayah}`, c.from + c.verseAt, clip?.seconds ?? 0);
-      add(`narrator ${c.ayah}`, c.from + c.narrAt, lines.get(`a${c.ayah}`)?.seconds ?? 0);
-    }
-    add("narrator outro", t.outro.from + t.outro.narrAt, lines.get("outro")?.seconds ?? 0);
-    console.log(`${name}: who speaks when (s): ${segs.map((x) => `${x.who} ${x.from.toFixed(2)}-${x.to.toFixed(2)}`).join(", ")}`);
-    for (let i = 1; i < segs.length; i++) if (segs[i].from < segs[i - 1].to - 0.001) throw new Error(`${name}: ${segs[i].who} begins before ${segs[i - 1].who} ends`);
-    // every voice must be heard in the finished video, where the timeline puts it
-    for (const x of segs) {
-      const run = spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-ss", x.from.toFixed(3), "-t", (x.to - x.from).toFixed(3), "-i", final, "-vn", "-af", "ebur128=framelog=quiet", "-f", "null", "-"], { encoding: "utf8" });
-      const m = [...(run.stderr ?? "").matchAll(/I:\s+(-?[\d.]+) LUFS/g)].pop();
-      x.lufs = m ? Number(m[1]) : null;
-      if (x.lufs === null || x.lufs < -32) throw new Error(`${name}: ${x.who} is not heard in the video (${x.lufs} LUFS)`);
-    }
-    console.log(`${name}: loudness of each voice in the video (LUFS): ${segs.map((x) => `${x.who} ${x.lufs.toFixed(1)}`).join(", ")}`);
-
-    // a sheet of nine frames spread over the video, and a sheet of the moments that show the light:
-    // the middle word of each clip while it is recited, the middle of each narration, intro, outro
-    const total = composition.durationInFrames;
-    const even = Array.from({ length: 9 }, (_, k) => Math.round(((k + 0.5) * total) / 9));
-    const moments = [t.intro.narrAt + 30];
-    const mid = (words) => words[Math.floor((words.length - 1) / 2)];
-    for (const c of t.cards) {
-      const clip = qari.verses.find((v) => v.ayah === c.ayah);
-      if (c.basmalaAt !== null && qari.basmala?.words.length) {
-        const w = mid(qari.basmala.words);
-        moments.push(Math.round(c.from + c.basmalaAt + ((w.start + w.end) / 2) * fps));
-      }
-      if (clip?.words.length) {
-        const w = mid(clip.words);
-        moments.push(Math.round(c.from + c.verseAt + ((w.start + w.end) / 2) * fps));
-      }
-      moments.push(Math.round(c.from + (c.narrAt + c.narrEnd) / 2));
-    }
-    moments.push(t.outro.from + t.outro.dur - 20);
-    const pick = (list) => list.map((n) => `eq(n\\,${Math.min(total - 1, n)})`).join("+");
-    execFileSync("ffmpeg", ["-y", "-v", "error", "-i", final, "-vf", `select='${pick(even)}',scale=354:-2,tile=3x3:padding=6:color=0x060a14`, "-fps_mode", "vfr", "-frames:v", "1", "-q:v", "3", path.join(frames, `${name}-sheet.jpg`)]);
+  if (frames) {
+    const pick = (list) => list.map((n) => `eq(n\\,${n})`).join("+");
     const cols = 4;
-    execFileSync("ffmpeg", ["-y", "-v", "error", "-i", final, "-vf", `select='${pick(moments)}',scale=264:-2,tile=${cols}x${Math.ceil(moments.length / cols)}:padding=6:color=0x060a14`, "-fps_mode", "vfr", "-frames:v", "1", "-q:v", "3", path.join(frames, `${name}-moments.jpg`)]);
-    moments.forEach((n, i) =>
-      execFileSync("ffmpeg", ["-y", "-v", "error", "-i", final, "-vf", `select='eq(n\\,${Math.min(total - 1, n)})',scale=540:-2`, "-fps_mode", "vfr", "-frames:v", "1", "-q:v", "3", path.join(frames, `${name}-m${String(i + 1).padStart(2, "0")}.jpg`)]),
-    );
-    console.log(`${name}: sheets written; moments at ${moments.map((n) => (n / fps).toFixed(2)).join(", ")} s`);
-
-    const record = {
-      sample: name,
-      private: "preview for the owner only; the recitation audio is downloaded at render time and never committed",
-      composition: { id: composition.id, width: composition.width, height: composition.height, fps: composition.fps, durationInFrames: composition.durationInFrames },
-      reciter: qari.reciter,
-      recitationSource: qari.source,
-      narration: { ...qari.narration, readsOnly: "the intro line, the translation, the closing credit; never the Arabic" },
-      fallbacks: qari.fallbacks,
-      clips: [qari.basmala, ...qari.verses].filter(Boolean).map(({ words, ...c }) => ({ ...c, words: words.length })),
-      wordTimesInVideo: table,
-      speakers: segs,
-      momentsSeconds: moments.map((n) => Math.round((n / fps) * 1000) / 1000),
-      source: props.source,
-      surah: props.surah,
-      ayahs: props.ayahs.map((x) => ({ ayahNumber: x.ayahNumber, locator: x.locator, textHashSha256: x.textHashSha256, textLength: x.text.length, translationLength: x.translation.length })),
-    };
-    fs.writeFileSync(path.join(out, `${name}.sources.json`), `${JSON.stringify(record, null, 1)}\n`);
-    continue;
+    execFileSync("ffmpeg", ["-y", "-v", "error", "-i", final, "-vf", `select='${pick(marks)}',scale=264:-2,tile=${cols}x${Math.ceil(marks.length / cols)}:padding=6:color=0x060a14`, "-fps_mode", "vfr", "-frames:v", "1", "-q:v", "3", path.join(frameDir, `${job.id}-sheet.jpg`)]);
+    marks.forEach((n, i) => execFileSync("ffmpeg", ["-y", "-v", "error", "-i", final, "-vf", `select='eq(n\\,${n})',scale=540:-2`, "-fps_mode", "vfr", "-frames:v", "1", "-q:v", "3", path.join(frameDir, `${job.id}-m${String(i + 1).padStart(2, "0")}.jpg`)]));
+    console.log(`${job.id}: frames at ${marks.map((n) => (n / fps).toFixed(2)).join(", ")} s`);
   }
-  execFileSync("ffmpeg", ["-y", "-v", "error", "-i", final, "-vf", "fps=2/3,scale=540:-2", "-q:v", "3", path.join(frames, `${name}-%02d.jpg`)]);
-  execFileSync("ffmpeg", ["-y", "-v", "error", "-i", final, "-vf", "fps=2/3,scale=216:-2,tile=8x4:padding=4:color=0x060a14", "-frames:v", "1", "-q:v", "3", path.join(frames, `${name}-sheet.jpg`)]);
 
-  // the record of where every line came from (no sacred or translated text in it)
+  const manifest = manifestOf(props, voice, qari, seconds);
+  fs.writeFileSync(path.join(out, `${job.id}.manifest.json`), `${JSON.stringify(manifest, null, 1)}\n`);
   const record = {
-    sample: name,
-    composition: { id: composition.id, width: composition.width, height: composition.height, fps: composition.fps, durationInFrames: composition.durationInFrames },
-    voice: { engine: voice.engine, voice: voice.voice, reason: voice.reason ?? null, readsOnly: props.kind === "counts" ? "the fixed English narration" : "the translation", lines: voice.lines.map((l) => ({ id: l.id, seconds: l.seconds })) },
-    source: props.source,
-    ...(props.kind === "verse"
-      ? { surah: props.surah, ayahs: props.ayahs.map((x) => ({ ayahNumber: x.ayahNumber, locator: x.locator, textHashSha256: x.textHashSha256, textLength: x.text.length, translationLength: x.translation.length })) }
-      : { totals: props.totals, narration: props.narration }),
+    job: job.id,
+    composition: { id: composition.id, width: composition.width, height: composition.height, fps, durationInFrames: composition.durationInFrames },
+    seconds,
+    voice: { engine: voice.engine, voice: voice.voice, reason: voice.reason ?? null, lines: voice.lines.map((l) => ({ id: l.id, seconds: l.seconds, words: l.words?.length ?? 0 })) },
+    recitation: qari ? { source: qari.source, previewOnly: qari.previewOnly, recitationId: qari.recitationId, reciter: qari.reciter, fallbacks: qari.fallbacks, clips: [qari.basmala, ...qari.verses].filter(Boolean).map(({ words, ...c }) => ({ ...c, words: words.length })) } : null,
+    speakers: segs,
+    wordTimesInVideo: table,
+    momentsSeconds: marks.map((n) => Math.round((n / fps) * 1000) / 1000),
   };
-  fs.writeFileSync(path.join(out, `${name}.sources.json`), JSON.stringify(record, null, 1) + "\n");
+  fs.writeFileSync(path.join(out, `${job.id}.check.json`), `${JSON.stringify(record, null, 1)}\n`);
+  console.log(`${job.id}: done in ${Math.round((Date.now() - t0) / 1000)} s`);
+  return manifest;
 }
-console.log(`done in ${Math.round((Date.now() - t0) / 1000)} s`);
+
+runMain(import.meta, async (args) => {
+  await renderJob(jobArg(args), { stills: args.includes("--stills") });
+});
