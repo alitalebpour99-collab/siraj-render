@@ -92,7 +92,9 @@ for (const f of fs.readdirSync(trial).filter((x) => x.endsWith(".sound.json"))) 
   const graph = `${inputs.map((x, i) => `[${i}:a]adelay=${Math.round(x.at * 1000)}:all=1[a${i}]`).join(";")};${inputs.map((_, i) => `[a${i}]`).join("")}amix=inputs=${inputs.length}:normalize=0:dropout_transition=0,apad,atrim=0:${seconds.toFixed(3)}[m]`;
   execFileSync("ffmpeg", ["-y", "-v", "error", ...inputs.flatMap((x) => ["-i", x.file]), "-filter_complex", graph, "-map", "[m]", "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", mix]);
   const final = path.join(outDir, `${id}.mp4`);
-  execFileSync("ffmpeg", ["-y", "-v", "error", "-i", picture, "-i", mix, "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-af", levelFilter(mix), "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-shortest", "-movflags", "+faststart", final]);
+  // --small: a lighter copy for looking at (a full disk on the PC); otherwise the picture as rendered
+  const video = args.includes("--small") ? ["-c:v", "libx264", "-preset", "veryfast", "-crf", "26", "-maxrate", "3000k", "-bufsize", "6000k", "-threads", "2", "-pix_fmt", "yuv420p"] : ["-c:v", "copy"];
+  execFileSync("ffmpeg", ["-y", "-v", "error", "-i", picture, "-i", mix, "-map", "0:v", "-map", "1:a", ...video, "-af", levelFilter(mix), "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-shortest", "-movflags", "+faststart", final]);
   // every voice is heard where it is placed, and never two at once
   const sorted = [...inputs].sort((a, b) => a.at - b.at);
   let overlap = null;

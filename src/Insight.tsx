@@ -319,6 +319,9 @@ const Tiles: React.FC<{ p: InsightProps; f: number; at: number; top: number; foc
         const y = a.y + (b.y - a.y) * t - lift * 70;
         const isFocus = focus.includes(num);
         const glow = isFocus ? c01((f - at - 20) / 20) : 0;
+        // once settled, a light reads the order tile by tile, again and again
+        const settled = at + 114 * 0.55 + mk(34);
+        const wave = f > settled ? Math.max(0, 1 - Math.abs(((f - settled) * 1.4) % 150 - o) / 6) : 0;
         const color = places[i] === "medinan" ? C.turquoise : C.brass;
         return (
           <div
@@ -333,7 +336,7 @@ const Tiles: React.FC<{ p: InsightProps; f: number; at: number; top: number; foc
               display: "grid",
               placeItems: "center",
               border: `1.5px solid ${isFocus ? C.star : color}`,
-              background: isFocus ? `rgba(227,192,120,${(0.25 + 0.65 * glow).toFixed(2)})` : `${color}2e`,
+              background: isFocus ? `rgba(227,192,120,${(0.25 + 0.65 * glow).toFixed(2)})` : wave > 0 ? `rgba(227,192,120,${(0.18 + 0.4 * wave).toFixed(2)})` : `${color}2e`,
               transform: `scale(${(1 + 0.22 * lift + 0.12 * glow).toFixed(3)})`,
               zIndex: isFocus ? 3 : lift > 0.05 ? 2 : 1,
               boxShadow: (isFocus || lift > 0.05) && flags.glow ? `0 ${(10 * lift).toFixed(0)}px ${(18 + 20 * glow).toFixed(0)}px rgba(${isFocus ? "227,192,120" : "0,0,0"},${(isFocus ? 0.6 * glow : 0.4 * lift).toFixed(2)})` : "none",

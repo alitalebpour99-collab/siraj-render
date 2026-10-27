@@ -155,6 +155,24 @@ const End: React.FC<{ p: CardProps; s: Scene }> = ({ p, s }) => {
             <div style={big}>{`${q.publisher}, ${host(q.canonicalUrl)}`}</div>
           </>,
         )}
+        {p.recite?.translation
+          ? block(
+              22,
+              <>
+                <div style={label}>{t.translation}</div>
+                <div style={{ ...big, direction: fa ? "rtl" : "ltr", fontFamily: ui }}>{p.recite.translation.translatorName}</div>
+              </>,
+            )
+          : null}
+        {p.qari
+          ? block(
+              24,
+              <>
+                <div style={label}>{t.recitation}</div>
+                <div style={{ ...big, color: C.gold }}>{t.recitationLine(p.qari.reciter.name)}</div>
+              </>,
+            )
+          : null}
         {block(26, <div style={{ fontFamily: ui, fontSize: fa ? 28 : 30, color: C.translation, lineHeight: fa ? 1.8 : 1.35, textAlign: "center", maxWidth: 840 }}>{K_WORDS[p.lang].rule}</div>)}
         {said ? <div style={{ opacity: fadeIn(f, said.from - s.from), fontFamily: ui, fontStyle: fa ? "normal" : "italic", fontSize: fa ? 30 : 33, color: C.ink, lineHeight: fa ? 1.8 : 1.35, textAlign: "center", maxWidth: 840 }}>{said.show}</div> : null}
         <Divider width={300} style={{ opacity: fadeIn(f, 32) }} />
@@ -174,7 +192,7 @@ const End: React.FC<{ p: CardProps; s: Scene }> = ({ p, s }) => {
 const VerseRing: React.FC<{ words: number[]; f: number; size: number }> = ({ words, f, size }) => {
   if (!words.length) return null;
   const max = Math.max(...words);
-  const R0 = size * 0.3;
+  const R0 = size * 0.37;
   const R1 = size * 0.5;
   const c = size / 2;
   const n = words.length;
