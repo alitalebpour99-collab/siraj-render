@@ -162,7 +162,17 @@ export async function renderJob(job, { stills = false, frames = process.env.FRAM
   // AAC at 48 kHz, speech levelled to -16 LUFS (no levelling of a silent track), moov at the front.
   const final = path.join(out, `${job.id}.mp4`);
   const audible = timeline.speakers.length > 0;
-  execFileSync("ffmpeg", ["-y", "-v", "error", "-i", raw, "-c:v", "copy", ...(audible ? ["-af", levelFilter(raw)] : []), "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", final]);
+  // The picture once more with a ceiling on its rate, so that the file stays under 45 MB: the
+  // owner's bot and the Telegram channel take a video of at most 50 MB (the first live job, a
+  // 114-second surah at CRF 18, was 76 MB and reached the owner as its cover only).
+  const rawSeconds = Number(probe(raw).format.duration) || timeline.total / 30;
+  const kbps = Math.max(1500, Math.min(6000, Math.floor((45 * 8192) / rawSeconds) - 220));
+  execFileSync("ffmpeg", [
+    "-y", "-v", "error", "-i", raw,
+    "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-maxrate", `${kbps}k`, "-bufsize", `${kbps * 2}k`, "-pix_fmt", "yuv420p", "-profile:v", "high",
+    ...(audible ? ["-af", levelFilter(raw)] : []),
+    "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", final,
+  ]);
   fs.rmSync(raw);
   const info = probe(final);
   const v = info.streams.find((s) => s.codec_type === "video");
@@ -171,6 +181,8 @@ export async function renderJob(job, { stills = false, frames = process.env.FRAM
   const ok = v?.codec_name === "h264" && v.width === 1080 && v.height === 1920 && a?.codec_name === "aac" && a.sample_rate === "48000" && moovFirst(final);
   console.log(`${job.id}: ${seconds.toFixed(2)} s, video ${v?.codec_name} ${v?.width}x${v?.height} ${v?.r_frame_rate}, audio ${a?.codec_name} ${a?.sample_rate} Hz, moov first ${moovFirst(final)}, voice ${voice.voice ?? "none"}, in ${Math.round((Date.now() - s0) / 1000)} s`);
   check(ok, "the video is H.264 1080x1920 with AAC 48 kHz and moov at the front");
+  const mb = fs.statSync(final).size / 1048576;
+  console.log(`${job.id}: ${mb.toFixed(1)} MB at most ${kbps} kbit/s${mb > 49 ? " — over the 50 MB the bot and Telegram take" : ""}`);
 
   // who speaks when: never two at once, and everyone is heard where the timeline puts them
   const { segs, overlap } = speakerWindows(timeline.speakers);
