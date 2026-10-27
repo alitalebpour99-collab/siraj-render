@@ -3,14 +3,18 @@
 // revelation order, sections, parts, pages, places of prostration). The narration is the job's
 // factual sentences; the names come from the API (Arabic) and the metadata (transliteration).
 import React from "react";
-import { AbsoluteFill, Sequence, interpolate, useCurrentFrame } from "remotion";
+import { AbsoluteFill, Audio, Sequence, interpolate, staticFile, useCurrentFrame } from "remotion";
+import { splitLeadingBasmala } from "./basmala";
+import { Fit } from "./Fit";
+import { applyStudio } from "./studio";
+import { LitText } from "./Verse";
 import { Narrated, numIn } from "./Counts";
 import { K_WORDS, L, SITE, host } from "./labels";
 import { Lamp, World } from "./light";
-import { Cartouche, Divider, MushafFrame, Seal, SirajMark } from "./ornament";
+import { AyahSeal, Cartouche, Divider, MushafFrame, Seal, SirajMark } from "./ornament";
 import type { CardProps, Lang } from "./props";
-import { C, FONT, SAFE, W, easeInOut, fadeIn, fadeOut, faNum, rise } from "./theme";
-import { ST, cardTimeline, type Scene } from "./timelines";
+import { C, FONT, SAFE, W, arNum, easeInOut, fadeIn, fadeOut, faNum, rise } from "./theme";
+import { ST, cardTimeline, type InsightScene, type Scene } from "./timelines";
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 const uiFont = (lang: Lang) => (lang === "fa" ? FONT.fa : FONT.en);
@@ -43,7 +47,12 @@ const Title: React.FC<{ p: CardProps; s: Scene }> = ({ p, s }) => {
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", paddingBottom: 300, opacity: fadeOut(f, s.dur, ST.OUT) }}>
       <Lamp warm={interpolate(f, [0, 30], [0, 0.9], clamp)} cy={0.4} />
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 30 }}>
-        <SeriesMark p={p} size={260} f={f} />
+        <div style={{ position: "relative", display: "grid", placeItems: "center" }}>
+          <VerseRing words={p.verseWords ?? []} f={f} size={620} />
+          <div style={{ position: "relative" }}>
+            <SeriesMark p={p} size={260} f={f} />
+          </div>
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: 20, opacity: fadeIn(f, 14, 16) }}>
           <Seal size={96} turn={turn} />
           <Cartouche height={200} open={open}>
@@ -158,9 +167,79 @@ const End: React.FC<{ p: CardProps; s: Scene }> = ({ p, s }) => {
   );
 };
 
-const VIEWS = { title: Title, facts: Facts, end: End } as const;
+/**
+ * The surah drawn from its own verses: a ring with one spoke per verse, its length by the
+ * verse's word count (counted in the Tanzil text, Basmala apart), drawn in as the card opens.
+ */
+const VerseRing: React.FC<{ words: number[]; f: number; size: number }> = ({ words, f, size }) => {
+  if (!words.length) return null;
+  const max = Math.max(...words);
+  const R0 = size * 0.3;
+  const R1 = size * 0.5;
+  const c = size / 2;
+  const n = words.length;
+  const drawn = interpolate(f, [4, 46], [0, n], clamp);
+  return (
+    <svg width={size} height={size} style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", opacity: 0.85 }}>
+      {words.map((w, i) => {
+        const a = -Math.PI / 2 + (i / n) * Math.PI * 2;
+        const r = R0 + (R1 - R0) * (0.15 + 0.85 * (w / max));
+        const k = Math.max(0, Math.min(1, drawn - i));
+        const rr = R0 + (r - R0) * k;
+        return <line key={i} x1={c + Math.cos(a) * R0} y1={c + Math.sin(a) * R0} x2={c + Math.cos(a) * rr} y2={c + Math.sin(a) * rr} stroke={C.gold} strokeWidth={Math.max(1, Math.min(5, (size * 2.4) / n))} strokeLinecap="round" opacity={0.25 + 0.6 * k} />;
+      })}
+      <circle cx={c} cy={c} r={R0 - 6} fill="none" stroke={C.gold} strokeWidth={1.2} opacity={0.5} />
+    </svg>
+  );
+};
+
+/** The opening ayah with the qari (the basmala line first, from his recitation of 1:1), each word lit as he reaches it. */
+const Recite: React.FC<{ p: CardProps; s: Scene }> = ({ p, s }) => {
+  const f = useCurrentFrame();
+  const r = p.recite;
+  if (!r) return null;
+  const fa = p.lang === "fa";
+  const a = r.ayahs[0]!;
+  const split = splitLeadingBasmala(r.surah.number, a.ayahNumber, a.text, r.opening);
+  const clips = (s as InsightScene).clips ?? [];
+  const at = (ayah: number | null) => {
+    const c = clips.find((x) => x.ayah === ayah);
+    return c ? c.from - s.from : 14;
+  };
+  const verse = p.qari?.verses.find((v) => v.ayah === a.ayahNumber) ?? null;
+  const basmala = p.qari?.basmala ?? null;
+  const o = Math.min(fadeIn(f, 0, 14), fadeOut(f, s.dur, ST.OUT));
+  return (
+    <AbsoluteFill style={{ opacity: o }}>
+      <Lamp warm={interpolate(f, [4, 24], [0.3, 1], clamp)} cy={0.42} />
+      <div style={{ position: "absolute", top: SAFE.top + 20, width: W, textAlign: "center", fontFamily: uiFont(p.lang), fontSize: 40, color: C.gold }}>
+        <span dir="ltr">{fa ? `${faNum(r.surah.number)}:${faNum(a.ayahNumber)}` : `${r.surah.number}:${a.ayahNumber}`}</span>
+      </div>
+      <div style={{ position: "absolute", top: SAFE.top + 110, bottom: 1920 - SAFE.bottom + 40, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18 }}>
+        {split ? (
+          <Fit width={820} maxHeight={140} max={70} min={34} measureKey={split.basmala} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.8, textAlign: "center", color: C.star }}>
+            <LitText text={split.basmala} clip={basmala} t={(f - at(null)) / 30} plain={C.star} />
+          </Fit>
+        ) : null}
+        <Fit width={840} maxHeight={520} max={104} min={36} measureKey={a.text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.85, textAlign: "center", textWrap: "balance" }}>
+          <LitText text={split ? split.rest : a.text} clip={verse} t={(f - at(a.ayahNumber)) / 30} after={<AyahSeal label={fa ? faNum(a.ayahNumber) : arNum(a.ayahNumber)} font={fa ? FONT.fa : FONT.quran} />} />
+        </Fit>
+        {a.translation ? (
+          <div style={{ marginTop: 20, opacity: fadeIn(f, at(a.ayahNumber) + 20, 14) }}>
+            <Fit width={820} maxHeight={260} max={fa ? 42 : 46} min={24} measureKey={a.translation} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: uiFont(p.lang), lineHeight: fa ? 1.8 : 1.35, textAlign: "center", color: C.translation, textWrap: "balance" }}>
+              {a.translation}
+            </Fit>
+          </div>
+        ) : null}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+const VIEWS = { title: Title, recite: Recite, facts: Facts, end: End } as const;
 
 export const CardReel: React.FC<CardProps> = (p) => {
+  applyStudio(p.studio);
   const t = cardTimeline(p);
   return (
     <AbsoluteFill style={{ background: C.night }}>
@@ -175,6 +254,13 @@ export const CardReel: React.FC<CardProps> = (p) => {
         );
       })}
       <Narrated scenes={t.scenes} lang={p.lang} subtitlesUntil={t.scenes.length - 1} />
+      {t.scenes.flatMap((s) =>
+        s.clips.map((c) => (
+          <Sequence key={`q-${c.id}`} from={c.from} durationInFrames={c.len + 2} name={`qari ${c.id}`}>
+            <Audio src={staticFile(c.file)} />
+          </Sequence>
+        )),
+      )}
     </AbsoluteFill>
   );
 };

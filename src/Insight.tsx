@@ -151,7 +151,7 @@ const Label: React.FC<{ lang: Lang; children: React.ReactNode; size?: number; co
 
 /* ---------- the 114 surahs as one strip ---------- */
 
-const STRIP = { left: 92, width: 896, height: 120 };
+const STRIP = { left: 92, width: 896, height: 170 };
 
 /**
  * The 114 surahs as thin bars, lit by a light that runs along the strip (right to left in
@@ -226,7 +226,7 @@ const Strip114: React.FC<{ p: InsightProps; f: number; at: number; top: number; 
 
 /* ---------- the 604 pages as a map ---------- */
 
-const MAP = { right: 968, top: 0, cell: 23, gap: 5.3 };
+const MAP = { cell: 21, gap: 4.6, cols: 30 };
 
 /**
  * The mushaf as a map: one column per part (juz), from the right, its pages from the top.
@@ -241,10 +241,12 @@ const PageMap: React.FC<{ p: InsightProps; f: number; at: number; top: number; l
     if (!first.has(j)) first.set(j, i);
   });
   const step = (MAP.cell + MAP.gap) * scale;
+  // centred: the first part at the right, as the mushaf opens
+  const right = (W + MAP.cols * step - MAP.gap * scale) / 2;
   const pos = (i: number) => {
     const j = juz[i] ?? 1;
     const row = i - (first.get(j) ?? 0);
-    return { x: (MAP.right - (j - 1) * step - MAP.cell * scale) * 1, y: row * step };
+    return { x: right - (j - 1) * step - MAP.cell * scale, y: row * step };
   };
   const rows = Math.max(...[...first.keys()].map((j) => juz.filter((x) => x === j).length), 1);
   const width = W;
@@ -257,8 +259,9 @@ const PageMap: React.FC<{ p: InsightProps; f: number; at: number; top: number; l
         const k = c01((f - fall) / mk(10));
         const on = lit.has(page);
         const medinan = place[i] === "medinan";
-        const fill = on ? (medinan ? C.turquoise : C.brass) : C.ink;
-        const o = on ? (0.25 + 0.75 * k) * (1 - dim) : (0.06 + 0.05 * (medinan ? 1 : 0)) * c01((f - at + 10) / 10);
+        // unlit pages keep a faint tint of their surah's place, so the lit ones show where they fall
+        const fill = medinan ? C.turquoise : C.brass;
+        const o = on ? (0.3 + 0.7 * k) * (1 - dim) : (medinan ? 0.13 : 0.08) * c01((f - at + 10) / 10);
         return <rect key={page} x={x} y={y} width={MAP.cell * scale} height={MAP.cell * scale} rx={3 * scale} fill={fill} opacity={o} />;
       })}
       {runner !== null && runner >= 1 && runner <= pages
@@ -289,7 +292,7 @@ const PageMap: React.FC<{ p: InsightProps; f: number; at: number; top: number; l
 
 /* ---------- 114 tiles that fly to the revelation order ---------- */
 
-const TILE = { cols: 12, cell: 64, gap: 8 };
+const TILE = { cols: 12, cell: 58, gap: 7 };
 
 const Tiles: React.FC<{ p: InsightProps; f: number; at: number; top: number; focus: number[] }> = ({ p, f, at, top, focus }) => {
   const fa = p.lang === "fa";
@@ -598,7 +601,7 @@ const StripView: React.FC<ViewProps> = ({ p, s }) => {
       </div>
     );
     below = (
-      <div dir="rtl" style={{ position: "absolute", top: 940, left: 90, width: W - 180, display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "6px 22px" }}>
+      <div dir="rtl" style={{ position: "absolute", top: 965, left: 90, width: W - 180, display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "6px 22px" }}>
         {p.spans.groups.map((g, i) => {
           const o = ramp(f, 40 + i * 3, 12);
           const on = i === fg;
@@ -614,7 +617,7 @@ const StripView: React.FC<ViewProps> = ({ p, s }) => {
   return (
     <AbsoluteFill style={{ opacity: out }}>
       <div style={{ position: "absolute", top: BAND.visTop + 10, left: 0, width: W, display: "flex", justifyContent: "center" }}>{head}</div>
-      <Strip114 p={p} f={f} at={12} top={p.format === "opening-letters" ? 700 : 760} lit={lit} focus={focus} twice={twice} pulseDark={pulseDark} />
+      <Strip114 p={p} f={f} at={12} top={p.format === "opening-letters" ? 620 : 740} lit={lit} focus={focus} twice={twice} pulseDark={pulseDark} />
       {below}
       <Captions s={s} lang={p.lang} />
     </AbsoluteFill>
@@ -698,14 +701,14 @@ const VerdictView: React.FC<ViewProps> = ({ p, s }) => {
   const pulse = interpolate(f, [at + 6, at + 16, at + 34], [0, 1, 0], clamp);
   return (
     <AbsoluteFill style={{ opacity: out }}>
-      <div style={{ position: "absolute", top: BAND.visTop + 40, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", gap: 40 }} dir={p.lang === "fa" ? "rtl" : "ltr"}>
-        <div style={{ display: "flex", gap: 70, alignItems: "center" }}>
+      <div style={{ position: "absolute", top: BAND.visTop + 110, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", gap: 80 }} dir={p.lang === "fa" ? "rtl" : "ltr"}>
+        <div style={{ display: "flex", gap: 80, alignItems: "center" }}>
           {[
             [Number(n.claim), w.claim, C.quiet],
             [Number(n.ayahs), w.count, C.brass],
           ].map(([val, label, color]) => (
             <div key={String(label)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-              <div dir="ltr" style={{ fontFamily: ui(p.lang), fontSize: 120, lineHeight: 1, color: String(color), fontVariantNumeric: "lining-nums", textDecoration: color === C.quiet ? "line-through" : undefined, textDecorationColor: C.brass }}>
+              <div dir="ltr" style={{ fontFamily: ui(p.lang), fontSize: 150, lineHeight: 1, color: String(color), fontVariantNumeric: "lining-nums", textDecoration: color === C.quiet ? "line-through" : undefined, textDecorationColor: C.brass }}>
                 {nIn(p.lang, Number(val))}
               </div>
               <Label lang={p.lang} size={34} color={C.quiet}>{String(label)}</Label>
@@ -713,7 +716,7 @@ const VerdictView: React.FC<ViewProps> = ({ p, s }) => {
           ))}
         </div>
         <div style={{ opacity: v, transform: `scale(${(0.9 + 0.1 * v + 0.05 * pulse).toFixed(3)})`, padding: "18px 46px", borderRadius: 18, border: `2.5px solid ${C.brass}`, background: `rgba(224,172,79,${(0.1 + 0.25 * pulse).toFixed(2)})`, boxShadow: flags.glow ? `0 0 ${(20 + 40 * pulse).toFixed(0)}px rgba(224,172,79,0.45)` : undefined }}>
-          <Label lang={p.lang} size={58} color={C.star}>{w.verdict(Boolean(n.holds))}</Label>
+          <Label lang={p.lang} size={70} color={C.star}>{w.verdict(Boolean(n.holds))}</Label>
         </div>
       </div>
       <Captions s={s} lang={p.lang} />
@@ -733,12 +736,12 @@ const TrickView: React.FC<ViewProps> = ({ p, s }) => {
   const b = ramp(f, rel + 62, 16);
   const s2 = surahOf(p, Number(n.longest));
   const D = (k: number) => (p.lang === "fa" ? faNum(Number(digits[k])) : digits[k]);
-  const size = 250;
+  const size = 300;
   return (
     <AbsoluteFill style={{ opacity: out }}>
-      <div style={{ position: "absolute", top: BAND.visTop, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+      <div style={{ position: "absolute", top: BAND.visTop + 40, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
         {s2 ? (
-          <div lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: 64, lineHeight: 1.5, color: C.star, opacity: ramp(f, 0, 14) }}>
+          <div lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: 70, lineHeight: 1.5, color: C.star, opacity: ramp(f, 0, 14), marginBottom: 46 }}>
             {s2.nameArabic}
           </div>
         ) : null}
@@ -753,10 +756,10 @@ const TrickView: React.FC<ViewProps> = ({ p, s }) => {
               </span>
             );
           })}
-          <div style={{ position: "absolute", top: -18, right: 0, width: "66%", height: 12, borderTop: `4px solid ${C.brass}`, borderLeft: `4px solid ${C.brass}`, borderRight: `4px solid ${C.brass}`, borderRadius: "10px 10px 0 0", opacity: a }} />
-          <div style={{ position: "absolute", bottom: -18, left: 0, width: "66%", height: 12, borderBottom: `4px solid ${C.turquoise}`, borderLeft: `4px solid ${C.turquoise}`, borderRight: `4px solid ${C.turquoise}`, borderRadius: "0 0 10px 10px", opacity: b }} />
+          <div style={{ position: "absolute", top: -26, right: 0, width: "64%", height: 24, borderTop: `4px solid ${C.brass}`, borderLeft: `4px solid ${C.brass}`, borderRight: `4px solid ${C.brass}`, borderRadius: "10px 10px 0 0", opacity: a }} />
+          <div style={{ position: "absolute", bottom: -26, left: 0, width: "64%", height: 24, borderBottom: `4px solid ${C.turquoise}`, borderLeft: `4px solid ${C.turquoise}`, borderRight: `4px solid ${C.turquoise}`, borderRadius: "0 0 10px 10px", opacity: b }} />
         </div>
-        <div style={{ display: "flex", gap: 90, marginTop: 40 }} dir={p.lang === "fa" ? "rtl" : "ltr"}>
+        <div style={{ display: "flex", gap: 90, marginTop: 70 }} dir={p.lang === "fa" ? "rtl" : "ltr"}>
           <div style={{ opacity: a, transform: `translateY(${((1 - a) * 20).toFixed(0)}px)` }}>
             <Label lang={p.lang} size={56} color={C.brass}>{`${nIn(p.lang, Number(n.meccan))} ${w.meccan}`}</Label>
           </div>
@@ -829,7 +832,7 @@ const MapView: React.FC<ViewProps> = ({ p, s }) => {
   const n = p.numbers;
   const out = c01((s.dur - f) / ST.OUT);
   const fa = p.lang === "fa";
-  const top = 560;
+  const top = 540;
   if (p.format === "middle") {
     const marks = (Array.isArray(p.data.marks) ? p.data.marks : []) as Array<{ id: string; page: number }>;
     const labels: Record<string, string> = { verses: w.byVerses, words: w.byWords, letters: w.byLetters };
@@ -874,7 +877,7 @@ const MapView: React.FC<ViewProps> = ({ p, s }) => {
           ))}
         </div>
       </div>
-      <PageMap p={p} f={f} at={8} top={top + 20} lit={lit} />
+      <PageMap p={p} f={f} at={8} top={top + 30} lit={lit} />
       <Captions s={s} lang={p.lang} />
     </AbsoluteFill>
   );
@@ -1070,7 +1073,7 @@ const Options: React.FC<{ p: InsightProps; f: number; at: number; reveal: number
   const answer = Number(p.data.answer);
   const fa = p.lang === "fa";
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 22, width: 760 }} dir={fa ? "rtl" : "ltr"}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 26, width: 840 }} dir={fa ? "rtl" : "ltr"}>
       {opts.map((num, i) => {
         const s = surahOf(p, num);
         const o = ramp(f, at + i * 5, 12);
@@ -1083,19 +1086,19 @@ const Options: React.FC<{ p: InsightProps; f: number; at: number; reveal: number
               display: "flex",
               alignItems: "center",
               gap: 26,
-              padding: "16px 30px",
+              padding: "20px 34px",
               borderRadius: 18,
               border: `2px solid ${right && reveal > 0.5 ? C.brass : `${C.ink}55`}`,
-              background: right ? `rgba(224,172,79,${(0.06 + 0.5 * k).toFixed(2)})` : `${C.ink}0a`,
+              background: right ? `rgba(224,172,79,${(0.06 + 0.88 * k).toFixed(2)})` : `${C.ink}0a`,
               opacity: o * (1 - (right ? 0 : 0.55 * reveal)),
               transform: `translateY(${((1 - o) * 24).toFixed(0)}px) scale(${(1 + 0.04 * k).toFixed(3)})`,
               boxShadow: right && flags.glow ? `0 0 ${(40 * k).toFixed(0)}px rgba(224,172,79,${(0.5 * k).toFixed(2)})` : undefined,
             }}
           >
-            <span style={{ fontFamily: ui(p.lang), fontSize: 40, color: C.gold, width: 60 }}>{w.options[i]}</span>
-            <span style={{ fontFamily: ui(p.lang), fontSize: 44, color: right && k > 0.5 ? C.star : C.ink }}>{w.surah(num)}</span>
+            <span style={{ fontFamily: ui(p.lang), fontSize: 46, color: right && k > 0.5 ? C.night : C.gold, width: 70 }}>{w.options[i]}</span>
+            <span style={{ fontFamily: ui(p.lang), fontSize: 52, color: right && k > 0.5 ? C.night : C.ink }}>{w.surah(num)}</span>
             {s ? (
-              <span lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: 46, lineHeight: 1.4, color: C.star, marginInlineStart: "auto" }}>
+              <span lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: 54, lineHeight: 1.4, color: right && k > 0.5 ? C.night : C.star, marginInlineStart: "auto" }}>
                 {s.nameArabic}
               </span>
             ) : null}
@@ -1164,7 +1167,8 @@ const EndView: React.FC<ViewProps> = ({ p, s }) => {
   const big = { fontFamily: FONT.en, fontSize: 34, color: C.ink, lineHeight: 1.3, textAlign: "center", maxWidth: 860, direction: "ltr" } as const;
   const block = (at: number, children: React.ReactNode) => <div style={{ opacity: ramp(f, at, 14), display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>{children}</div>;
   const qari = p.qari?.reciter.name ?? null;
-  const tr = p.recite?.translation ?? null;
+  // the translation is named only where the video showed it (one recited ayah, not the alphabet view)
+  const tr = p.recite && p.recite.ayahs.length === 1 && p.format !== "every-letter" ? p.recite.translation : null;
   return (
     <AbsoluteFill>
       <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: BAND.visTop, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", gap: 24 }}>
@@ -1245,7 +1249,7 @@ const Chip: React.FC<{ p: InsightProps; f: number }> = ({ p, f }) => {
     <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: BAND.chip, left: 0, width: W, display: "flex", justifyContent: "center", opacity: c01((f + 10) / 10) }}>
       <div style={{ display: "inline-flex", alignItems: "center", gap: 14, padding: "8px 26px", borderRadius: 999, border: `1.5px solid ${C.gold}88`, background: `${C.night}aa` }}>
         <Seal size={30} />
-        <span style={{ fontFamily: ui(p.lang), fontSize: fa ? 30 : 30, fontWeight: 500, letterSpacing: fa ? 0 : "0.14em", textTransform: fa ? "none" : "uppercase", color: C.gold }}>{chipOf(p.format, p.lang, n)}</span>
+        <span style={{ fontFamily: ui(p.lang), fontSize: fa ? 33 : 30, fontWeight: 500, letterSpacing: fa ? 0 : "0.14em", textTransform: fa ? "none" : "uppercase", color: C.gold }}>{chipOf(p.format, p.lang, n)}</span>
       </div>
     </div>
   );
@@ -1338,15 +1342,15 @@ export const InsightCover: React.FC<InsightProps> = (raw) => {
       <World total={1} still seed={7 + p.format.length * 3 + p.episode.length} />
       {studio.frame ? <MushafFrame drawn /> : null}
       <Lamp warm={0.7} cy={0.45} />
-      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", gap: tall ? 36 : 18, paddingInline: 70, paddingBottom: tall ? 0 : 10 }}>
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", gap: tall ? 60 : 18, paddingInline: 70, paddingBottom: tall ? 0 : 10 }}>
         <div dir={fa ? "rtl" : "ltr"} style={{ display: "inline-flex", alignItems: "center", gap: 14, padding: "8px 26px", borderRadius: 999, border: `1.5px solid ${C.gold}88` }}>
           <Seal size={30} />
           <span style={{ fontFamily: ui(p.lang), fontSize: 30, letterSpacing: fa ? 0 : "0.14em", textTransform: fa ? "none" : "uppercase", color: C.gold }}>{chipOf(p.format, p.lang, studio.seriesNumber ? (p.series?.n ?? null) : null)}</span>
         </div>
-        <div style={{ transform: `scale(${tall ? 1 : 0.78})`, marginBlock: tall ? 0 : -60 }}>
+        <div style={{ transform: `scale(${tall ? 1.22 : 0.78})`, marginBlock: tall ? 60 : -60 }}>
           <Hero p={p} f={999} cover />
         </div>
-        <Fit width={900} maxHeight={tall ? 260 : 200} max={fa ? 62 : 68} min={34} measureKey={hook} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), lineHeight: fa ? 1.7 : 1.25, textAlign: "center", color: C.ink, textWrap: "balance" }}>
+        <Fit width={900} maxHeight={tall ? 300 : 200} max={fa ? (tall ? 72 : 60) : tall ? 80 : 66} min={34} measureKey={hook} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), lineHeight: fa ? 1.7 : 1.25, textAlign: "center", color: C.ink, textWrap: "balance" }}>
           {hook}
         </Fit>
         <div style={{ fontFamily: FONT.en, fontSize: 32, color: C.gold, letterSpacing: "0.04em" }}>{SITE}</div>

@@ -183,7 +183,11 @@ export function scenesTimeline(plan: ScenePlan[], narration: Narration[], voice:
 }
 
 export const countsTimeline = (p: Pick<CountsProps, "metric" | "narration" | "voice">) => scenesTimeline(COUNT_SCENES[p.metric], p.narration, p.voice);
-export const cardTimeline = (p: Pick<CardProps, "narration" | "voice">) => scenesTimeline(CARD_SCENES, p.narration, p.voice);
+/** The card with its opening ayah recited by the qari (S3b): the title, the recitation, the facts, the sources. */
+export const CARD_SCENES_RECITE: ScenePlan[] = [CARD_SCENES[0]!, { id: "recite", lines: [], min: 75 }, CARD_SCENES[1]!, CARD_SCENES[2]!];
+
+export const cardTimeline = (p: Pick<CardProps, "narration" | "voice" | "recite" | "qari">): InsightTimeline =>
+  p.recite ? insightTimeline({ scenes: CARD_SCENES_RECITE, narration: p.narration, voice: p.voice, qari: p.qari ?? null, loop: false }) : { ...scenesTimeline(CARD_SCENES, p.narration, p.voice), loopFrames: 0, scenes: scenesTimeline(CARD_SCENES, p.narration, p.voice).scenes.map((x) => ({ ...x, clips: [] })) };
 
 /* ---------- Insight videos (S3b) ---------- */
 

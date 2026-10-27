@@ -10,6 +10,7 @@ import { C_WORDS, L, SITE } from "./labels";
 import { Lamp, World } from "./light";
 import { Cartouche, Divider, MushafFrame, Seal, SirajMark } from "./ornament";
 import type { CardProps, CountsProps, Lang, VerseProps } from "./props";
+import { applyStudio } from "./studio";
 import { C, FONT } from "./theme";
 
 const uiFont = (lang: Lang) => (lang === "fa" ? FONT.fa : FONT.en);
@@ -40,6 +41,7 @@ const Frame: React.FC<{ seed: number; source: string; lang: Lang; children: Reac
 };
 
 export const VerseCover: React.FC<VerseProps> = (p) => {
+  applyStudio(p.studio);
   const { height } = useVideoConfig();
   const tall = height > 1500;
   const fa = p.lang === "fa";
@@ -72,6 +74,7 @@ export const VerseCover: React.FC<VerseProps> = (p) => {
 };
 
 export const CountsCover: React.FC<CountsProps> = (p) => {
+  applyStudio(null);
   const { height } = useVideoConfig();
   const tall = height > 1500;
   const fa = p.lang === "fa";
@@ -159,6 +162,7 @@ export const CountsCover: React.FC<CountsProps> = (p) => {
 };
 
 export const CardCover: React.FC<CardProps> = (p) => {
+  applyStudio(p.studio);
   const { height } = useVideoConfig();
   const tall = height > 1500;
   return (

@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { splitLeadingBasmala } from "../src/basmala.ts";
 import { INSIGHTS, episodeOf, insightIds } from "./episodes.mjs";
-import { ALPHABET, OPENING_LETTER_SURAHS, firstLetterWords, formWords, model } from "./insights.mjs";
+import { ALPHABET, OPENING_LETTER_SURAHS, firstLetterWords, formWords, model, wordsOf } from "./insights.mjs";
 import { API, DataChanged, UA, check, checkTrust, jobArg, releaseOf, runMain, same, sha256, siraj, sleep } from "./lib.mjs";
 import { cardNumbers, countNumbers, juzOf, loadTanzil } from "./tanzil.mjs";
 import { CARD_SCENES, COUNT_SCENES, planIds } from "../src/timelines.ts";
@@ -120,6 +120,7 @@ async function verseProps(job) {
       surahMetadata: metadataOf(idx),
     },
     facts,
+    studio: p.studio ?? null,
   };
   console.log(`${job.id}: verse ${p.surah}:${p.from}-${p.to} (${p.whole ? "whole" : "part"}), ${props.ayahs.length} ayahs, text ${e.textRelease}, translation ${tr.release?.releaseKey}`);
   console.log(`${job.id}: lengths (text/translation) ${props.ayahs.map((a) => `${a.text.length}/${a.translation.length}`).join(" ")}`);
@@ -180,6 +181,21 @@ async function cardProps(job) {
     source: { quran: releaseOf(idx.release), surahMetadata: metadataOf(idx) },
     facts,
   };
+  // S3b: the opening ayah with the qari (the basmala line first, as in a verse video) and the
+  // words of every verse for the ring, when the job asks for it
+  if (p.recite) {
+    const opening = await siraj(`/api/quran/1?from=1&to=1&translation=0&release=${encodeURIComponent(job.expect.textRelease)}`);
+    checkTrust(opening, "opening");
+    check(opening.release?.releaseKey === job.expect.textRelease && opening.ayahs?.length === 1, "opening ayah of the same release");
+    props.recite = await reciteOf(job, idx, meta, { surah: p.surah, from: p.recite.from ?? 1, to: p.recite.to ?? 1, basmala: true }, opening.ayahs[0].text);
+    const whole = await sirajPaced(`/api/quran/${p.surah}?from=1&to=${props.surah.ayahCount}&translation=0&exegesis=0&release=${encodeURIComponent(job.expect.textRelease)}`);
+    checkTrust(whole, "card verses");
+    props.verseWords = whole.ayahs.map((a) => {
+      const split = splitLeadingBasmala(p.surah, a.ayahNumber, a.text, opening.ayahs[0].text);
+      return wordsOf(split ? split.rest : a.text).length;
+    });
+  }
+  props.studio = p.studio ?? null;
   console.log(`${job.id}: surah card ${p.surah} of ${p.series.of}, ${props.narration.length} narration lines (${props.narration.map((l) => l.id).join(",")})`);
   return props;
 }

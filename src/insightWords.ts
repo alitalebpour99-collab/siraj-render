@@ -69,7 +69,9 @@ export function ruleOf(format: InsightFormat, episode: string, lang: Lang, numbe
     case "opening-letters":
       return fa ? j(["فهرست ۲۹ سوره: شماره‌ها", "حروف: نخستین کلمهٔ آیهٔ نخست (و آیهٔ دوم، اگر آن هم یک کلمه باشد)", "بی بسم‌الله"]) : j(["the 29 surahs: a list of numbers", "the letters: the first word of verse 1 (and of verse 2 when that is one word too)", "the Basmala not counted"]);
     case "every-letter":
-      return fa ? j([TANZIL.fa, "هر ۲۸ حرف، دست‌کم یک بار", "أ إ آ ٱ همان ا، ة همان ت، ى همان ي", NO_BASMALA.fa]) : j([TANZIL.en, "each of the 28 letters at least once", "أ إ آ ٱ as ا, ة as ت, ى as ي", NO_BASMALA.en]);
+      return fa
+        ? j([TANZIL.fa, "هر ۲۸ حرف، دست‌کم یک بار", "الف با همزه همان الف، تای گرد همان ت، الف مقصوره همان ی", NO_BASMALA.fa])
+        : j([TANZIL.en, "each of the 28 letters at least once", "alif with hamza counts as alif, ta marbuta as ta, alif maqsura as ya", NO_BASMALA.en]);
     case "quiz":
       return fa ? "از متن و فرادادهٔ تنزیل" : "From the Tanzil text and metadata";
     default:
