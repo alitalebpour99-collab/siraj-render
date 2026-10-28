@@ -475,7 +475,7 @@ export const INSIGHTS = {
     // (src/Insight.tsx), so the voice never adds to the verse's own length. No narration lines.
     scenes: [
       { id: "recite", lines: [], min: 60 },
-      { id: "end", lines: [], min: 45 },
+      { id: "end", lines: [], min: 75 },
     ],
     // the narrated scenes of S3b, for a job planned before S3e (its lines keep their places)
     legacyScenes: [

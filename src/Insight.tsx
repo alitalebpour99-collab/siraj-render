@@ -496,7 +496,8 @@ const Hero: React.FC<{ p: InsightProps; f: number; cover?: boolean }> = ({ p, f,
       );
     }
     case "every-letter":
-      return <Alphabet p={p} f={f} lit={() => (cover ? 1 : 0.18 + 0.1 * Math.sin(f / 9))} size={98} />;
+      // the cover scales this 1.22: 76 keeps the seven columns inside the frame
+      return <Alphabet p={p} f={f} lit={() => (cover ? 1 : 0.18 + 0.1 * Math.sin(f / 9))} size={cover ? 76 : 98} />;
     case "names":
     case "closing-names":
       return (
@@ -1066,13 +1067,13 @@ const ReciteView: React.FC<ViewProps> = ({ p, s }) => {
               {everyTitle(p)}
             </Fit>
           </div>
-          <Alphabet p={p} f={f} lit={(i) => c01((f - (litAt[i] ?? 1e9)) / 6)} size={64} />
+          <Alphabet p={p} f={f} lit={(i) => c01((f - (litAt[i] ?? 1e9)) / 6)} size={58} />
           <Label lang={p.lang} size={40} color={C.gold}>
             <span dir="ltr">{`${nIn(p.lang, done)} / ${nIn(p.lang, fw.length)}${sep(p.lang)}${refText}`}</span>
           </Label>
         </div>
-        <div style={{ position: "absolute", top: 820, left: 0, width: W, display: "flex", justifyContent: "center" }}>
-          <Fit width={880} maxHeight={BAND.capTop + BAND.capH - 830} max={44} min={20} measureKey={text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.85, textAlign: "center" }}>
+        <div style={{ position: "absolute", top: 870, left: 0, width: W, display: "flex", justifyContent: "center" }}>
+          <Fit width={880} maxHeight={BAND.capTop + BAND.capH - 880} max={44} min={20} measureKey={text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.85, textAlign: "center" }}>
             <LitText text={text} clip={p.studio.wordGlow ? clip : null} t={tSec} after={<AyahSeal label={fa ? faNum(a.ayahNumber) : arNum(a.ayahNumber)} font={fa ? FONT.fa : FONT.quran} />} />
           </Fit>
         </div>
@@ -1333,7 +1334,9 @@ export const InsightReel: React.FC<InsightProps> = (raw) => {
   const f = useCurrentFrame();
   const first = t.scenes[0]!;
   const last = t.scenes[t.scenes.length - 1]!;
-  const ruleOn = Math.min(c01((f - (t.scenes[1]?.from ?? 0) + 6) / 12), c01((last.from - f + 6) / 12));
+  // the rule box from the second scene on; a video that recites from its first second (Every Letter) shows it from the first second
+  const ruleFrom = first.id === "recite" ? 24 : (t.scenes[1]?.from ?? 0);
+  const ruleOn = Math.min(c01((f - ruleFrom + 6) / 12), c01((last.from - f + 6) / 12));
   const Hook = viewOf(p, first.id);
   return (
     <AbsoluteFill style={{ background: C.night }}>
