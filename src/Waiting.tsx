@@ -77,7 +77,13 @@ export type WaitingProps = {
 
 type Prepared = WaitingProps & { studio: Studio };
 type Box = readonly [number, number];
-type VP = { p: Prepared; t: InsightTimeline; cover?: boolean };
+/** `at`: the frame a cover shows (a still is drawn at frame 0; <Freeze> does not move a one-frame composition). */
+type VP = { p: Prepared; t: InsightTimeline; cover?: boolean; at?: number };
+/** The view's frame: the cover's settled frame when it draws one, else the video's own. */
+const useAt = (at?: number) => {
+  const f = useCurrentFrame();
+  return at ?? f;
+};
 
 const NO_VOICE: Voice = { engine: "none", voice: null, lines: [] };
 
@@ -314,8 +320,8 @@ const Candle: React.FC<{ f: number; lit: number; height: number }> = ({ f, lit, 
 /* ---------- the views ---------- */
 
 /** حکمت نهج‌البلاغه: the Arabic word by word, the brass line, the Persian as the narrator reads it. */
-const NahjView: React.FC<VP> = ({ p, t }) => {
-  const f = useCurrentFrame();
+const NahjView: React.FC<VP> = ({ p, t, at }) => {
+  const f = useAt(at);
   const x = p.text;
   if (!x) return null;
   const open = sceneOf(t, "open");
@@ -342,8 +348,8 @@ const NahjView: React.FC<VP> = ({ p, t }) => {
 };
 
 /** شب جمعه · دعای کمیل: the candle is lit, a slow light passes over the Arabic, the Persian is read. */
-const KumaylView: React.FC<VP> = ({ p, t }) => {
-  const f = useCurrentFrame();
+const KumaylView: React.FC<VP> = ({ p, t, at }) => {
+  const f = useAt(at);
   const x = p.text;
   if (!x) return null;
   const candle = sceneOf(t, "candle");
@@ -415,8 +421,8 @@ const KumaylView: React.FC<VP> = ({ p, t }) => {
 };
 
 /** ذکر امروز: the day's dhikr and a ring that fills as it counts (a Story). */
-const StoryView: React.FC<VP> = ({ p, t }) => {
-  const f = useCurrentFrame();
+const StoryView: React.FC<VP> = ({ p, t, at }) => {
+  const f = useAt(at);
   const x = p.text;
   if (!x) return null;
   const dh = sceneOf(t, "dhikr");
@@ -471,8 +477,8 @@ const StoryView: React.FC<VP> = ({ p, t }) => {
 };
 
 /** مناسبت: the authority, the name, one line; very slow fades, no glow, no flashes. */
-const OccasionView: React.FC<VP> = ({ p, t }) => {
-  const f = useCurrentFrame();
+const OccasionView: React.FC<VP> = ({ p, t, at }) => {
+  const f = useAt(at);
   const o = p.occasion;
   if (!o) return null;
   const main = sceneOf(t, "main");
@@ -565,8 +571,8 @@ const PairVerse: React.FC<{ p: Prepared; a: Ayah; box: Box; clip: QariClip | nul
 };
 
 /** The Mirror: the sections as bars, the fold onto the pairs, the qari's two verses, the sources. */
-const MirrorView: React.FC<VP> = ({ p, t, cover }) => {
-  const f = useCurrentFrame();
+const MirrorView: React.FC<VP> = ({ p, t, cover, at }) => {
+  const f = useAt(at);
   const mr = p.mirror;
   if (!mr) return null;
   const fa = p.lang === "fa";
@@ -821,8 +827,8 @@ const TafsirPage: React.FC<{ p: Prepared; k: number; total: number }> = ({ p, k,
 };
 
 /** The carousel's silent Reel twin: each slide stands in the 4:5 crop, then turns to the next. */
-const TafsirReel: React.FC<VP> = ({ p, t }) => {
-  const f = useCurrentFrame();
+const TafsirReel: React.FC<VP> = ({ p, t, at }) => {
+  const f = useAt(at);
   const n = t.scenes.length;
   let pos = 0;
   t.scenes.forEach((s, i) => {
@@ -891,8 +897,16 @@ export const WaitingReel: React.FC<WaitingProps> = (raw) => {
 };
 
 /** The frame a cover shows: everything in place (the Mirror folded, with its pair and their verses). */
-function settledFrame(p: WaitingProps, t: InsightTimeline) {
+/**
+ * The frame a cover shows: everything in place — the Mirror folded with its pair, Kumayl its first
+ * line read under the lit candle, the others their text read and the source shown.
+ */
+export function settledFrame(p: Pick<WaitingProps, "format">, t: InsightTimeline) {
   if (p.format === "mirror") return sceneOf(t, "pair").from + 24;
+  if (p.format === "kumayl") {
+    const b = sceneOf(t, "b1");
+    return Math.max(b.from, b.from + b.dur - 20);
+  }
   return Math.min(t.total - 1, sceneOf(t, "end").from + 36);
 }
 
@@ -915,9 +929,7 @@ export const WaitingCover: React.FC<WaitingProps> = (raw) => {
             <TafsirPage p={p} k={1} total={slides} />
           </div>
         ) : (
-          <Freeze frame={settledFrame(p, t)}>
-            <View p={p} t={t} cover />
-          </Freeze>
+          <View p={p} t={t} cover at={settledFrame(p, t)} />
         )}
       </div>
     </AbsoluteFill>

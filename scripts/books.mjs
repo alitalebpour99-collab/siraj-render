@@ -19,10 +19,10 @@
 //   - Dua Kumayl: whole lines in order from where the last passage ended, as many as fit about
 //     half a minute of the narrator; after the last line it starts again;
 //   - the dhikr Story: the weekday's dua (Siraj's own «امروز» row, src/lib/duaToday.ts of the
-//     siraj repo), one line a week in order, the next line short enough for a Story;
-//   - Tafsir Nemooneh: the records in the mushaf's order; on the slides, whole sentences of the
-//     commentary in order (a sentence is never cut, reworded or summed up; a sentence left out is
-//     marked by an ellipsis between whole sentences).
+//     siraj repo), one line a week in order from its second line, the next line short enough;
+//   - Tafsir Nemooneh: the records in the mushaf's order; on the slides, the commentary from its
+//     start in whole sentences, in order, nothing left out in between (a sentence is never cut,
+//     reworded or summed up); an ellipsis after the last one when the commentary goes on.
 // Nothing here holds or logs a text: tests use made-up words.
 
 /** Nahj al-balagha with the Persian of the Makarem office: its work on Siraj, its volume, the part of the sayings. */
@@ -217,7 +217,6 @@ export function storyLine(lines, from, fit = FIT.story) {
 /* ---------- Tafsir Nemooneh: whole sentences on the slides ---------- */
 
 const HEADING = /^[^\s:]{2,12}:$/;
-const ENDS = new Set([".", "!", "؟", "?"]);
 
 /**
  * Where the commentary of a record begins (its paragraph index): after the record's own two
