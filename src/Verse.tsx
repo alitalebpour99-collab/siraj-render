@@ -12,6 +12,7 @@ import { L, SITE, firstUrl, host } from "./labels";
 import { Lamp, World } from "./light";
 import { AyahSeal, Cartouche, Divider, MushafFrame, Seal, SirajMark } from "./ornament";
 import type { QariClip, VerseProps, WordTime } from "./props";
+import { applyStudio, flags } from "./studio";
 import { C, FONT, SAFE, W, arNum, easeInOut, easeOut, fadeIn, fadeOut, faNum, rise } from "./theme";
 import { VT, verseTimeline, type VerseCard } from "./timelines";
 import { pieces, wordParts } from "./words";
@@ -23,14 +24,19 @@ const H_BOTTOM = 1920 - SAFE.bottom + 20;
 // ---------- the light of a word ----------
 
 type RGBA = [number, number, number, number];
-const DIM: RGBA = [243, 234, 214, 0.5];
-const SETTLED: RGBA = [231, 186, 98, 1];
-const HOT: RGBA = [255, 219, 140, 1];
+const DIM_DARK: RGBA = [243, 234, 214, 0.5];
+const SETTLED_DARK: RGBA = [231, 186, 98, 1];
+const HOT_DARK: RGBA = [255, 219, 140, 1];
+// on the mushaf paper the ink is dark and the light is a deeper brass
+const DIM_PAPER: RGBA = [42, 33, 22, 0.42];
+const SETTLED_PAPER: RGBA = [122, 79, 16, 1];
+const HOT_PAPER: RGBA = [168, 102, 12, 1];
 const mix = (a: RGBA, b: RGBA, t: number): RGBA => [0, 1, 2, 3].map((i) => a[i]! + (b[i]! - a[i]!) * t) as RGBA;
 const rgba = (c: RGBA) => `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${c[3].toFixed(3)})`;
 
 /** A word blooms when the qari reaches it, stays bright while he recites it, then settles. */
 function wordLook(t: number, w: WordTime): React.CSSProperties {
+  const [DIM, SETTLED, HOT] = flags.paper ? [DIM_PAPER, SETTLED_PAPER, HOT_PAPER] : [DIM_DARK, SETTLED_DARK, HOT_DARK];
   if (t < w.start) return { color: rgba(DIM) };
   const lit = clamp01((t - w.start) / 0.14);
   const hot = t <= w.end ? 1 : easeOut(clamp01(1 - (t - w.end) / 0.75));
@@ -38,7 +44,7 @@ function wordLook(t: number, w: WordTime): React.CSSProperties {
   const color = mix(mix(DIM, SETTLED, lit), HOT, hot * lit * 0.85);
   return {
     color: rgba(color),
-    textShadow: `0 0 ${(5 + 19 * glow).toFixed(1)}px rgba(224,172,79,${(0.16 + 0.56 * glow).toFixed(3)}), 0 0 ${(2 + 7 * glow).toFixed(1)}px rgba(255,232,176,${(0.08 + 0.5 * glow).toFixed(3)})`,
+    textShadow: flags.paper ? `0 0 ${(4 + 10 * glow).toFixed(1)}px rgba(200,140,40,${(0.1 + 0.3 * glow).toFixed(3)})` : `0 0 ${(5 + 19 * glow).toFixed(1)}px rgba(224,172,79,${(0.16 + 0.56 * glow).toFixed(3)}), 0 0 ${(2 + 7 * glow).toFixed(1)}px rgba(255,232,176,${(0.08 + 0.5 * glow).toFixed(3)})`,
   };
 }
 
@@ -52,7 +58,7 @@ function timesFor(clip: QariClip, count: number): WordTime[] {
  * Stored text set word by word, each word lit by its own timing (or, with no recitation, set
  * plainly in ink); `after` (the ayah's seal) stays on one line with the last word, as in S1.
  */
-const LitText: React.FC<{ text: string; clip: QariClip | null | undefined; t: number; after?: React.ReactNode; plain?: string }> = ({ text, clip, t, after, plain = C.ink }) => {
+export const LitText: React.FC<{ text: string; clip: QariClip | null | undefined; t: number; after?: React.ReactNode; plain?: string }> = ({ text, clip, t, after, plain = C.ink }) => {
   const { parts, count } = wordParts(text);
   const times = clip ? timesFor(clip, count) : null;
   let last = -1;
@@ -194,7 +200,13 @@ const Intro: React.FC<{ p: VerseProps; dur: number }> = ({ p, dur }) => {
   const t = fa ? L.fa : L.en;
   const ui = fa ? FONT.fa : FONT.en;
   const out = fadeOut(f, dur, VT.XF);
-  const open = interpolate(f, [6, 26], [0, 1], { ...clamp, easing: easeInOut });
+  // the studio's first second: «Surah n of 114», a short fact, or a question that the name answers
+  const hook = p.studio?.hook ?? "name-number";
+  const place = p.surah.revelationPlace === "meccan" ? t.meccan : t.medinan;
+  const verses = t.verses(p.surah.ayahCount);
+  const top = hook === "fact" ? `${place} · ${verses}` : hook === "question" ? (fa ? `${place} · ${verses}؛ کدام سوره؟` : `${place} · ${verses}: which surah?`) : t.of(p.surah.number, p.surahTotal);
+  const late = hook === "question" ? 30 : 0;
+  const open = interpolate(f, [6 + late, 26 + late], [0, 1], { ...clamp, easing: easeInOut });
   const turn = interpolate(f, [6, dur], [-40, 6], { ...clamp, easing: easeInOut });
   const warm = interpolate(f, [4, 30], [0, 1], { ...clamp, easing: easeInOut });
   const push = interpolate(f, [0, dur], [0.97, 1.02], clamp);
@@ -205,7 +217,7 @@ const Intro: React.FC<{ p: VerseProps; dur: number }> = ({ p, dur }) => {
       <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", paddingBottom: 140, transform: `scale(${push.toFixed(4)})` }}>
         <div dir={fa ? "rtl" : "ltr"} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 32 }}>
           <div style={{ opacity: fadeIn(f, 2), transform: `translateY(${rise(f, 2)}px)`, fontFamily: ui, fontSize: fa ? 52 : 56, fontWeight: 500, letterSpacing: fa ? 0 : "0.2em", fontVariantCaps: fa ? "normal" : "all-small-caps", fontVariantNumeric: "lining-nums", color: C.gold }}>
-            {t.of(p.surah.number, p.surahTotal)}
+            {top}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
             <Seal size={112} turn={turn} style={{ opacity: fadeIn(f, 8, 16) }} />
@@ -284,6 +296,7 @@ const Outro: React.FC<{ p: VerseProps; dur: number }> = ({ p, dur }) => {
           <div style={{ opacity: fadeIn(f, 32), display: "flex", flexDirection: "column", alignItems: "center", gap: 10, marginTop: 4 }}>
             <div style={{ fontFamily: FONT.en, fontSize: 44, color: C.gold, letterSpacing: "0.04em", direction: "ltr" }}>{SITE}</div>
             {p.voice.lines.length ? <div style={{ fontFamily: ui, fontSize: fa ? 26 : 27, color: C.quiet }}>{fa ? L.fa.voice : L.en.voice}</div> : null}
+            {p.studio?.ending === "next" ? <div style={{ marginTop: 12, padding: "10px 32px", borderRadius: 999, border: `2px solid ${C.brass}`, fontFamily: ui, fontSize: 36, color: C.star }}>{fa ? "بخش بعد فردا" : "The next part tomorrow"}</div> : null}
           </div>
         </div>
       </AbsoluteFill>
@@ -291,7 +304,10 @@ const Outro: React.FC<{ p: VerseProps; dur: number }> = ({ p, dur }) => {
   );
 };
 
-export const VerseReel: React.FC<VerseProps> = (p) => {
+export const VerseReel: React.FC<VerseProps> = (raw) => {
+  // the studio (look, motion, motes, frame, word glow, ending); without one, the S1 look
+  const studio = applyStudio(raw.studio);
+  const p: VerseProps = { ...raw, studio, qari: raw.qari && !studio.wordGlow ? { ...raw.qari, verses: raw.qari.verses.map((v) => ({ ...v, mode: "verse" as const })), basmala: raw.qari.basmala ? { ...raw.qari.basmala, mode: "verse" as const } : null } : raw.qari };
   const t = verseTimeline(p);
   const lines = new Map(p.voice.lines.map((l) => [l.id, l]));
   const audio = (key: string, from: number, file: string | undefined, seconds: number | undefined) =>
@@ -303,7 +319,7 @@ export const VerseReel: React.FC<VerseProps> = (p) => {
   return (
     <AbsoluteFill style={{ background: C.night }}>
       <World total={t.total} seed={p.surah.number} />
-      <MushafFrame />
+      {studio.frame ? <MushafFrame /> : null}
       <Sequence from={t.intro.from} durationInFrames={t.intro.dur} name="intro">
         <Intro p={p} dur={t.intro.dur} />
       </Sequence>

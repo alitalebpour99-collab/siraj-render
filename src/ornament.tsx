@@ -3,6 +3,7 @@
 // cartouche of a surah's name, the seal at the end of an ayah, the lamp mark.
 import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
+import { flags } from "./studio";
 import { C, easeInOut } from "./theme";
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
@@ -66,8 +67,8 @@ export const Night: React.FC<{ still?: boolean; glowY?: number }> = ({ still, gl
       </div>
       {/* the lattice fades towards the middle: the night laid over it, thick in the middle */}
       <div style={{ ...layer, background: `radial-gradient(70% 55% at 50% ${cy}, ${C.night2}e6 0%, ${C.night2}99 45%, ${C.night2}00 100%)` }} />
-      <div style={{ ...layer, opacity: breathe, background: `radial-gradient(60% 42% at 50% ${cy}, ${C.brass}24 0%, ${C.brass}08 60%, ${C.brass}00 100%)` }} />
-      <div style={{ ...layer, background: "radial-gradient(85% 75% at 50% 50%, #0000 62%, #00000073 100%)" }} />
+      <div style={{ ...layer, opacity: flags.glow ? breathe : 0, background: `radial-gradient(60% 42% at 50% ${cy}, ${C.brass}24 0%, ${C.brass}08 60%, ${C.brass}00 100%)` }} />
+      <div style={{ ...layer, background: `radial-gradient(85% 75% at 50% 50%, #0000 62%, ${flags.paper ? "#5e431c33" : "#00000073"} 100%)` }} />
     </AbsoluteFill>
   );
 };

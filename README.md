@@ -31,10 +31,13 @@ owner and never publishes it). Pictures are generated geometry only, no figures.
 |---|---|
 | `en-verse`, `fa-verse` (`…:range`) | «Verse & meaning»: a whole surah or its opening section, the qari with the word light, the translation and its narrator, the sources |
 | `en-counts`, `fa-counts` (`:overview`, `:revelation-order`, `:prostrations`, `:divisions`) | numbers counted from the Tanzil metadata, each with its counting rule |
-| `en-surah-card`, `fa-surah-card` | «Surah n of 114»: verses, Meccan or Medinan, revelation order, sections, parts, pages, prostration |
+| `en-surah-card`, `fa-surah-card` | «Surah n of 114»: verses, Meccan or Medinan, revelation order, sections, parts, pages, prostration; with `props.recite` the opening ayah with the qari and a ring of the verses drawn by their word counts |
+| `<lang>-<format>:<episode>` (S3b) | the insight videos, 12–40 s, counted at render time from the whole Tanzil Simple text and the metadata with the rule printed on screen (`scripts/insights.mjs`, `scripts/episodes.mjs`): `only` (The Only… №), `myth-fact` (The Counts Test №), `meccan-medinan`, `counted`, `mushaf-map`, `middle`, `revelation-order`, `one-line`, `opening-letters`, `every-letter`, `quiz` (with its carousel twin); `names` and `closing-names` are approve-first (their search forms wait for the lead) |
 
-Each has `<id>-cover` (1080×1920) and `<id>-grid` (1080×1350). The quiz carousel is not drawn,
-so the service does not plan it.
+Each has `<id>-cover` (1080×1920) and `<id>-grid` (1080×1350); the quiz also `<id>-slide` (its
+carousel twin, 1080×1350). Every format honours the studio (`props.studio`: look lapis / night /
+pewter / paper, motion, motes, frame, series number, word glow, pace, ending loop / next / source,
+the Story cut). Search forms are locators (a verse and a word span), never typed words.
 
 | path | what |
 |---|---|
@@ -55,8 +58,10 @@ so the service does not plan it.
   to do ends in seconds), then takes one job. Repository secret `SIRAJ_RENDER_SECRET`, variable
   `SIRAJ_SOCIAL_URL`. No artifact.
 - `.github/workflows/try.yml` — by hand: renders jobs written as the service writes them, without
-  the service; keeps stills, frames, covers and the JSON records (never a video or a sound) for
-  one day.
+  the service; keeps stills, frames, covers, the JSON records, the picture of the video with no
+  sound track and the narrator's own lines for one day (never the recitation). On the owner's PC
+  `node scripts/sample-mux.mjs <trial dir> <out dir> [--eleven <dir>]` cuts the qari again from
+  the public chapter files and makes the whole sample there (never committed or uploaded).
 - `.github/workflows/check.yml` — typecheck and the unit tests (placeholders only) on every push.
 
 Fonts: Amiri Quran © The Amiri Quran Project Authors; Vazirmatn © The Vazirmatn Project

@@ -124,6 +124,7 @@ export type VerseProps = {
   source: { quran: Release; translation: TranslationSource; translationNote: string | null; surahMetadata: MetadataSource };
   voice: Voice;
   qari: Qari | null;
+  studio?: Studio;
 };
 
 /* ---------- Counts and the surah card ---------- */
@@ -161,6 +162,67 @@ export type CardProps = {
   narration: Narration[];
   source: { quran: Release; surahMetadata: MetadataSource };
   voice: Voice;
+  /** the opening ayah with the qari (S3b), and the words of every verse for the ring */
+  recite?: Recite | null;
+  qari?: Qari | null;
+  verseWords?: number[];
+  studio?: Studio;
 };
 
-export type AnyProps = VerseProps | CountsProps | CardProps;
+export type AnyProps = VerseProps | CountsProps | CardProps | InsightProps;
+
+/* ---------- The studio (the control room's «استودیو», service §4.7) ---------- */
+
+export type Look = "lapis" | "night" | "pewter" | "paper";
+export type Studio = {
+  template: string | null;
+  look: Look;
+  motion: "calm" | "medium" | "lively";
+  particles: boolean;
+  frame: boolean;
+  seriesNumber: boolean;
+  wordGlow: boolean;
+  pace: "slow" | "normal" | "brisk";
+  hook: "name-number" | "fact" | "question";
+  ending: "loop" | "next" | "source";
+  maxSeconds: number | null;
+  story: boolean;
+  carousel: boolean;
+};
+
+/* ---------- The insight formats (S3b) ---------- */
+
+export type InsightFormat = "only" | "myth-fact" | "meccan-medinan" | "counted" | "mushaf-map" | "middle" | "revelation-order" | "one-line" | "opening-letters" | "every-letter" | "names" | "closing-names" | "quiz";
+
+/** One scene of an insight video: the narration ids it carries, its shortest length (frames). */
+export type ScenePlan = { id: string; lines: string[]; min: number };
+
+/** A surah as an insight video names it: numbers, the API's Arabic name, Tanzil's transliteration. */
+export type IndexSurah = { number: number; nameArabic: string; tname: string; ayahCount: number; place: "meccan" | "medinan"; order: number };
+
+/** The verses the qari recites in an insight video (texts exactly as the API served them). */
+export type Recite = { surah: SurahInfo; from: number; to: number; ayahs: Ayah[]; opening: string | null; basmala: boolean; translation: TranslationSource | null };
+
+export type InsightProps = {
+  kind: "insight";
+  id: string;
+  lang: Lang;
+  format: InsightFormat;
+  episode: string;
+  series: { n: number } | null;
+  scenes: ScenePlan[];
+  /** the numbers the manifest repeats (the job's expect.numbers, counted here) */
+  numbers: Record<string, unknown>;
+  /** what the picture needs (lit cells, places, focus …): numbers and flags only */
+  data: Record<string, unknown>;
+  surahs: IndexSurah[];
+  pages: number;
+  /** spans of the stored text the picture shows (a counted form, the opening letters), exactly as served */
+  spans: { form: string | null; groups: string[] };
+  narration: Narration[];
+  recite: Recite | null;
+  source: { quran: Release; surahMetadata: MetadataSource };
+  voice: Voice;
+  qari: Qari | null;
+  studio: Studio;
+};

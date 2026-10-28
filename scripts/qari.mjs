@@ -94,8 +94,8 @@ async function reciterOf(recitationId) {
   return { name: `Recitation ${recitationId}`, style: null, qirat: null };
 }
 
-/** The clips of the public chapter route. */
-async function publicClips(props, id, out, split) {
+/** The clips of the public chapter route (`props` is the recited unit: id, surah, from, to, ayahs). */
+async function publicClips(props, id, out, split, withBasmala = true) {
   const ch = await chapter(id, props.surah.number);
   check(ch.timestamps.length === props.surah.ayahCount, "the recitation has every ayah of the surah");
   const first = ch.cuts[props.from - 1];
@@ -111,10 +111,12 @@ async function publicClips(props, id, out, split) {
     const file = path.join(out, `q-${a.ayahNumber}.wav`);
     const { seconds, toMs } = cut(ch.file, c.fromMs, c.toMs, gain, file, ch.ms);
     const al = alignClip({ sirajWords, segments: t.segments, fromMs: c.fromMs, toMs });
-    return { id: `q${a.ayahNumber}`, ayah: a.ayahNumber, file: `qari/${props.id}/q-${a.ayahNumber}.wav`, seconds, mode: al.mode, words: al.words, sirajWords, qfWords: al.qfWords, verseKey: t.verse_key };
+    // where the clip was cut (for a sample mixed again on the owner's PC; no sound leaves the run)
+    const src = { recitationId: id, chapter: props.surah.number, fromMs: c.fromMs, toMs, gainDb: Math.round(gain * 100) / 100 };
+    return { id: `q${a.ayahNumber}`, ayah: a.ayahNumber, file: `qari/${props.id}/q-${a.ayahNumber}.wav`, seconds, mode: al.mode, words: al.words, sirajWords, qfWords: al.qfWords, verseKey: t.verse_key, src };
   });
   let basmala = null;
-  if (split) {
+  if (split && withBasmala) {
     const one = await chapter(id, 1);
     const t = one.timestamps[0];
     const c = one.cuts[0];
@@ -122,13 +124,13 @@ async function publicClips(props, id, out, split) {
     const file = path.join(out, "q-basmala.wav");
     const { seconds, toMs } = cut(one.file, c.fromMs, c.toMs, g, file, one.ms);
     const al = alignClip({ sirajWords: wordCount(split.basmala), segments: t.segments, fromMs: c.fromMs, toMs });
-    basmala = { id: "qb", ayah: null, file: `qari/${props.id}/q-basmala.wav`, seconds, mode: al.mode, words: al.words, sirajWords: wordCount(split.basmala), qfWords: al.qfWords, verseKey: "1:1 (basmala)" };
+    basmala = { id: "qb", ayah: null, file: `qari/${props.id}/q-basmala.wav`, seconds, mode: al.mode, words: al.words, sirajWords: wordCount(split.basmala), qfWords: al.qfWords, verseKey: "1:1 (basmala)", src: { recitationId: id, chapter: 1, fromMs: c.fromMs, toMs, gainDb: Math.round(g * 100) / 100 } };
   }
   return { verses, basmala };
 }
 
 /** The clips of the licensed route: one file per ayah, its segments on the file's own clock. */
-async function licensedClips(props, rec, out, split) {
+async function licensedClips(props, rec, out, split, withBasmala = true) {
   const byKey = new Map((rec.ayahs ?? []).map((a) => [a.verseKey, a]));
   const raw = [];
   for (const a of props.ayahs) {
@@ -149,7 +151,7 @@ async function licensedClips(props, rec, out, split) {
     return { id: `q${a.ayahNumber}`, ayah: a.ayahNumber, file: `qari/${props.id}/q-${a.ayahNumber}.wav`, seconds, mode: al.mode, words: al.words, sirajWords, qfWords: al.qfWords, verseKey: r.verseKey };
   });
   let basmala = null;
-  if (split && rec.basmala?.url) {
+  if (split && withBasmala && rec.basmala?.url) {
     const src = path.resolve(".work", "qari", `${props.id}-basmala.mp3`);
     await download(rec.basmala.url, src, 2000);
     const ms = durationMs(src);
@@ -163,8 +165,12 @@ async function licensedClips(props, rec, out, split) {
 
 /** public/qari/<id>/manifest.json for a verse job, or null (no recitation; `reason` says why). */
 export async function qariJob(job) {
-  const props = JSON.parse(fs.readFileSync(path.join("props", `${job.id}.json`), "utf8"));
-  if (props.kind !== "verse") return { qari: null, reason: "not a verse" };
+  const all = JSON.parse(fs.readFileSync(path.join("props", `${job.id}.json`), "utf8"));
+  // what is recited: a verse job's unit (with the basmala before ayah 1), or an insight's / a card's
+  // `recite` (the basmala only when it asks for it)
+  const props = all.kind === "verse" ? all : all.recite ? { id: all.id, surah: all.recite.surah, from: all.recite.from, to: all.recite.to, ayahs: all.recite.ayahs, opening: all.recite.opening } : null;
+  const withBasmala = all.kind === "verse" ? true : Boolean(all.recite?.basmala);
+  if (!props) return { qari: null, reason: "nothing recited" };
   const out = path.join("public", "qari", job.id);
   fs.rmSync(out, { recursive: true, force: true });
   const rec = job.props.recitation ?? null;
@@ -173,7 +179,7 @@ export async function qariJob(job) {
   const split = props.from === 1 ? splitLeadingBasmala(props.surah.number, 1, props.ayahs[0].text, props.opening) : null;
   try {
     fs.mkdirSync(out, { recursive: true });
-    const { verses, basmala } = licensed ? await licensedClips(props, rec, out, split) : await publicClips(props, id, out, split);
+    const { verses, basmala } = licensed ? await licensedClips(props, rec, out, split, withBasmala) : await publicClips(props, id, out, split, withBasmala);
     const reciter = licensed ? { name: rec.reciterName ?? `Recitation ${id}`, style: rec.style ?? null, qirat: null } : await reciterOf(id);
     const fallbacks = [basmala, ...verses].filter((v) => v && v.mode !== "word").map((v) => ({ verseKey: v.verseKey, sirajWords: v.sirajWords, qfWords: v.qfWords }));
     const manifest = { source: licensed ? "quran-foundation" : "quran-com-public", previewOnly: !licensed, recitationId: id, reciter, basmala, verses, fallbacks };

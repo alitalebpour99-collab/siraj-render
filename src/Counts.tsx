@@ -10,6 +10,7 @@ import { C_WORDS, L, SITE, host } from "./labels";
 import { World } from "./light";
 import { Divider, MushafFrame, SirajMark } from "./ornament";
 import type { CountsProps, Lang } from "./props";
+import { applyStudio } from "./studio";
 import { C, FONT, SAFE, W, easeInOut, easeOut, enNum, fadeIn, fadeOut, faGrouped, faNum, rise } from "./theme";
 import { ST, countsTimeline, type Scene } from "./timelines";
 
@@ -491,6 +492,7 @@ export const Narrated: React.FC<{ scenes: Scene[]; lang: Lang; subtitlesUntil: n
 const VIEWS = { total: Total, places: Places, chart: Chart, order: Order, sajdas: Sajdas, divisions: Divisions, end: End } as const;
 
 export const CountsReel: React.FC<CountsProps> = (p) => {
+  applyStudio(null);
   const t = countsTimeline(p);
   const f = useCurrentFrame();
   const endFrom = t.scenes[t.scenes.length - 1]!.from;

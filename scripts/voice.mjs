@@ -9,7 +9,7 @@
 //   - Kokoro (en) / Mana-Persian-Piper (fa): read here by scripts/tts.py, its whole output kept
 //     in .work/ (an engine may echo what it reads; no text may reach a log).
 // Every line is levelled to the same loudness. The log shows ids, counts and seconds only.
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { check, download, jobArg, level, loudness, runMain } from "./lib.mjs";
@@ -90,6 +90,31 @@ function fromFreeVoice(job, voice, lines) {
   return made.map((m) => ({ id: m.id, file: path.join(work, m.file) }));
 }
 
+/** The studio's narration pace (slow · normal · brisk), for the free voices (ElevenLabs lines come made). */
+export function paced(voice, pace) {
+  if (!pace || pace === "normal") return voice;
+  if (voice.engine === "kokoro") return { ...voice, speed: Math.round((voice.speed ?? 1) * (pace === "slow" ? 0.88 : 1.1) * 100) / 100 };
+  if (voice.engine === "piper") return { ...voice, lengthScale: Math.round((voice.lengthScale ?? 1) * (pace === "slow" ? 1.12 : 0.9) * 100) / 100 };
+  return voice;
+}
+
+/**
+ * A trial only (try.yml): lines that were voiced on the owner's PC with ElevenLabs (the key never
+ * reaches GitHub). The run gets their lengths and word times and puts silence of that length in
+ * their place; the real lines are mixed in on the PC (scripts/sample-mux.mjs).
+ */
+function placeholders(job, asked, wanted) {
+  const dir = path.join("public", "voice", job.id);
+  const given = new Map((asked.lines ?? []).map((l) => [l.id, l]));
+  return wanted.map((w) => {
+    const l = given.get(w.id);
+    check(l && Number(l.seconds) > 0.2, `placeholder line ${w.id} has a length`);
+    const out = path.join(dir, `n-${w.id}.wav`);
+    execFileSync("ffmpeg", ["-y", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", Number(l.seconds).toFixed(3), "-c:a", "pcm_s16le", out]);
+    return { id: w.id, file: `voice/${job.id}/n-${w.id}.wav`, seconds: Number(l.seconds), ...(Array.isArray(l.words) && l.words.length ? { words: l.words } : {}) };
+  });
+}
+
 const label = (v) =>
   v.engine === "kokoro" ? `kokoro-82m:${v.voice}:${v.speed ?? 1}` : v.engine === "piper" ? `mana-persian-piper:${v.voice}:length_scale=${v.lengthScale ?? 1}` : v.engine === "elevenlabs" ? `${v.model}:${v.voiceId}` : null;
 
@@ -101,8 +126,20 @@ export async function voiceJob(job) {
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(outDir, { recursive: true });
   const asked = job.props.voice ?? FREE[lang];
+  const pace = job.props.studio?.pace ?? "normal";
   let manifest = null;
-  if (asked.engine === "elevenlabs") {
+  // nothing to read (a silent carousel, a silent Story): no narrator at all
+  if (props.silent || asked.engine === "none" || !linesOf(props, false).length) {
+    manifest = { engine: "none", voice: null, reason: "nothing to read", lines: [] };
+    fs.writeFileSync(path.join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 1)}
+`);
+    console.log(`${job.id}: no narrator (nothing to read)`);
+    return manifest;
+  }
+  if (asked.engine === "placeholder") {
+    manifest = { engine: "elevenlabs", voice: label({ ...asked, engine: "elevenlabs" }), placeholder: true, lines: placeholders(job, asked, linesOf(props, false)) };
+  }
+  if (!manifest && asked.engine === "elevenlabs") {
     try {
       const raws = await fromElevenLabs(job, linesOf(props, false));
       manifest = { engine: "elevenlabs", voice: label(asked), lines: levelAll(job.id, raws) };
@@ -112,7 +149,7 @@ export async function voiceJob(job) {
     }
   }
   if (!manifest) {
-    const voice = asked.engine === "kokoro" || asked.engine === "piper" ? asked : FREE[lang];
+    const voice = paced(asked.engine === "kokoro" || asked.engine === "piper" ? asked : FREE[lang], pace);
     const raws = fromFreeVoice(job, voice, linesOf(props, true));
     if (raws) manifest = { engine: voice.engine, voice: label(voice), ...(asked.reason ? { reason: asked.reason } : {}), lines: levelAll(job.id, raws) };
     // Only the Persian voice may be missing (S1's rule): the video is then timed by reading length.
