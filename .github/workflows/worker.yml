@@ -6,7 +6,11 @@ name: Worker
 # text of the content is logged; NOTHING is uploaded as an artifact (this repository is public
 # and the recitation must not be downloadable here): the files go to the service only.
 # The schedule was registered again on 2026-10-28: after the workflow was disabled and enabled,
-# GitHub never started it by its timer.
+# GitHub never started it by its timer, nor timer.yml's either. So a run that took a job looks
+# again at the end and, while something waits, starts the next run itself (the last step): one
+# start, by hand, by a timer or by the service, renders the whole queue. A run that took nothing
+# starts nothing, so an empty look never repeats; a failing job is bounded by the service's
+# render attempts.
 
 on:
   workflow_dispatch:
@@ -40,6 +44,9 @@ jobs:
     if: github.repository == 'alitalebpour99-collab/siraj-render' && github.event.schedule != '23 4 1 * *'
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    permissions:
+      contents: read
+      actions: write   # the last step starts the next run
     env:
       SIRAJ_SOCIAL_URL: ${{ vars.SIRAJ_SOCIAL_URL }}
       SIRAJ_RENDER_SECRET: ${{ secrets.SIRAJ_RENDER_SECRET }}
@@ -104,4 +111,15 @@ jobs:
         run: node -e "import('@remotion/renderer').then((m) => m.ensureBrowser())"
       - if: steps.look.outputs.waiting != '0'
         name: Take one job, render it, hand it back
-        run: node scripts/worker.mjs
+        shell: bash
+        run: node scripts/worker.mjs 2>&1 | tee /tmp/worker.log
+      - if: always() && steps.look.outputs.waiting != '0'
+        name: More waiting? Start the next run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          grep -q '^job .*: attempt ' /tmp/worker.log 2>/dev/null || { echo "no job was taken: no next run"; exit 0; }
+          n=$(curl -fsS --retry 3 --retry-delay 5 -H "authorization: Bearer $SIRAJ_RENDER_SECRET" "$SIRAJ_SOCIAL_URL/api/render/work?peek=1&can=$CAN" | jq -r '.waiting // 0') || n=0
+          echo "still waiting: $n"
+          if [ "$n" != "0" ]; then gh workflow run worker.yml --repo "$GITHUB_REPOSITORY" --ref main && echo "next run started"; fi
