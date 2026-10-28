@@ -149,11 +149,11 @@ export async function renderJob(job, { stills = false, frames = process.env.FRAM
     }
     console.log(`${job.id}: 3 carousel slides written`);
   }
-  // the short tafsir IS a carousel (waiting template): every slide, always — 1 the verse, then the record's paragraphs
+  // the short tafsir IS a carousel (waiting template): every slide, always — 1 the ayahs, 2–4 the record's whole sentences, 5 the source
   const tafsir = props.kind === "waiting" && props.format === "tafsir";
   if (tafsir) {
     const id = `${job.composition}-slide`;
-    const n = 1 + props.tafsir.paragraphs.length;
+    const n = props.facts.slides;
     for (let k = 1; k <= n; k++) {
       const still = await selectComposition({ ...common, id, inputProps: { ...inputProps, slide: k } });
       await renderStill({ ...common, composition: still, inputProps: { ...inputProps, slide: k }, imageFormat: "jpeg", jpegQuality: 92, output: path.join(out, `${job.id}-slide${k}.jpg`) });
@@ -282,7 +282,7 @@ export async function renderJob(job, { stills = false, frames = process.env.FRAM
     console.log(`${job.id}: frames at ${marks.map((n) => (n / fps).toFixed(2)).join(", ")} s`);
   }
 
-  const manifest = { ...manifestOf(props, voice, qari, seconds), checks: { audio: !overlap, safeFrame: props.kind === "insight" ? safeFrame() : true } };
+  const manifest = { ...manifestOf(props, voice, qari, seconds), checks: { audio: !overlap, safeFrame: props.kind === "insight" ? safeFrame() : props.kind === "waiting" ? safeFrame(textBoxes(props.format)) : true } };
   fs.writeFileSync(path.join(out, `${job.id}.manifest.json`), `${JSON.stringify(manifest, null, 1)}\n`);
   const record = {
     job: job.id,

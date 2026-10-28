@@ -10,7 +10,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { splitLeadingBasmala } from "../src/basmala.ts";
-import { INSIGHTS, episodeOf, insightIds } from "./episodes.mjs";
+import { INSIGHTS, episodeOf, insightIds, scenesFor } from "./episodes.mjs";
 import { ALPHABET, OPENING_LETTER_SURAHS, endingFacts, firstLetterWords, formWords, model, wordsOf } from "./insights.mjs";
 import { API, DataChanged, UA, check, checkTrust, jobArg, releaseOf, runMain, same, sha256, siraj, sleep } from "./lib.mjs";
 import { cardNumbers, countNumbers, juzOf, loadTanzil } from "./tanzil.mjs";
@@ -331,7 +331,7 @@ async function insightProps(job) {
     format: p.format,
     episode: p.episode,
     series: Number.isInteger(p.series?.n) ? { n: p.series.n } : null,
-    scenes: def.scenes,
+    scenes: scenesFor(p.format, narration),
     numbers: ep.numbers,
     data,
     surahs: idx.surahs.map((s, i) => ({ number: s.surahNumber, nameArabic: s.nameArabic, tname: meta.suras[i].tname, ayahCount: s.ayahCount, place: s.revelationPlace, order: s.revelationOrder })),

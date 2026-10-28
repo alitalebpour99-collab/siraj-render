@@ -27,23 +27,26 @@ import { Lamp, World } from "./light";
 import { AyahSeal, MushafFrame, Seal, SirajMark, starPath } from "./ornament";
 import type { Ayah, Lang, MetadataSource, Narration, Qari, QariClip, Release, ScenePlan, Studio, TranslationSource, Voice } from "./props";
 import { applyStudio, flags, mk } from "./studio";
-import { C, FONT, FPS, H, W, arNum, easeInOut, easeOut, faGrouped, faNum } from "./theme";
+import { C, FONT, FPS, H, W, arNum, easeInOut, easeOut, faNum } from "./theme";
 import { ST, insightTimeline, type InsightScene, type InsightTimeline, type SceneLine } from "./timelines";
 import { LitText } from "./Verse";
 import { pieces, wordParts } from "./words";
-import { SLIDE, WAITING_LANGS, WAITING_LOOK, WBOX, scenesOf, type WaitingFormat } from "./waitingPlan";
+import { SLIDE, TAFSIR_SLIDES, WAITING_LANGS, WAITING_LOOK, WBOX, scenesOf, type WaitingFormat } from "./waitingPlan";
 
 /* ---------- props (scripts/waiting.mjs writes them) ---------- */
 
 export type Weekday = "sat" | "sun" | "mon" | "tue" | "wed" | "thu" | "fri";
-/** Where a text comes from, as the job names it. */
-export type WaitSource = { title: string; publisher: string; url: string; translator: string | null; releaseKey: string | null };
-/** A Nahj saying, a Kumayl passage or the day's dhikr: the Arabic and its Persian, verbatim. */
-export type WaitText = { number: number | null; day: Weekday | null; count: number | null; arabic: string; persian: string; textHashSha256: string | null; source: WaitSource };
+/** Where a text comes from: the book and its publisher (interface words), its page at the publisher and on Siraj. */
+export type WaitSource = { title: string; publisher: string; url: string; siraj: string };
+/** One line of a text as Siraj serves it: the Arabic and its Persian, verbatim. */
+export type WaitLine = { number: number; arabic: string; persian: string };
+/** A Nahj saying, a Kumayl passage (its lines) or the day's dhikr, read from Siraj in the run. */
+export type WaitText = { kind: "nahj" | "kumayl" | "dhikr"; number: number | null; day: Weekday | null; lines: WaitLine[]; source: WaitSource; total?: number };
 export type WaitSurah = { number: number; ayahCount: number; nameArabic: string; revelationPlace: "meccan" | "medinan"; revelationOrder: number };
 /** Quran verses as Siraj's API served them in the run (the Mirror's pair, the tafsir's verse). */
 export type WaitVerses = { surah: WaitSurah; from: number; to: number; ayahs: Ayah[]; opening: string | null; basmala: boolean; translation: TranslationSource | null };
-export type WaitTafsir = { verse: WaitVerses | null; paragraphs: string[]; volume: number | null; page: number | null; source: WaitSource };
+/** The tafsir carousel: the ayahs (slide 1), three slides of whole sentences of the record as served, the record's work and where it is. */
+export type WaitTafsir = { verse: WaitVerses | null; slides: string[]; work: { title: string; author: string }; source: { url: string | null; publisher: string; siraj: string } };
 export type WaitOccasion = { authority: string; name: string; line: string; url: string | null };
 export type WaitMirror = { surah: number; scholar: { name: string; work: string }; sections: Array<{ from: number; to: number }>; center: number; pair: [number, number] };
 
@@ -62,8 +65,10 @@ export type WaitingProps = {
   recite: WaitVerses | null;
   /** no narrator, whatever voice was made (the tafsir carousel, a silent dhikr Story) */
   silent: boolean;
-  /** the Quran text and metadata sources when the video shows a verse (their keys are null otherwise) */
-  source: { quran: Omit<Partial<Release>, "releaseKey"> & { releaseKey: string | null }; surahMetadata: Omit<Partial<MetadataSource>, "sha256"> & { sha256: string | null } };
+  /** the Quran text and metadata sources when the video shows a verse (their keys are null otherwise); the book's release */
+  source: { quran: Omit<Partial<Release>, "releaseKey"> & { releaseKey: string | null }; surahMetadata: Omit<Partial<MetadataSource>, "sha256"> & { sha256: string | null }; text: { releaseKey: string } | null };
+  /** the served strings' hashes (for the manifest) */
+  texts: Array<{ locator: string; textHashSha256: string }>;
   voice: Voice;
   qari: Qari | null;
   studio: Partial<Studio> | null;
@@ -98,7 +103,7 @@ const ui = (lang: Lang) => (lang === "fa" ? FONT.fa : FONT.en);
 const dIn = (lang: Lang, n: number) => (lang === "fa" ? faNum(n) : String(n));
 const boxH = (b: Box) => b[1] - b[0];
 const sceneOf = (t: InsightTimeline, id: string): InsightScene => t.scenes.find((s) => s.id === id) ?? { id, from: t.total, dur: 1, lines: [], clips: [] };
-const seedOf = (p: WaitingProps) => 23 + p.format.length * 5 + (p.text?.number ?? p.mirror?.surah ?? p.tafsir?.page ?? 0);
+const seedOf = (p: WaitingProps) => 23 + p.format.length * 5 + (p.text?.number ?? p.text?.lines[0]?.number ?? p.mirror?.surah ?? p.tafsir?.verse?.surah.number ?? 0);
 
 /* ---------- interface words (no sacred text, no translation) ---------- */
 
@@ -129,15 +134,12 @@ const WW = {
     announced: (who: string) => `بنا بر اعلام ${who}`,
   },
 };
-const TR_VOICE = "صدای مصنوعی · فقط ترجمه خوانده می‌شود";
+const TR_VOICE = "صدای مصنوعی · فقط فارسی را می‌خواند";
 
-const sourceLine = (s: WaitSource) => [s.title, s.translator ? `ترجمهٔ ${s.translator}` : null].filter(Boolean).join(" · ");
-const tafsirChip = (x: WaitTafsir) => {
-  const v = x.volume ? `جلد ${faNum(x.volume)}` : null;
-  const pg = x.page ? `ص ${faNum(x.page)}` : null;
-  const where = [v, pg].filter(Boolean).join("، ");
-  return where ? `تفسیر نمونه · ${where}` : "تفسیر نمونه";
-};
+/** The foot's source line: the service's spoken source line when the job has one (shown as said), else the book and its publisher. */
+const sourceLine = (p: WaitingProps, s: WaitSource) => p.narration.find((l) => l.id === "src")?.show ?? `${s.title} · ${s.publisher}`;
+/** An address as it is shown: without its scheme. */
+const bare = (url: string) => url.replace(/^https?:///, "");
 
 /* ---------- type that moves ---------- */
 
@@ -320,20 +322,21 @@ const NahjView: React.FC<VP> = ({ p, t }) => {
   const read = sceneOf(t, "read");
   const end = sceneOf(t, "end");
   const B = WBOX.nahj;
-  const count = Math.max(1, wordParts(x.arabic).count);
+  const arabic = x.lines[0]?.arabic ?? "";
+  const count = Math.max(1, wordParts(arabic).count);
   const step = Math.min(mk(16), Math.max(2, (open.dur - 56) / count));
   return (
     <AbsoluteFill>
       <Lamp warm={0.4 + 0.6 * ramp(f, open.from, 60)} cy={0.3} />
       <Chip lang="fa" f={f} text={`حکمت ${faNum(x.number ?? 0)} · نهج‌البلاغه`} />
       <Block box={B.arabic}>
-        <Fit width={900} maxHeight={boxH(B.arabic)} max={78} min={32} measureKey={x.arabic} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.95, textAlign: "center", color: C.star, textWrap: "balance" }}>
-          <SlowArabic text={x.arabic} f={f} at={(k) => open.from + 8 + k * step} len={mk(22)} />
+        <Fit width={900} maxHeight={boxH(B.arabic)} max={78} min={30} measureKey={arabic} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.95, textAlign: "center", color: C.star, textWrap: "balance", whiteSpace: "pre-line" }}>
+          <SlowArabic text={arabic.trim()} f={f} at={(k) => open.from + 8 + k * step} len={mk(22)} />
         </Fit>
       </Block>
       <BrassLine top={B.line[0]} k={span01(f, open.from + open.dur - 46, open.from + open.dur - 4)} />
       <Read lines={read.lines} f={f} box={B.persian} />
-      <Foot lang="fa" f={f} source={sourceLine(x.source)} showAt={read.from} endAt={end.from} voice={p.voice.lines.length ? TR_VOICE : null} />
+      <Foot lang="fa" f={f} source={sourceLine(p, x.source)} showAt={read.from} endAt={end.from} voice={p.voice.lines.length ? TR_VOICE : null} />
     </AbsoluteFill>
   );
 };
@@ -344,39 +347,69 @@ const KumaylView: React.FC<VP> = ({ p, t }) => {
   const x = p.text;
   if (!x) return null;
   const candle = sceneOf(t, "candle");
-  const open = sceneOf(t, "open");
-  const read = sceneOf(t, "read");
   const end = sceneOf(t, "end");
   const B = WBOX.kumayl;
-  const { count } = wordParts(x.arabic);
-  const step = Math.min(mk(14), Math.max(2, (open.dur - 40) / Math.max(1, count)));
-  // the light passes word after word, as a qari's light would, but it is only light: nobody recites
-  const sweep: QariClip = {
-    id: "light",
-    ayah: null,
-    file: "",
-    seconds: open.dur / FPS,
-    mode: "word",
-    words: Array.from({ length: count }, (_, k) => ({ start: (10 + k * step) / FPS, end: (10 + (k + 1.8) * step) / FPS })),
-    sirajWords: count,
-    qfWords: count,
-    verseKey: "",
-  };
   const lit = span01(f, candle.from + 6, candle.from + 6 + mk(40));
+  const first = x.lines[0]?.number ?? 1;
+  const last = x.lines[x.lines.length - 1]?.number ?? first;
+  const chip = first === last ? `شب جمعه · دعای کمیل · بند ${faNum(first)}` : `شب جمعه · دعای کمیل · بندهای ${faNum(first)} تا ${faNum(last)}`;
+  const rest = end.lines.find((l) => l.id === "rest");
+  const endIn = ramp(f, end.from + 4, 20);
   return (
     <AbsoluteFill>
       <Lamp warm={0.25 + 0.75 * lit} cy={0.25} />
-      <Chip lang="fa" f={f} text={`شب جمعه · دعای کمیل · بند ${faNum(x.number ?? 0)}`} />
+      <Chip lang="fa" f={f} text={chip} />
       <div style={{ position: "absolute", top: B.candle[0], left: 0, width: W, height: boxH(B.candle), display: "flex", justifyContent: "center" }}>
         <Candle f={f} lit={lit} height={boxH(B.candle)} />
       </div>
-      <Block box={B.arabic} style={{ opacity: ramp(f, candle.from + candle.dur - 30, 30) }}>
-        <Fit width={900} maxHeight={boxH(B.arabic)} max={70} min={30} measureKey={x.arabic} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.95, textAlign: "center", textWrap: "balance" }}>
-          <LitText text={x.arabic} clip={sweep} t={(f - open.from) / FPS} />
-        </Fit>
-      </Block>
-      <Read lines={read.lines} f={f} box={B.persian} max={44} />
-      <Foot lang="fa" f={f} source={sourceLine(x.source)} showAt={open.from} endAt={end.from} voice={p.voice.lines.length ? TR_VOICE : null} />
+      {x.lines.map((line, k) => {
+        const s = sceneOf(t, `b${k + 1}`);
+        const o = Math.min(ramp(f, s.from - 4, 16), 1 - ramp(f, s.from + s.dur - 14, 14));
+        if (o <= 0) return null;
+        const text = line.arabic.trim();
+        const { count } = wordParts(text);
+        const tr = s.lines[0];
+        // the light passes word after word while the Persian is read, but it is only light: nobody recites
+        const span = Math.max(30, (tr ? tr.from + tr.len - s.from : s.dur) - 18);
+        const step = Math.max(2, span / Math.max(1, count));
+        const sweep: QariClip = {
+          id: `light-${k}`,
+          ayah: null,
+          file: "",
+          seconds: s.dur / FPS,
+          mode: "word",
+          words: Array.from({ length: count }, (_, j) => ({ start: (8 + j * step) / FPS, end: (8 + (j + 1.8) * step) / FPS })),
+          sirajWords: count,
+          qfWords: count,
+          verseKey: "",
+        };
+        return (
+          <React.Fragment key={line.number}>
+            <Block box={B.arabic} style={{ opacity: o }}>
+              <Fit width={900} maxHeight={boxH(B.arabic)} max={68} min={30} measureKey={text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.95, textAlign: "center", textWrap: "balance" }}>
+                <LitText text={text} clip={sweep} t={(f - s.from) / FPS} />
+              </Fit>
+            </Block>
+            <div style={{ opacity: o }}>
+              <Read lines={s.lines} f={f} box={B.persian} max={44} />
+            </div>
+          </React.Fragment>
+        );
+      })}
+      {f >= end.from ? (
+        <div dir="rtl" style={{ position: "absolute", top: B.arabic[0], left: 0, width: W, height: B.persian[1] - B.arabic[0], display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 26, opacity: endIn }}>
+          {rest ? (
+            <Fit width={860} maxHeight={260} max={46} min={26} measureKey={rest.show} lang="fa" dir="rtl" style={{ fontFamily: FONT.fa, fontWeight: 500, lineHeight: 1.8, textAlign: "center", color: C.ink, textWrap: "balance" }}>
+              <Kinetic text={rest.show} f={f} at={wordTimes(rest)} />
+            </Fit>
+          ) : null}
+          <div style={{ width: 260, height: 1.5, background: `linear-gradient(90deg, transparent, ${C.gold}, transparent)` }} />
+          <Fit width={920} maxHeight={60} max={30} min={18} measureKey={x.source.siraj} lang="en" dir="ltr" style={{ fontFamily: FONT.en, lineHeight: 1.4, textAlign: "center", color: C.gold, whiteSpace: "nowrap", letterSpacing: "0.02em" }}>
+            {bare(x.source.siraj)}
+          </Fit>
+        </div>
+      ) : null}
+      <Foot lang="fa" f={f} source={sourceLine(p, x.source)} showAt={candle.from + candle.dur - 10} endAt={end.from} voice={p.voice.lines.length ? TR_VOICE : null} />
     </AbsoluteFill>
   );
 };
@@ -389,6 +422,7 @@ const StoryView: React.FC<VP> = ({ p, t }) => {
   const dh = sceneOf(t, "dhikr");
   const end = sceneOf(t, "end");
   const B = WBOX.story;
+  const arabic = (x.lines[0]?.arabic ?? "").trim();
   const k = span01(f, dh.from + 12, dh.from + dh.dur - 24);
   const size = boxH(B.ring);
   const c = size / 2;
@@ -422,25 +456,16 @@ const StoryView: React.FC<VP> = ({ p, t }) => {
           />
         </svg>
         <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 }}>
-          {x.count ? (
-            <>
-              <div dir="ltr" style={{ fontFamily: FONT.fa, fontSize: 140, lineHeight: 1.1, color: C.ink, fontVariantNumeric: "tabular-nums" }}>
-                {faGrouped(Math.round(x.count * k))}
-              </div>
-              <div style={{ fontFamily: FONT.fa, fontSize: 36, lineHeight: 1.5, color: C.gold }}>بار</div>
-            </>
-          ) : (
-            <Seal size={120} turn={f * 0.3} />
-          )}
+          <Seal size={120} turn={f * 0.3} />
         </div>
       </div>
       <Block box={B.arabic} style={{ opacity: ramp(f, dh.from, 14) }}>
-        <Fit width={900} maxHeight={boxH(B.arabic)} max={84} min={36} measureKey={x.arabic} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.9, textAlign: "center", color: C.star, textShadow: flags.glow ? "0 0 22px rgba(240,194,122,0.4)" : undefined, textWrap: "balance" }}>
-          {x.arabic}
+        <Fit width={900} maxHeight={boxH(B.arabic)} max={84} min={36} measureKey={arabic} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.9, textAlign: "center", color: C.star, textShadow: flags.glow ? "0 0 22px rgba(240,194,122,0.4)" : undefined, textWrap: "balance" }}>
+          {arabic}
         </Fit>
       </Block>
       <Read lines={dh.lines} f={f} box={B.persian} max={42} />
-      <Foot lang="fa" f={f} source={sourceLine(x.source)} showAt={dh.from + 20} endAt={end.from} voice={p.voice.lines.length ? TR_VOICE : null} />
+      <Foot lang="fa" f={f} source={sourceLine(p, x.source)} showAt={dh.from + 20} endAt={end.from} voice={p.voice.lines.length ? TR_VOICE : null} />
     </AbsoluteFill>
   );
 };
@@ -697,20 +722,24 @@ const MirrorView: React.FC<VP> = ({ p, t, cover }) => {
 
 /* ---------- the tafsir carousel ---------- */
 
-/** One slide of the carousel (1080×1350): 1 the verse with Makarem's Persian, then the record's paragraphs. */
+/**
+ * One slide of the carousel (1080×1350): 1 the ayahs with Makarem's Persian; 2–4 whole sentences of
+ * the record, exactly as served (an ellipsis only after the last, when the commentary goes on);
+ * 5 the work, its author as Siraj names them, and where the rest of it is.
+ */
 const TafsirPage: React.FC<{ p: Prepared; k: number; total: number }> = ({ p, k, total }) => {
   const x = p.tafsir;
   if (!x) return null;
   const v = x.verse;
   const S = SLIDE;
-  const chip = tafsirChip(x);
+  const chip = v ? `${x.work.title} · ${v.from === v.to ? `آیهٔ ${faNum(v.from)}` : `آیه‌های ${faNum(v.from)} تا ${faNum(v.to)}`}` : x.work.title;
   const row = (b: Box): React.CSSProperties => ({ position: "absolute", top: b[0], left: 0, width: S.width, height: b[1] - b[0], display: "flex", alignItems: "center", justifyContent: "center" });
-  const para = k >= 2 ? (x.paragraphs[k - 2] ?? "") : "";
+  const para = k >= 2 && k < total ? (x.slides[k - 2] ?? "") : "";
   const ref = v ? (v.from === v.to ? `آیهٔ ${faNum(v.from)}` : `آیه‌های ${faNum(v.from)}–${faNum(v.to)}`) : "";
   const arabic = v ? v.ayahs.map((a) => a.text).join(" ") : "";
   const persian = v ? v.ayahs.map((a) => a.translation).join(" ") : "";
   // slide 1 names the translation, the others the tafsir and its publisher
-  const foot = k === 1 ? (v?.translation ? `ترجمهٔ ${v.translation.translatorName}` : "") : `${chip} · ${x.source.publisher}`;
+  const foot = k === 1 ? (v?.translation ? `ترجمهٔ ${v.translation.translatorName}` : "") : k < total ? `${x.work.title} · ${x.work.author}` : "";
   return (
     <div dir="rtl" style={{ position: "absolute", left: 0, top: 0, width: S.width, height: S.height }}>
       <div style={row(S.chip)}>
@@ -762,9 +791,20 @@ const TafsirPage: React.FC<{ p: Prepared; k: number; total: number }> = ({ p, k,
       ) : null}
       {para ? (
         <div style={row(S.paragraph)}>
-          <Fit width={900} maxHeight={boxH(S.paragraph)} max={44} min={24} measureKey={para} lang="fa" dir="rtl" style={{ fontFamily: FONT.fa, lineHeight: 1.95, textAlign: "justify", textAlignLast: "center", color: C.ink }}>
+          <Fit width={900} maxHeight={boxH(S.paragraph)} max={42} min={24} measureKey={para} lang="fa" dir="rtl" style={{ fontFamily: FONT.fa, lineHeight: 1.95, textAlign: "justify", textAlignLast: "right", color: C.ink, whiteSpace: "pre-line" }}>
             {para}
           </Fit>
+        </div>
+      ) : null}
+      {k === total ? (
+        <div style={{ ...row(S.paragraph), flexDirection: "column", gap: 30 }}>
+          <SirajMark size={96} />
+          <div style={{ fontFamily: FONT.fa, fontSize: 64, fontWeight: 700, lineHeight: 1.4, color: C.star }}>{x.work.title}</div>
+          <div style={{ fontFamily: FONT.fa, fontSize: 34, lineHeight: 1.6, color: C.ink, textAlign: "center", maxWidth: 860 }}>{x.work.author}</div>
+          {x.source.url ? <div style={{ fontFamily: FONT.en, fontSize: 26, color: C.quiet, direction: "ltr" }}>{host(x.source.url)}</div> : null}
+          <div style={{ width: 260, height: 1.5, background: `linear-gradient(90deg, transparent, ${C.gold}, transparent)` }} />
+          <div style={{ fontFamily: FONT.fa, fontSize: 36, lineHeight: 1.6, color: C.translation }}>ادامهٔ تفسیر این آیه‌ها در سراج</div>
+          <div style={{ fontFamily: FONT.en, fontSize: 34, color: C.gold, letterSpacing: "0.02em", direction: "ltr" }}>{bare(x.source.siraj)}</div>
         </div>
       ) : null}
       <div style={{ ...row(S.mark), fontFamily: FONT.fa, fontSize: 30, color: C.gold }}>{`${faNum(k)} از ${faNum(total)}${k < total ? " ←" : ""}`}</div>
@@ -863,7 +903,7 @@ export const WaitingCover: React.FC<WaitingProps> = (raw) => {
   const { height } = useVideoConfig();
   const tall = height > 1500;
   const View = VIEWS[p.format];
-  const slides = 1 + (p.tafsir?.paragraphs.length ?? 0);
+  const slides = TAFSIR_SLIDES;
   return (
     <AbsoluteFill style={{ background: C.night }}>
       <World total={1} still seed={seedOf(p)} />
@@ -887,7 +927,7 @@ export const WaitingCover: React.FC<WaitingProps> = (raw) => {
 /** A slide of the tafsir carousel (1080×1350), `slide` 1…5. */
 export const TafsirSlide: React.FC<WaitingProps & { slide?: number }> = (raw) => {
   const p = prepared(raw);
-  const total = 1 + (p.tafsir?.paragraphs.length ?? 0);
+  const total = TAFSIR_SLIDES;
   const k = Math.max(1, Math.min(total, raw.slide ?? 1));
   return (
     <AbsoluteFill style={{ background: C.night }}>
@@ -914,7 +954,8 @@ const emptyWaiting = (lang: Lang, format: WaitingFormat): WaitingProps => ({
   mirror: null,
   recite: null,
   silent: format === "tafsir",
-  source: { quran: { releaseKey: null }, surahMetadata: { sha256: null } },
+  source: { quran: { releaseKey: null }, surahMetadata: { sha256: null }, text: null },
+  texts: [],
   voice: NO_VOICE,
   qari: null,
   studio: null,

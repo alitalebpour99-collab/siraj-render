@@ -470,7 +470,15 @@ export const INSIGHTS = {
   },
 
   "every-letter": {
+    // S3e (lead, 2026-10-28: at most a minute): the qari recites the one verse from the first
+    // second while its letters light as he reaches them; what the narrator said is on screen
+    // (src/Insight.tsx), so the voice never adds to the verse's own length. No narration lines.
     scenes: [
+      { id: "recite", lines: [], min: 60 },
+      { id: "end", lines: [], min: 45 },
+    ],
+    // the narrated scenes of S3b, for a job planned before S3e (its lines keep their places)
+    legacyScenes: [
       { id: "hook", lines: ["hook", "this"], min: 120 },
       { id: "recite", lines: [], min: 60 },
       { id: "end", lines: ["other", "end"], min: 120 },
@@ -486,7 +494,9 @@ export const INSIGHTS = {
           const [s, a] = verse.split(":").map(Number);
           return { numbers: { verses: f.verses, letters: f.letters, verse }, data: { surah: s, ayah: a } };
         },
-        lines: (lang, n) => {
+        lines: () => [],
+        // S3b's sentences: kept for the jobs planned before S3e (fetch.mjs uses the job's own lines)
+        legacyLines: (lang, n) => {
           const other = n.verses.filter((v) => v !== n.verse);
           return lang === "fa"
             ? [
@@ -593,7 +603,15 @@ export const INSIGHTS = {
 };
 
 /** The narration ids of a format's scenes (a job's narration may hold only these). */
-export const insightIds = (format) => INSIGHTS[format].scenes.flatMap((s) => s.lines);
+export const insightIds = (format) => [...new Set([...INSIGHTS[format].scenes, ...(INSIGHTS[format].legacyScenes ?? [])].flatMap((s) => s.lines))];
+
+/** The scenes a job is drawn with: a format's own, or its earlier scenes when the job brings their lines. */
+export function scenesFor(format, narration) {
+  const def = INSIGHTS[format];
+  if (!def.legacyScenes || !narration?.length) return def.scenes;
+  const own = new Set(def.scenes.flatMap((s) => s.lines));
+  return narration.some((l) => !own.has(l.id)) ? def.legacyScenes : def.scenes;
+}
 
 /**
  * The facts and the sentences of one episode. `pick` overrides the episode's own surah, verse

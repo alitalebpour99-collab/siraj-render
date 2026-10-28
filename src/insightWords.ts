@@ -119,6 +119,9 @@ export const I_WORDS = {
     verseOf: (s: number, a: number) => `${s}:${a}`,
     without: "without it",
     with: "with it",
+    // Every Letter (S3e): what the narrator said before, now on screen (the qari fills the minute)
+    everyTitle: (verses: string, letters: string) => `One of ${verses} verses that hold all ${letters} letters`,
+    everyOther: (refs: string) => `The other: ${refs}`,
   },
   fa: {
     claim: "ادعا",
@@ -153,5 +156,7 @@ export const I_WORDS = {
     verseOf: (s: number, a: number) => `${faNum(s)}:${faNum(a)}`,
     without: "بی آن",
     with: "با آن",
+    everyTitle: (verses: string, letters: string) => `یکی از ${verses} آیه‌ای که هر ${letters} حرف الفبا را دارند`,
+    everyOther: (refs: string) => `آیهٔ دیگر: ${refs}`,
   },
 };
