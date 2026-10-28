@@ -571,8 +571,8 @@ const PairVerse: React.FC<{ p: Prepared; a: Ayah; box: Box; clip: QariClip | nul
 };
 
 /** The Mirror: the sections as bars, the fold onto the pairs, the qari's two verses, the sources. */
-const MirrorView: React.FC<VP> = ({ p, t, cover, at }) => {
-  const f = useAt(at);
+const MirrorView: React.FC<VP> = ({ p, t, cover, at: still }) => {
+  const f = useAt(still);
   const mr = p.mirror;
   if (!mr) return null;
   const fa = p.lang === "fa";
