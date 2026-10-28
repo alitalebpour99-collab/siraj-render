@@ -5,6 +5,8 @@ name: Worker
 # finds nothing ends in seconds, before anything is installed. Nothing secret is printed; no
 # text of the content is logged; NOTHING is uploaded as an artifact (this repository is public
 # and the recitation must not be downloadable here): the files go to the service only.
+# The schedule was registered again on 2026-10-28: after the workflow was disabled and enabled,
+# GitHub never started it by its timer.
 
 on:
   workflow_dispatch:
