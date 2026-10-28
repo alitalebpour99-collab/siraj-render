@@ -52,13 +52,38 @@ export const quranPath = (surah) => `/quran/${surah}`;
 export const FIT = {
   nahj: { arabic: 400, persian: 600, seconds: 40 },
   kumayl: { arabic: 420, persian: 330, lines: 5 },
-  story: { arabic: 130, persian: 110 },
+  // line 1 of a weekday dua is its opening formula (the same in nearly all seven): the Story starts at line 2
+  story: { arabic: 120, persian: 90, first: 2 },
   tafsir: { ayahs: 4, arabic: 320, translation: 460, slide: 460, slides: 3 },
 };
 
 /** About how many characters of Persian the narrator reads in a second (Aran, eleven_v4, speed 0.92). */
 export const FA_CHARS_PER_SECOND = 11;
 export const readSeconds = (persian) => persian.replace(/\s+/g, " ").trim().length / FA_CHARS_PER_SECOND;
+
+/* ---------- the narrator's fixed lines (the service's; plain spoken Persian, S3d) ---------- */
+
+/** The books and their author as the narrator says them, with the vowels that make them read right. */
+export const FA_BOOK = { nahj: "نَهجُ‌البَلاغه", mafatih: "مَفاتیحِ نوین", tafsir: "تفسیرِ نمونه", kumayl: "دعای کُمِیل", makarem: "آیت‌اللّه ناصِرِ مَکارِمِ شیرازی" };
+
+const FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
+const faDigits = (n) => String(n).replace(/[0-9]/g, (d) => FA_DIGITS[Number(d)]);
+
+/**
+ * The fixed line after a saying: the book and the saying's number said by name, and whose Persian
+ * it is (the Makarem office's site; Siraj names no translator for it). `words` turns a number
+ * into Persian words (spoken.mjs faWords; the service passes its own copy).
+ */
+export function nahjSourceLine(n, words) {
+  return { id: "src", show: `نهج‌البلاغه، حکمت ${faDigits(n)} · ترجمهٔ فارسی از دفتر آیت‌الله مکارم شیرازی`, say: `از ${FA_BOOK.nahj}، حکمتِ ${words(n)}. ترجمهٔ فارسی از دفترِ ${FA_BOOK.makarem}.` };
+}
+
+/** The fixed line after a Kumayl passage: where the rest is (the next line on Siraj, or the whole dua after its last line). */
+export function kumaylRestLine(next) {
+  return next
+    ? { id: "rest", show: `ادامهٔ دعای کمیل از بند ${faDigits(next)} در سایت سراج`, say: `ادامهٔ ${FA_BOOK.kumayl} را در سایتِ سراج بخوانید. از ${FA_BOOK.mafatih}ِ ${FA_BOOK.makarem}.` }
+    : { id: "rest", show: "متن کامل دعای کمیل در سایت سراج", say: `متنِ کاملِ ${FA_BOOK.kumayl} را در سایتِ سراج بخوانید. از ${FA_BOOK.mafatih}ِ ${FA_BOOK.makarem}.` };
+}
 
 /* ---------- reading the reader pages ---------- */
 
@@ -172,12 +197,18 @@ export function duaPassage(lines, from, fit = FIT.kumayl) {
   return to === null ? null : { from, to };
 }
 
-/** The dhikr Story's line: the first line from `from` on (in order, then from the top) short enough for a Story; null when none is. */
+/**
+ * The dhikr Story's line: the first line from `from` on (in order, then again from line
+ * `fit.first`) short enough for a Story; the dua's opening line is never taken. Null when none is.
+ */
 export function storyLine(lines, from, fit = FIT.story) {
-  const ok = (l) => l.arabic.trim().length > 0 && l.arabic.trim().length <= fit.arabic && l.persian.trim().length > 0 && l.persian.trim().length <= fit.persian;
-  const start = Math.max(0, lines.findIndex((l) => l.number >= from));
-  for (let k = 0; k < lines.length; k++) {
-    const l = lines[(start + k) % lines.length];
+  const ok = (l) => l.number >= fit.first && l.arabic.trim().length > 0 && l.arabic.trim().length <= fit.arabic && l.persian.trim().length > 0 && l.persian.trim().length <= fit.persian;
+  const pool = lines.filter((l) => l.number >= fit.first);
+  if (!pool.length) return null;
+  const at = pool.findIndex((l) => l.number >= from);
+  const start = at < 0 ? 0 : at;
+  for (let k = 0; k < pool.length; k++) {
+    const l = pool[(start + k) % pool.length];
     if (ok(l)) return l.number;
   }
   return null;

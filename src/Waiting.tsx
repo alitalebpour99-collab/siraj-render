@@ -139,7 +139,7 @@ const TR_VOICE = "صدای مصنوعی · فقط فارسی را می‌خوا�
 /** The foot's source line: the service's spoken source line when the job has one (shown as said), else the book and its publisher. */
 const sourceLine = (p: WaitingProps, s: WaitSource) => p.narration.find((l) => l.id === "src")?.show ?? `${s.title} · ${s.publisher}`;
 /** An address as it is shown: without its scheme. */
-const bare = (url: string) => url.replace(/^https?:///, "");
+const bare = (url: string) => url.replace(/^https?:\/\//, "");
 
 /* ---------- type that moves ---------- */
 

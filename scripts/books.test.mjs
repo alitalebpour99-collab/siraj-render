@@ -3,7 +3,8 @@
 // only: made-up words in the shape of the texts, never a text of a book.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { FIT, MAFATIH, commentaryStart, dayIndex, decodeText, duaLineUrl, duaPassage, duaPath, nahjFits, nahjPath, readDuaPage, readHadithPage, sentencesOf, slideText, storyLine, tafsirSlides, trParts } from "./books.mjs";
+import { readingProblems, faWords } from "./spoken.mjs";
+import { FIT, MAFATIH, kumaylRestLine, nahjSourceLine, commentaryStart, dayIndex, decodeText, duaLineUrl, duaPassage, duaPath, nahjFits, nahjPath, readDuaPage, readHadithPage, sentencesOf, slideText, storyLine, tafsirSlides, trParts } from "./books.mjs";
 
 const words = (prefix, n) => Array.from({ length: n }, (_, i) => `${prefix}${i + 1}`).join(" ");
 
@@ -66,11 +67,12 @@ test("Kumayl's passage: whole lines in order from where the last ended, as many 
   assert.deepEqual(duaPassage(short, 1), { from: 1, to: FIT.kumayl.lines });
 });
 
-test("the dhikr Story's line: the next one short enough, from the top again after the last", () => {
-  const lines = [80, 300, 60, 400].map((n, i) => ({ number: i + 1, arabic: "a".repeat(40), persian: "f".repeat(n) }));
-  assert.equal(storyLine(lines, 1), 1);
-  assert.equal(storyLine(lines, 2), 3);
-  assert.equal(storyLine(lines, 4), 1);
+test("the dhikr Story's line: never the opening line, the next one short enough, from line 2 again after the last", () => {
+  const lines = [20, 80, 300, 60, 400].map((n, i) => ({ number: i + 1, arabic: "a".repeat(40), persian: "f".repeat(n) }));
+  assert.equal(storyLine(lines, 1), 2);
+  assert.equal(storyLine(lines, 3), 4);
+  assert.equal(storyLine(lines, 5), 2);
+  assert.equal(storyLine(lines, 9), 2);
   assert.equal(storyLine(lines.map((l) => ({ ...l, persian: "f".repeat(500) })), 1), null);
 });
 
@@ -95,4 +97,20 @@ test("the tafsir slides: from the commentary, whole pieces in order, nothing lef
   assert.equal(tafsirSlides(["h1:", "x.", "h2:", prose(1, 40), "z".repeat(FIT.tafsir.slide + 1) + "."].join("\n")), null);
   // one heading only: the structure is unclear
   assert.equal(tafsirSlides(["h1:", prose(1, 40), prose(2, 40)].join("\n")), null);
+});
+
+test("the fixed lines are plain spoken Persian and name the book (S3d guard)", () => {
+  for (const n of [1, 9, 98, 110, 480]) {
+    const l = nahjSourceLine(n, faWords);
+    assert.equal(l.id, "src");
+    assert.deepEqual(readingProblems(l.say), [], l.say);
+    assert.ok(l.say.includes(faWords(n)));
+    assert.ok(/نَهجُ‌البَلاغه/.test(l.say) && /مَکارِمِ/.test(l.say));
+  }
+  for (const next of [4, 113, null]) {
+    const l = kumaylRestLine(next);
+    assert.equal(l.id, "rest");
+    assert.deepEqual(readingProblems(l.say), [], l.say);
+    assert.ok(/مَفاتیحِ نوینِ/.test(l.say));
+  }
 });
