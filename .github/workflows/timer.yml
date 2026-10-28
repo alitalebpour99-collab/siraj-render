@@ -1,0 +1,24 @@
+name: Timer
+
+# Starts the Worker (worker.yml) every half hour. The Worker's own schedule never fired in this
+# repository (not once from 2026-10-27 to 10-28, also after a new commit to its file), while starting
+# it by hand always works; this separate timer starts it by hand on GitHub's side. The Worker looks
+# first and ends in seconds when nothing waits, and its concurrency group keeps one render at a time.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "12,42 * * * *"
+
+permissions:
+  actions: write
+
+jobs:
+  start:
+    if: github.repository == 'alitalebpour99-collab/siraj-render'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run worker.yml --repo "$GITHUB_REPOSITORY" --ref main
