@@ -44,6 +44,7 @@ the Story cut). Search forms are locators (a verse and a word span), never typed
 | `scripts/worker.mjs` | claims ONE job from the service, runs the steps below, uploads the video and covers, then the manifest (`failed=1` with one line on any error) |
 | `scripts/fetch.mjs` | `props/<job>.json` from Siraj's API and the Tanzil metadata, checked against the job's `expect` |
 | `scripts/voice.mjs`, `scripts/tts.py`, `scripts/spoken.mjs` | the narrator's lines, levelled, into `public/voice/<job>/` |
+| `scripts/spoken.mjs` (S3d) | the reading layer: a Persian `say` is plain spoken Persian (numbers in words, «سورهٔ پنجاه و پنج، آیهٔ یک», no digit, Latin letter, colon or semicolon, the source named as «پروژهٔ تَنزیل»); `show` keeps its digits; guarded by `scripts/reading.test.mjs` |
 | `scripts/qari.mjs`, `scripts/align.mjs` | the qari's clips and word timings into `public/qari/<job>/` |
 | `scripts/render.mjs`, `scripts/manifest.mjs` | the MP4, the covers, the sound checks (never two voices at once, every voice heard) and the manifest |
 | `scripts/tanzil.mjs` | the metadata: parsed, hash-checked, cross-checked and counted as the service counts it |
