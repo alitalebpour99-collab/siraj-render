@@ -191,6 +191,8 @@ export async function renderJob(job, { stills = false, frames = process.env.FRAM
     audioCodec: "aac",
     enforceAudioTrack: true,
     concurrency: Number(process.env.RENDER_CONCURRENCY ?? 4),
+    // this file is encoded once more below (levelled sound, a rate ceiling): its own pass can be quick
+    x264Preset: "veryfast",
     outputLocation: raw,
     onProgress: ({ progress }) => {
       const step = Math.floor(progress * 4);
