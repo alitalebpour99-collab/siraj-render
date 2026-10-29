@@ -105,12 +105,14 @@ test("the fixed lines are plain spoken Persian and name the book (S3d guard)", (
     assert.equal(l.id, "src");
     assert.deepEqual(readingProblems(l.say), [], l.say);
     assert.ok(l.say.includes(faWords(n)));
-    assert.ok(/نَهجُ‌البَلاغه/.test(l.say) && /مَکارِمِ/.test(l.say));
+    assert.ok(/نَهجُ‌البَلاغه/.test(l.say));
+    // the translator is credited on the card only, never spoken (the owner, 2026-10-29)
+    assert.ok(!/مَکارِم|مکارم/.test(l.say) && /مکارم/.test(l.show));
   }
   for (const next of [4, 113, null]) {
     const l = kumaylRestLine(next);
     assert.equal(l.id, "rest");
     assert.deepEqual(readingProblems(l.say), [], l.say);
-    assert.ok(/مَفاتیحِ نوینِ/.test(l.say));
+    assert.ok(/مَفاتیحِ نوین/.test(l.say) && !/مَکارِم|مکارم/.test(l.say));
   }
 });

@@ -70,19 +70,20 @@ const FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 const faDigits = (n) => String(n).replace(/[0-9]/g, (d) => FA_DIGITS[Number(d)]);
 
 /**
- * The fixed line after a saying: the book and the saying's number said by name, and whose Persian
- * it is (the Makarem office's site; Siraj names no translator for it). `words` turns a number
+ * The fixed line after a saying: the book and the saying's number said by name. Whose Persian it is
+ * (the Makarem office's site) stands on the card only: the owner, 2026-10-29, the translator and the
+ * qari are credited on screen, never spoken. `words` turns a number
  * into Persian words (spoken.mjs faWords; the service passes its own copy).
  */
 export function nahjSourceLine(n, words) {
-  return { id: "src", show: `نهج‌البلاغه، حکمت ${faDigits(n)} · ترجمهٔ فارسی از دفتر آیت‌الله مکارم شیرازی`, say: `از ${FA_BOOK.nahj}، حکمتِ ${words(n)}. ترجمهٔ فارسی از دفترِ ${FA_BOOK.makarem}.` };
+  return { id: "src", show: `نهج‌البلاغه، حکمت ${faDigits(n)} · ترجمهٔ فارسی از دفتر آیت‌الله مکارم شیرازی`, say: `از ${FA_BOOK.nahj}، حکمتِ ${words(n)}.` };
 }
 
 /** The fixed line after a Kumayl passage: where the rest is (the next line on Siraj, or the whole dua after its last line). */
 export function kumaylRestLine(next) {
   return next
-    ? { id: "rest", show: `ادامهٔ دعای کمیل از بند ${faDigits(next)} در سایت سراج`, say: `ادامهٔ ${FA_BOOK.kumayl} را در سایتِ سراج بخوانید. از ${FA_BOOK.mafatih}ِ ${FA_BOOK.makarem}.` }
-    : { id: "rest", show: "متن کامل دعای کمیل در سایت سراج", say: `متنِ کاملِ ${FA_BOOK.kumayl} را در سایتِ سراج بخوانید. از ${FA_BOOK.mafatih}ِ ${FA_BOOK.makarem}.` };
+    ? { id: "rest", show: `ادامهٔ دعای کمیل از بند ${faDigits(next)} در سایت سراج`, say: `ادامهٔ ${FA_BOOK.kumayl} را در سایتِ سراج بخوانید. از ${FA_BOOK.mafatih}.` }
+    : { id: "rest", show: "متن کامل دعای کمیل در سایت سراج", say: `متنِ کاملِ ${FA_BOOK.kumayl} را در سایتِ سراج بخوانید. از ${FA_BOOK.mafatih}.` };
 }
 
 /* ---------- reading the reader pages ---------- */
