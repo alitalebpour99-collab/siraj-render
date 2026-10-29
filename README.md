@@ -32,6 +32,8 @@ owner and never publishes it). Pictures are generated geometry only, no figures.
 | `en-verse`, `fa-verse` (`…:range`) | «Verse & meaning»: a whole surah or its opening section, the qari with the word light, the translation and its narrator, the sources |
 | `en-counts`, `fa-counts` (`:overview`, `:revelation-order`, `:prostrations`, `:divisions`) | numbers counted from the Tanzil metadata, each with its counting rule |
 | `en-surah-card`, `fa-surah-card` | «Surah n of 114»: verses, Meccan or Medinan, revelation order, sections, parts, pages, prostration; with `props.recite` the opening ayah with the qari and a ring of the verses drawn by their word counts |
+| `fa-nahj-hikma`, `fa-kumayl`, `fa-dua-story`, `fa-tafsir` (S3e) | the books beside the Quran, read from Siraj in the run and hash-checked (`scripts/books.mjs`): a Nahj al-balagha saying, a Kumayl passage (whole lines, «the rest on Siraj» with the exact address), the dhikr Story (about nine seconds), the five-slide tafsir carousel (whole sentences of Tafsir Nemooneh exactly as served); the narrator reads the Persian only, never the Arabic; the translator and the qari are credited on screen, never spoken |
+| `fa-occasion`, `en-occasion`, `en-mirror`, `fa-mirror` | the occasion (only after an announced month start; muted) and the Mirror (approve-first) |
 | `<lang>-<format>:<episode>` (S3b) | the insight videos, 12–40 s, counted at render time from the whole Tanzil Simple text and the metadata with the rule printed on screen (`scripts/insights.mjs`, `scripts/episodes.mjs`): `only` (The Only… №), `myth-fact` (The Counts Test №), `meccan-medinan`, `counted`, `mushaf-map`, `middle`, `revelation-order`, `one-line`, `opening-letters`, `every-letter`, `quiz` (with its carousel twin); `names` and `closing-names` are approve-first (their search forms wait for the lead) |
 
 Each has `<id>-cover` (1080×1920) and `<id>-grid` (1080×1350); the quiz also `<id>-slide` (its
@@ -42,6 +44,7 @@ the Story cut). Search forms are locators (a verse and a word span), never typed
 | path | what |
 |---|---|
 | `scripts/worker.mjs` | claims ONE job from the service, runs the steps below, uploads the video and covers, then the manifest (`failed=1` with one line on any error) |
+| `scripts/books.mjs` (S3e) | Siraj's reader pages and tafsir route read (verbatim elements only), and the fixed rules that choose a passage; the service keeps a copy (`src/content/books.ts`) |
 | `scripts/fetch.mjs` | `props/<job>.json` from Siraj's API and the Tanzil metadata, checked against the job's `expect` |
 | `scripts/voice.mjs`, `scripts/tts.py`, `scripts/spoken.mjs` | the narrator's lines, levelled, into `public/voice/<job>/` |
 | `scripts/spoken.mjs` (S3d) | the reading layer: a Persian `say` is plain spoken Persian (numbers in words, «سورهٔ پنجاه و پنج، آیهٔ یک», no digit, Latin letter, colon or semicolon, the source named as «پروژهٔ تَنزیل»); `show` keeps its digits; guarded by `scripts/reading.test.mjs` |
