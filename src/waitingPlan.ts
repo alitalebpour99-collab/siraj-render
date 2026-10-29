@@ -29,35 +29,38 @@ export const WAITING_LOOK: Record<WaitingFormat, "lapis" | "night" | "pewter"> =
   mirror: "lapis",
 };
 
-/** The narration of a translated text: the served translation in one to four lines, in order. */
-export const TR_LINES = ["tr1", "tr2", "tr3", "tr4"];
+/** The narrator's lines of a served translation, in order (a Kumayl passage: one a line of the dua). */
+export const TR_LINES = ["tr1", "tr2", "tr3", "tr4", "tr5", "tr6"];
+
+/** The service's own fixed lines a format may carry (plain spoken Persian): the source said by name, «the rest on Siraj». */
+export const FIXED_LINES: Record<WaitingFormat, string[]> = { "nahj-hikma": ["src"], kumayl: ["rest"], "dua-story": [], tafsir: [], occasion: [], mirror: [] };
 
 /** The narration ids of the Mirror (approved prose, read by the narrator; never over the qari). */
 export const MIRROR_LINES = ["hook", "fold", "fold2", "pair", "pair2", "end"];
 
-/** The most slides of the tafsir carousel: the verse, then up to four paragraphs. */
-export const TAFSIR_MAX_SLIDES = 5;
+/** The tafsir carousel: the ayahs, three slides of whole sentences, the source and where the rest is. */
+export const TAFSIR_SLIDES = 5;
 
 /** The silent Reel twin of the carousel: each slide stands 3.5 s, then turns. */
-export const tafsirScenes = (slides: number): Plan[] => Array.from({ length: Math.max(1, Math.min(TAFSIR_MAX_SLIDES, slides)) }, (_, i) => ({ id: `slide${i + 1}`, lines: [], min: 105 }));
+export const tafsirScenes = (): Plan[] => Array.from({ length: TAFSIR_SLIDES }, (_, i) => ({ id: `slide${i + 1}`, lines: [], min: 105 }));
+
+/** Kumayl: the candle, then each line of the passage (its Arabic, its Persian read), then «the rest on Siraj». */
+export const kumaylScenes = (bands: number): Plan[] => [
+  { id: "candle", lines: [], min: 75 },
+  ...Array.from({ length: Math.max(1, Math.min(TR_LINES.length, bands)) }, (_, k) => ({ id: `b${k + 1}`, lines: [TR_LINES[k]!], min: 105 })),
+  { id: "end", lines: ["rest"], min: 120 },
+];
 
 /**
  * The scenes of each format. The narrator's lines follow one another; the qari is heard only in
  * the Mirror's «recite» scene, before its narration and never under it (insightTimeline).
  */
-export const WAITING_SCENES: Record<Exclude<WaitingFormat, "tafsir">, Plan[]> = {
-  // the Arabic words appear slowly and a brass line opens; then the Persian as the narrator reads it
+export const WAITING_SCENES: Record<Exclude<WaitingFormat, "tafsir" | "kumayl">, Plan[]> = {
+  // the Arabic words appear slowly and a brass line opens; the Persian as the narrator reads it; the source said by name
   "nahj-hikma": [
-    { id: "open", lines: [], min: 150 },
-    { id: "read", lines: TR_LINES, min: 210 },
-    { id: "end", lines: [], min: 90 },
-  ],
-  // the candle is lit, a slow light passes over the Arabic, then the Persian is read
-  kumayl: [
-    { id: "candle", lines: [], min: 75 },
-    { id: "open", lines: [], min: 165 },
-    { id: "read", lines: TR_LINES, min: 240 },
-    { id: "end", lines: [], min: 105 },
+    { id: "open", lines: [], min: 135 },
+    { id: "read", lines: TR_LINES, min: 180 },
+    { id: "end", lines: ["src"], min: 90 },
   ],
   // the day's dhikr and its ring filling (a Story of about nine seconds)
   "dua-story": [
@@ -79,8 +82,8 @@ export const WAITING_SCENES: Record<Exclude<WaitingFormat, "tafsir">, Plan[]> = 
   ],
 };
 
-/** The scene plan of one job. */
-export const scenesOf = (format: WaitingFormat, slides = TAFSIR_MAX_SLIDES): Plan[] => (format === "tafsir" ? tafsirScenes(slides) : WAITING_SCENES[format]);
+/** The scene plan of one job (`bands`: the lines of a Kumayl passage). */
+export const scenesOf = (format: WaitingFormat, bands = 1): Plan[] => (format === "tafsir" ? tafsirScenes() : format === "kumayl" ? kumaylScenes(bands) : WAITING_SCENES[format]);
 
 /**
  * Where text stands, [top, bottom] in pixels of the 1080×1920 frame. Every box sits inside the

@@ -42,6 +42,9 @@ function wordLook(t: number, w: WordTime): React.CSSProperties {
   const hot = t <= w.end ? 1 : easeOut(clamp01(1 - (t - w.end) / 0.75));
   const glow = lit * (0.28 + 0.72 * hot);
   const color = mix(mix(DIM, SETTLED, lit), HOT, hot * lit * 0.85);
+  // a settled word keeps one soft layer of light (two blurred layers on every word of a long verse
+  // made «Every Letter» the slowest render, S3e); the word being recited keeps both, as before
+  if (hot === 0 && !flags.paper) return { color: rgba(color), textShadow: `0 0 ${(5 + 19 * glow).toFixed(1)}px rgba(224,172,79,${(0.16 + 0.56 * glow).toFixed(3)})` };
   return {
     color: rgba(color),
     textShadow: flags.paper ? `0 0 ${(4 + 10 * glow).toFixed(1)}px rgba(200,140,40,${(0.1 + 0.3 * glow).toFixed(3)})` : `0 0 ${(5 + 19 * glow).toFixed(1)}px rgba(224,172,79,${(0.16 + 0.56 * glow).toFixed(3)}), 0 0 ${(2 + 7 * glow).toFixed(1)}px rgba(255,232,176,${(0.08 + 0.5 * glow).toFixed(3)})`,

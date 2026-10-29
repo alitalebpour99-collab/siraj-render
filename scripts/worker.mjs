@@ -84,7 +84,8 @@ fs.writeFileSync(path.join("jobs", `${job.id}.json`), JSON.stringify(job));
 const up = (kind) => job.upload.file.replace("<kind>", encodeURIComponent(kind));
 
 try {
-  if (job.kind !== "video" && job.kind !== "carousel") throw new Error(`a ${job.kind} job is not drawn by this renderer`);
+  // a Story (the dhikr of the day) is a short video of its own: drawn and handed in as a video is
+  if (!["video", "carousel", "story"].includes(job.kind)) throw new Error(`a ${job.kind} job is not drawn by this renderer`);
   await fetchJob(job);
   await voiceJob(job);
   const { qari, reason } = await qariJob(job);

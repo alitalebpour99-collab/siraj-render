@@ -496,7 +496,8 @@ const Hero: React.FC<{ p: InsightProps; f: number; cover?: boolean }> = ({ p, f,
       );
     }
     case "every-letter":
-      return <Alphabet p={p} f={f} lit={() => (cover ? 1 : 0.18 + 0.1 * Math.sin(f / 9))} size={98} />;
+      // the cover scales this 1.22: 76 keeps the seven columns inside the frame
+      return <Alphabet p={p} f={f} lit={() => (cover ? 1 : 0.18 + 0.1 * Math.sin(f / 9))} size={cover ? 76 : 98} />;
     case "names":
     case "closing-names":
       return (
@@ -1020,6 +1021,14 @@ function wordStart(clip: QariClip | null | undefined, word: number, count: numbe
   return (word / Math.max(1, count)) * clip.seconds;
 }
 
+/** Every Letter's line on screen: one of the verses that hold all the letters (fixed words, the counted numbers). */
+const everyTitle = (p: InsightProps) => I_WORDS[p.lang].everyTitle(nIn(p.lang, strs(p.numbers.verses).length), nIn(p.lang, Number(p.numbers.letters)));
+/** …and the other verses that hold them, by reference. */
+const everyOther = (p: InsightProps) => {
+  const others = strs(p.numbers.verses).filter((v) => v !== String(p.numbers.verse));
+  return others.length ? I_WORDS[p.lang].everyOther(others.map((r) => refIn(p.lang, r)).join(sep(p.lang))) : "";
+};
+
 /** The recited verses: the qari with the word light; the letters of «every letter» light as he reaches them. */
 const ReciteView: React.FC<ViewProps> = ({ p, s }) => {
   const f = useCurrentFrame();
@@ -1052,13 +1061,19 @@ const ReciteView: React.FC<ViewProps> = ({ p, s }) => {
       <AbsoluteFill style={{ opacity: out }}>
         <Lamp warm={warm} cy={0.36} />
         <div style={{ position: "absolute", top: BAND.visTop - 6, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
-          <Alphabet p={p} f={f} lit={(i) => c01((f - (litAt[i] ?? 1e9)) / 6)} size={70} />
+          {/* the hook from the first frame, on screen: the qari fills the minute (S3e) */}
+          <div dir={fa ? "rtl" : "ltr"} style={{ opacity: c01((f + 8) / 8) }}>
+            <Fit width={900} maxHeight={120} max={fa ? 44 : 46} min={26} measureKey={everyTitle(p)} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), fontWeight: 600, lineHeight: fa ? 1.6 : 1.25, textAlign: "center", color: C.ink, textWrap: "balance" }}>
+              {everyTitle(p)}
+            </Fit>
+          </div>
+          <Alphabet p={p} f={f} lit={(i) => c01((f - (litAt[i] ?? 1e9)) / 6)} size={58} />
           <Label lang={p.lang} size={40} color={C.gold}>
             <span dir="ltr">{`${nIn(p.lang, done)} / ${nIn(p.lang, fw.length)}${sep(p.lang)}${refText}`}</span>
           </Label>
         </div>
-        <div style={{ position: "absolute", top: 820, left: 0, width: W, display: "flex", justifyContent: "center" }}>
-          <Fit width={880} maxHeight={BAND.capTop + BAND.capH - 830} max={44} min={20} measureKey={text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.85, textAlign: "center" }}>
+        <div style={{ position: "absolute", top: 870, left: 0, width: W, display: "flex", justifyContent: "center" }}>
+          <Fit width={880} maxHeight={BAND.capTop + BAND.capH - 880} max={44} min={20} measureKey={text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.85, textAlign: "center" }}>
             <LitText text={text} clip={p.studio.wordGlow ? clip : null} t={tSec} after={<AyahSeal label={fa ? faNum(a.ayahNumber) : arNum(a.ayahNumber)} font={fa ? FONT.fa : FONT.quran} />} />
           </Fit>
         </div>
@@ -1209,6 +1224,14 @@ const EndView: React.FC<ViewProps> = ({ p, s }) => {
         <div style={{ opacity: ramp(f, 0, 14) }}>
           <SirajMark size={88} />
         </div>
+        {p.format === "every-letter" && everyOther(p) && !s.lines.length
+          ? block(
+              2,
+              <div dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), fontSize: 38, color: C.ink, lineHeight: 1.5 }}>
+                {everyOther(p)}
+              </div>,
+            )
+          : null}
         {block(
           4,
           <>
@@ -1311,11 +1334,13 @@ export const InsightReel: React.FC<InsightProps> = (raw) => {
   const f = useCurrentFrame();
   const first = t.scenes[0]!;
   const last = t.scenes[t.scenes.length - 1]!;
-  const ruleOn = Math.min(c01((f - (t.scenes[1]?.from ?? 0) + 6) / 12), c01((last.from - f + 6) / 12));
+  // the rule box from the second scene on; a video that recites from its first second (Every Letter) shows it from the first second
+  const ruleFrom = first.id === "recite" ? 24 : (t.scenes[1]?.from ?? 0);
+  const ruleOn = Math.min(c01((f - ruleFrom + 6) / 12), c01((last.from - f + 6) / 12));
   const Hook = viewOf(p, first.id);
   return (
     <AbsoluteFill style={{ background: C.night }}>
-      <World total={t.total} seed={7 + p.format.length * 3 + p.episode.length} muted={p.format !== "every-letter"} />
+      <World total={t.total} seed={7 + p.format.length * 3 + p.episode.length} muted />
       {studio.frame ? <MushafFrame /> : null}
       <Chip p={p} f={f} />
       {t.scenes.map((s) => {
@@ -1370,7 +1395,8 @@ export const InsightCover: React.FC<InsightProps> = (raw) => {
   const { height } = useVideoConfig();
   const tall = height > 1500;
   const fa = p.lang === "fa";
-  const hook = p.narration[0]?.show ?? "";
+  // Every Letter has no narration since S3e: its line on screen is its hook
+  const hook = p.narration[0]?.show ?? (p.format === "every-letter" ? everyTitle(p) : "");
   return (
     <AbsoluteFill style={{ background: C.night }}>
       <World total={1} still seed={7 + p.format.length * 3 + p.episode.length} />

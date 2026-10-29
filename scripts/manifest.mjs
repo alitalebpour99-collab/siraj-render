@@ -13,8 +13,12 @@ export function manifestOf(props, voice, qari, seconds) {
       quran: { releaseKey: props.source.quran.releaseKey },
       translation: translation ? { releaseKey: translation } : null,
       metadataSha256: props.source.surahMetadata.sha256,
+      // a book beside the Quran (Nahj al-balagha, Mafatih Novin, Tafsir Nemooneh): its release (S3e)
+      ...(props.source.text ? { text: { releaseKey: props.source.text.releaseKey } } : {}),
     },
     ayahs: recited.map((a) => ({ locator: a.locator, textHashSha256: a.textHashSha256 })),
+    // the served strings of that book, each by its place and hash (never the text)
+    ...(props.texts?.length ? { texts: props.texts.map((t) => ({ locator: t.locator, textHashSha256: t.textHashSha256 })) } : {}),
     facts: props.facts,
   };
 }
