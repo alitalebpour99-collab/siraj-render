@@ -1410,12 +1410,12 @@ const Chip: React.FC<{ p: InsightProps; f: number }> = ({ p, f }) => {
  * The lamp style's rule box: its 45 px lines need up to three rows; it ends at 1650 in the column,
  * the bottom of the safe zone on screen (the column is set at 90 % around the frame's middle).
  */
-const RULE_LAMP = { top: 1418, h: 232 };
-const RuleBox: React.FC<{ p: InsightProps; o: number }> = ({ p, o }) => {
+const RULE_LAMP = { top: 1418, h: 232, lift: 130 };
+const RuleBox: React.FC<{ p: InsightProps; o: number; lift?: number }> = ({ p, o, lift = 0 }) => {
   const fa = p.lang === "fa";
   const text = ruleOf(p.format, p.episode, p.lang, p.numbers);
   return (
-    <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: flags.lamp ? RULE_LAMP.top : BAND.rule, left: (W - 880) / 2, width: 880, height: flags.lamp ? RULE_LAMP.h : BAND.ruleH, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, opacity: o }}>
+    <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: flags.lamp ? RULE_LAMP.top - RULE_LAMP.lift * lift : BAND.rule, left: (W - 880) / 2, width: 880, height: flags.lamp ? RULE_LAMP.h : BAND.ruleH, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, opacity: o }}>
       <div style={{ width: 200, height: 1.5, background: `linear-gradient(90deg, transparent, ${C.gold}, transparent)` }} />
       <Fit width={880} maxHeight={(flags.lamp ? RULE_LAMP.h : BAND.ruleH) - 14} max={lz(26)} min={lz(18)} measureKey={text} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), lineHeight: fa ? 1.7 : 1.35, textAlign: "center", color: C.quiet }}>
         {text}
@@ -1444,6 +1444,8 @@ export const InsightReel: React.FC<InsightProps> = (raw) => {
   // the lamp style: from 1.5 s on, so the lower half is never empty (its words come after the hook's first 1.5 s)
   const ruleFrom = first.id === "recite" ? 24 : lamp ? Math.min(46, t.scenes[1]?.from ?? 46) : (t.scenes[1]?.from ?? 0);
   // the lamp style keeps it through the sources too (the lower half is never empty) and fades it before the loop
+  // …and rises a little while the channel badge stands at the close, so the two never meet
+  const ruleLift = lamp && raw.style?.badge ? easeInOut(c01((f - (t.total - t.loopFrames - BADGE_LEN - 6) + 14) / 14)) : 0;
   const ruleOn = Math.min(c01((f - ruleFrom + 6) / 12), lamp ? c01((t.total - t.loopFrames - f) / 12) : c01((last.from - f + 6) / 12));
   const Hook = viewOf(p, first.id);
   const seed = 7 + p.format.length * 3 + p.episode.length;
@@ -1475,7 +1477,7 @@ export const InsightReel: React.FC<InsightProps> = (raw) => {
             </Sequence>
           );
         })}
-        <RuleBox p={p} o={ruleOn} />
+        <RuleBox p={p} o={ruleOn} lift={ruleLift} />
         {t.loopFrames ? (
           <Sequence from={t.total - t.loopFrames} durationInFrames={t.loopFrames} name="loop">
             <LoopIn frames={t.loopFrames} clear={lamp}>
