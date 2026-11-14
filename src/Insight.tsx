@@ -13,7 +13,7 @@ import { splitLeadingBasmala } from "./basmala";
 import { Fit } from "./Fit";
 import { BAND } from "./layout";
 import { FORMAT_NAME, I_WORDS, chipOf, ruleOf } from "./insightWords";
-import { SITE, host } from "./labels";
+import { L, QARI_FA, SITE, host } from "./labels";
 import { Lamp, World } from "./light";
 import { AyahSeal, Cartouche, MushafFrame, Seal, SirajMark } from "./ornament";
 import type { IndexSurah, InsightProps, Lang, QariClip } from "./props";
@@ -34,14 +34,18 @@ import { COL_X, hookHead } from "./lamp/zones";
  * 92 % of its size, so every text keeps at least 32 px here (29 px, 1.5 % of the frame, on screen).
  */
 const LAMP_COLUMN = { scale: 0.9, dx: COL_X - 540 };
-/** A text size of the classic look, at least 33 px in the lamp style (30 px on screen in the column). */
-const lz = (n: number) => (flags.lamp ? Math.max(n, 33) : n);
-/** Each scene of the lamp style pushes in slowly (3 %) while it stands, so the picture is never still. */
+/**
+ * A text size of the classic look, at least 45 px in the lamp style: 40 px on screen in the column
+ * (the 40 px floor of the review of 2026-11-14; it was 33, 30 px on screen, before).
+ */
+const lz = (n: number) => (flags.lamp ? Math.max(n, 45) : n);
+/** Each scene of the lamp style pushes in slowly (4 %) while it stands, so the picture is never still. */
 const Push: React.FC<{ dur: number; children: React.ReactNode }> = ({ dur, children }) => {
   const f = useCurrentFrame();
-  // in and out again at an even pace, 8 s a turn and 3 % at most, so a long recitation keeps moving too
-  const t = (Math.min(f, dur) % 240) / 240;
-  const k = 0.03 * (t < 0.5 ? 2 * t : 2 - 2 * t);
+  // in and out again at an even pace, 6 s a turn and 4 % at most, so one long recited word keeps
+  // moving too (3 % in 8 s stood still 3.9 s under freezedetect in «The Only…», 2026-11-14)
+  const t = (Math.min(f, dur) % 180) / 180;
+  const k = 0.04 * (t < 0.5 ? 2 * t : 2 - 2 * t);
   return <AbsoluteFill style={{ transform: `scale(${(1 + k).toFixed(4)})`, transformOrigin: "540px 300px" }}>{children}</AbsoluteFill>;
 };
 const BADGE_LEN = 66;
@@ -85,7 +89,8 @@ const Kinetic: React.FC<{ text: string; f: number; at: number[]; color?: string 
             style={{
               display: "inline-block",
               opacity: o,
-              transform: `translateY(${((1 - o) * 20).toFixed(1)}px) scale(${(0.94 + 0.06 * o).toFixed(3)})`,
+              // the lamp style keeps every word at its full size (the 40 px floor): it only rises
+              transform: flags.lamp ? `translateY(${((1 - o) * 20).toFixed(1)}px)` : `translateY(${((1 - o) * 20).toFixed(1)}px) scale(${(0.94 + 0.06 * o).toFixed(3)})`,
               filter: o < 1 ? `blur(${((1 - o) * 5).toFixed(1)}px)` : undefined,
               color: gold ? C.brass : color,
               textShadow: gold && flags.glow ? `0 0 ${(18 * o).toFixed(1)}px rgba(224,172,79,0.45)` : undefined,
@@ -119,7 +124,7 @@ const Said: React.FC<{ line: SceneLine; s: InsightScene; lang: Lang; top?: numbe
       <Fit
         width={860}
         maxHeight={height}
-        max={max ?? (fa ? 44 : 50)}
+        max={lz(max ?? (fa ? 44 : 50))}
         min={lz(26)}
         measureKey={line.show}
         lang={lang}
@@ -169,7 +174,7 @@ const BigNumber: React.FC<{ lang: Lang; value: number; f: number; at: number; si
 };
 
 const Label: React.FC<{ lang: Lang; children: React.ReactNode; size?: number; color?: string; style?: React.CSSProperties }> = ({ lang, children, size = 40, color = C.ink, style }) => (
-  <div dir={lang === "fa" ? "rtl" : "ltr"} style={{ fontFamily: ui(lang), fontSize: size, color, textAlign: "center", lineHeight: lang === "fa" ? 1.7 : 1.25, ...style }}>
+  <div dir={lang === "fa" ? "rtl" : "ltr"} style={{ fontFamily: ui(lang), fontSize: lz(size), color, textAlign: "center", lineHeight: lang === "fa" ? 1.7 : 1.25, ...style }}>
     {children}
   </div>
 );
@@ -228,7 +233,7 @@ const Strip114: React.FC<{ p: InsightProps; f: number; at: number; top: number; 
         })}
         <line x1={STRIP.left} x2={STRIP.left + STRIP.width} y1={STRIP.height + 6} y2={STRIP.height + 6} stroke={C.gold} strokeWidth={1.2} opacity={0.6} />
       </svg>
-      <div dir="ltr" style={{ position: "absolute", top: STRIP.height + 14, left: STRIP.left, width: STRIP.width, display: "flex", justifyContent: "space-between", fontFamily: ui(p.lang), fontSize: lz(26), color: C.quiet }}>
+      <div dir="ltr" style={{ position: "absolute", top: STRIP.height + 14, left: STRIP.left, width: STRIP.width, display: "flex", justifyContent: "space-between", fontFamily: ui(p.lang), fontSize: lz(26), color: C.quiet, paddingInline: flags.lamp ? 50 : 0, boxSizing: "border-box" }}>
         <span>{dIn(p.lang, fa ? n : 1)}</span>
         <span>{dIn(p.lang, fa ? 1 : n)}</span>
       </div>
@@ -239,7 +244,7 @@ const Strip114: React.FC<{ p: InsightProps; f: number; at: number; top: number; 
         const left = Math.max(110, Math.min(W - 110, cx));
         return s ? (
           <div key={`l${num}`} style={{ position: "absolute", top: STRIP.height + 50, left: left - 200, width: 400, display: "flex", flexDirection: "column", alignItems: "center", opacity: o }}>
-            <div lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: 44, lineHeight: 1.4, color: C.star }}>
+            <div lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: lz(44), lineHeight: 1.4, color: C.star }}>
               {s.nameArabic}
             </div>
           </div>
@@ -560,7 +565,7 @@ const HookView: React.FC<ViewProps> = ({ p, s }) => {
     return (
       <AbsoluteFill style={{ opacity: out }}>
         <div data-role="hook" style={{ position: "absolute", top: BAND.visTop, left: 0, width: W, height: 300, display: "flex", alignItems: "center", justifyContent: "center", transform: `translateY(${(22 * (1 - easeInOut(c01(f / 50)))).toFixed(1)}px) scale(${(0.96 + 0.04 * easeInOut(c01(f / 50))).toFixed(4)})` }}>
-          <Fit width={860} maxHeight={300} max={fa ? 76 : 84} min={44} measureKey={head} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), fontWeight: 600, lineHeight: fa ? 1.6 : 1.2, textAlign: "center", textWrap: "balance", color: C.ink }}>
+          <Fit width={860} maxHeight={300} max={fa ? 76 : 84} min={lz(44)} measureKey={head} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), fontWeight: 600, lineHeight: fa ? 1.6 : 1.2, textAlign: "center", textWrap: "balance", color: C.ink }}>
             {head}
           </Fit>
         </div>
@@ -928,7 +933,7 @@ const MapView: React.FC<ViewProps> = ({ p, s }) => {
       <AbsoluteFill style={{ opacity: out }}>
         <div style={{ position: "absolute", top: BAND.visTop - 10, left: 90, width: W - 180, display: "flex", flexDirection: "column", gap: 4 }} dir={fa ? "rtl" : "ltr"}>
           {m2.map((m) => (
-            <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", opacity: 0.25 + 0.75 * m.o, fontFamily: ui(p.lang), fontSize: 38, color: m === lastOn ? C.star : C.ink, borderBottom: `1px solid ${C.gold}44`, paddingBlock: 6 }}>
+            <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", opacity: 0.25 + 0.75 * m.o, fontFamily: ui(p.lang), fontSize: lz(38), color: m === lastOn ? C.star : C.ink, borderBottom: `1px solid ${C.gold}44`, paddingBlock: 6 }}>
               <span>{labels[m.id]}</span>
               <span dir="ltr" style={{ color: C.brass }}>{refs[m.id]}</span>
               <span style={{ fontSize: lz(30), color: C.quiet }}>{w.page(m.page)}</span>
@@ -954,7 +959,7 @@ const MapView: React.FC<ViewProps> = ({ p, s }) => {
             [C.brass, w.meccan, Number(n.meccan)],
             [C.turquoise, w.medinan, Number(n.medinan)],
           ].map(([color, label, v]) => (
-            <span key={String(label)} style={{ display: "inline-flex", alignItems: "center", gap: 12, fontFamily: ui(p.lang), fontSize: 36, color: C.ink }}>
+            <span key={String(label)} style={{ display: "inline-flex", alignItems: "center", gap: 12, fontFamily: ui(p.lang), fontSize: lz(36), color: C.ink }}>
               <span style={{ width: 24, height: 24, borderRadius: 5, background: String(color), display: "inline-block" }} />
               {`${String(label)}${sep(p.lang)}${nIn(p.lang, Number(v))}`}
             </span>
@@ -1007,7 +1012,7 @@ const LadderView: React.FC<ViewProps> = ({ p, s }) => {
     <AbsoluteFill style={{ opacity: out }}>
       {line ? (
         <div style={{ position: "absolute", top: BAND.visTop - 10, left: 0, width: W, display: "flex", justifyContent: "center" }}>
-          <Fit width={860} maxHeight={130} max={60} min={30} measureKey={line} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.6, textAlign: "center", color: C.star }}>
+          <Fit width={860} maxHeight={130} max={60} min={lz(30)} measureKey={line} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.6, textAlign: "center", color: C.star }}>
             {line}
           </Fit>
         </div>
@@ -1024,6 +1029,8 @@ const LadderView: React.FC<ViewProps> = ({ p, s }) => {
         })}
       </svg>
       {places.map((a, i) => {
+        // the lamp style names only the last place reached (45 px numbers on every row would overlap)
+        if (flags.lamp && a !== Math.max(-1, ...places.filter((x) => x <= run))) return null;
         const passed = c01((run - a) / 2);
         const left = i % 2 === 0;
         return (
@@ -1053,7 +1060,7 @@ const Alphabet: React.FC<{ p: InsightProps; f: number; lit: (i: number) => numbe
         const k = c01(lit(i));
         return (
           <div key={i} style={{ height: size + 14, display: "grid", placeItems: "center", borderRadius: 14, border: `1.5px solid ${C.gold}${k > 0.5 ? "" : "55"}`, background: `rgba(224,172,79,${(0.05 + 0.3 * k).toFixed(2)})`, transform: `scale(${(0.95 + 0.08 * k).toFixed(3)})` }}>
-            <span lang="ar" style={{ fontFamily: FONT.quran, fontSize: size * 0.62, lineHeight: 1, color: k > 0.5 ? C.star : C.ink, opacity: 0.35 + 0.65 * k, textShadow: k > 0.5 && flags.glow ? `0 0 ${(22 * k).toFixed(0)}px rgba(255,214,140,0.8)` : undefined, paddingBottom: size * 0.12 }}>
+            <span lang="ar" style={{ fontFamily: FONT.quran, fontSize: lz(size * 0.62), lineHeight: 1, color: k > 0.5 ? C.star : C.ink, opacity: 0.35 + 0.65 * k, textShadow: k > 0.5 && flags.glow ? `0 0 ${(22 * k).toFixed(0)}px rgba(255,214,140,0.8)` : undefined, paddingBottom: size * 0.12 }}>
               {String.fromCodePoint(code)}
             </span>
           </div>
@@ -1112,7 +1119,7 @@ const ReciteView: React.FC<ViewProps> = ({ p, s }) => {
         <div style={{ position: "absolute", top: BAND.visTop - 6, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
           {/* the hook from the first frame, on screen: the qari fills the minute (S3e) */}
           <div dir={fa ? "rtl" : "ltr"} style={{ opacity: c01((f + 8) / 8) }}>
-            <Fit width={900} maxHeight={120} max={fa ? 44 : 46} min={lz(26)} measureKey={everyTitle(p)} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), fontWeight: 600, lineHeight: fa ? 1.6 : 1.25, textAlign: "center", color: C.ink, textWrap: "balance" }}>
+            <Fit width={900} maxHeight={120} max={lz(fa ? 44 : 46)} min={lz(26)} measureKey={everyTitle(p)} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), fontWeight: 600, lineHeight: fa ? 1.6 : 1.25, textAlign: "center", color: C.ink, textWrap: "balance" }}>
               {everyTitle(p)}
             </Fit>
           </div>
@@ -1122,7 +1129,7 @@ const ReciteView: React.FC<ViewProps> = ({ p, s }) => {
           </Label>
         </div>
         <div style={{ position: "absolute", top: 870, left: 0, width: W, display: "flex", justifyContent: "center" }}>
-          <Fit width={880} maxHeight={BAND.capTop + BAND.capH - 880} max={44} min={lz(20)} measureKey={text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.85, textAlign: "center" }}>
+          <Fit width={880} maxHeight={BAND.capTop + BAND.capH - 880} max={lz(44)} min={lz(20)} measureKey={text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.85, textAlign: "center" }}>
             <LitText text={text} clip={p.studio.wordGlow ? clip : null} t={tSec} after={<AyahSeal label={fa ? faNum(a.ayahNumber) : arNum(a.ayahNumber)} font={fa ? FONT.fa : FONT.quran} />} />
           </Fit>
         </div>
@@ -1143,17 +1150,18 @@ const ReciteView: React.FC<ViewProps> = ({ p, s }) => {
           const text = body(a.ayahNumber, a.text);
           const clip = clipOf(a.ayahNumber);
           const t0 = startOf(a.ayahNumber);
-          const o = many ? c01((f - t0 + 10) / 8) * 0.65 + 0.35 : 1;
+          // the lamp style keeps every ayah at full strength (its waiting words are a readable brown, 7:1)
+          const o = many && !flags.lamp ? c01((f - t0 + 10) / 8) * 0.65 + 0.35 : 1;
           return (
             <div key={a.ayahNumber} style={{ display: "flex", flexDirection: "column", alignItems: "center", opacity: o }}>
-              <Fit width={860} maxHeight={many ? 150 : 420} max={many ? 78 : 104} min={34} measureKey={text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.85, textAlign: "center", textWrap: "balance" }}>
+              <Fit width={860} maxHeight={many ? 150 : 420} max={many ? 78 : 104} min={lz(34)} measureKey={text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.85, textAlign: "center", textWrap: "balance" }}>
                 <span data-role="quote" data-q={`a${a.ayahNumber}`}>
                   <LitText text={text} clip={p.studio.wordGlow ? clip : null} t={(f - t0) / 30} after={<AyahSeal label={fa ? faNum(a.ayahNumber) : arNum(a.ayahNumber)} font={fa ? FONT.fa : FONT.quran} />} />
                 </span>
               </Fit>
               {a.translation && !many ? (
                 <div style={{ marginTop: 26, opacity: c01((f - t0 - 20) / 14) }}>
-                  <Fit width={820} maxHeight={220} max={fa ? 40 : 44} min={lz(24)} measureKey={a.translation} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), lineHeight: fa ? 1.8 : 1.35, textAlign: "center", color: C.translation, textWrap: "balance" }}>
+                  <Fit width={820} maxHeight={220} max={lz(fa ? 40 : 44)} min={lz(24)} measureKey={a.translation} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), lineHeight: fa ? 1.8 : 1.35, textAlign: "center", color: C.translation, textWrap: "balance" }}>
                     <span data-role="quote" data-q={`t${a.ayahNumber}`}>{a.translation}</span>
                   </Fit>
                 </div>
@@ -1264,11 +1272,46 @@ const EndView: React.FC<ViewProps> = ({ p, s }) => {
   const q = p.source.quran;
   const m = p.source.surahMetadata;
   const label = { fontFamily: ui(p.lang), fontSize: lz(26), fontWeight: 600, letterSpacing: fa ? 0 : "0.16em", textTransform: fa ? "none" : "uppercase", color: C.gold } as const;
-  const big = { fontFamily: FONT.en, fontSize: 34, color: C.ink, lineHeight: 1.3, textAlign: "center", maxWidth: 860, direction: "ltr" } as const;
+  const big = { fontFamily: FONT.en, fontSize: lz(34), color: C.ink, lineHeight: 1.3, textAlign: "center", maxWidth: 860, direction: "ltr" } as const;
   const block = (at: number, children: React.ReactNode) => <div style={{ opacity: ramp(f, at, 14), display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>{children}</div>;
   const qari = p.qari?.reciter.name ?? null;
   // the translation is named only where the video showed it (one recited ayah, not the alphabet view)
   const tr = p.recite && p.recite.ayahs.length === 1 && p.format !== "every-letter" ? p.recite.translation : null;
+  if (flags.lamp) {
+    // the lamp style (review of 2026-11-14): the sources as one line large enough to read; the
+    // publisher's titles, the licence and the «synthetic voice» label are in the caption
+    const qariName = p.qari ? (fa ? (QARI_FA[p.qari.recitationId] ?? null) : p.qari.reciter.name) : null;
+    const line = fa
+      ? [`متن قرآن از ${L.fa.tanzil}`, tr ? `ترجمهٔ ${tr.translatorName}` : null, qariName ? `تلاوت ${qariName}` : null].filter(Boolean).join("، ")
+      : [`Text: ${q.publisher}`, tr ? `Translation: ${tr.translatorName}` : null, qariName ? `Recitation: ${qariName}` : null].filter(Boolean).join(". ");
+    return (
+      <AbsoluteFill>
+        <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: BAND.visTop, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", gap: 34 }}>
+          <div data-fill="lamp" style={{ opacity: ramp(f, 0, 14) }}>
+            <Emblem size={130} warm={0.8} />
+          </div>
+          {p.format === "every-letter" && everyOther(p) && !s.lines.length
+            ? block(
+                2,
+                <div dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), fontSize: lz(38), color: C.ink, lineHeight: 1.5, textAlign: "center", maxWidth: 860 }}>
+                  {everyOther(p)}
+                </div>,
+              )
+            : null}
+          {block(
+            4,
+            <div data-role="source" style={{ display: "flex", justifyContent: "center" }}>
+              <Fit width={860} maxHeight={300} max={lz(54)} min={lz(40)} measureKey={line} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), fontWeight: 500, lineHeight: 1.55, textAlign: "center", textWrap: "balance", color: C.ink }}>
+                {line}
+              </Fit>
+            </div>,
+          )}
+          <div style={{ opacity: ramp(f, 12, 14), fontFamily: FONT.en, fontSize: lz(54), color: C.gold, letterSpacing: "0.03em", direction: "ltr" }}>{SITE}</div>
+        </div>
+        <Captions s={s} lang={p.lang} />
+      </AbsoluteFill>
+    );
+  }
   return (
     <AbsoluteFill>
       <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: BAND.visTop, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", gap: 24 }}>
@@ -1278,7 +1321,7 @@ const EndView: React.FC<ViewProps> = ({ p, s }) => {
         {p.format === "every-letter" && everyOther(p) && !s.lines.length
           ? block(
               2,
-              <div dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), fontSize: 38, color: C.ink, lineHeight: 1.5 }}>
+              <div dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), fontSize: lz(38), color: C.ink, lineHeight: 1.5 }}>
                 {everyOther(p)}
               </div>,
             )
@@ -1319,7 +1362,7 @@ const EndView: React.FC<ViewProps> = ({ p, s }) => {
           <div style={{ fontFamily: FONT.en, fontSize: 44, color: C.gold, letterSpacing: "0.04em", direction: "ltr" }}>{SITE}</div>
           {p.voice.lines.length ? <div style={{ fontFamily: ui(p.lang), fontSize: lz(25), color: C.quiet }}>{w.voice}</div> : null}
           {p.studio.ending === "next" ? (
-            <div style={{ marginTop: 14, padding: "12px 34px", borderRadius: 999, border: `2px solid ${C.brass}`, fontFamily: ui(p.lang), fontSize: 40, color: C.star }}>{w.next}</div>
+            <div style={{ marginTop: 14, padding: "12px 34px", borderRadius: 999, border: `2px solid ${C.brass}`, fontFamily: ui(p.lang), fontSize: lz(40), color: C.star }}>{w.next}</div>
           ) : null}
         </div>
       </div>
@@ -1363,13 +1406,18 @@ const Chip: React.FC<{ p: InsightProps; f: number }> = ({ p, f }) => {
   );
 };
 
+/**
+ * The lamp style's rule box: its 45 px lines need up to three rows; it ends at 1650 in the column,
+ * the bottom of the safe zone on screen (the column is set at 90 % around the frame's middle).
+ */
+const RULE_LAMP = { top: 1418, h: 232 };
 const RuleBox: React.FC<{ p: InsightProps; o: number }> = ({ p, o }) => {
   const fa = p.lang === "fa";
   const text = ruleOf(p.format, p.episode, p.lang, p.numbers);
   return (
-    <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: BAND.rule, left: (W - 880) / 2, width: 880, height: BAND.ruleH, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, opacity: o }}>
+    <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: flags.lamp ? RULE_LAMP.top : BAND.rule, left: (W - 880) / 2, width: 880, height: flags.lamp ? RULE_LAMP.h : BAND.ruleH, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, opacity: o }}>
       <div style={{ width: 200, height: 1.5, background: `linear-gradient(90deg, transparent, ${C.gold}, transparent)` }} />
-      <Fit width={880} maxHeight={BAND.ruleH - 14} max={lz(26)} min={lz(18)} measureKey={text} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), lineHeight: fa ? 1.7 : 1.35, textAlign: "center", color: C.quiet }}>
+      <Fit width={880} maxHeight={(flags.lamp ? RULE_LAMP.h : BAND.ruleH) - 14} max={lz(26)} min={lz(18)} measureKey={text} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), lineHeight: fa ? 1.7 : 1.35, textAlign: "center", color: C.quiet }}>
         {text}
       </Fit>
     </div>
@@ -1393,8 +1441,12 @@ export const InsightReel: React.FC<InsightProps> = (raw) => {
   const first = t.scenes[0]!;
   const last = t.scenes[t.scenes.length - 1]!;
   // the rule box from the second scene on; a video that recites from its first second (Every Letter) shows it from the first second
-  const ruleFrom = first.id === "recite" ? 24 : (t.scenes[1]?.from ?? 0);
-  const ruleOn = Math.min(c01((f - ruleFrom + 6) / 12), c01((last.from - f + 6) / 12));
+  // the lamp style: from 1.5 s on, so the lower half is never empty (its words come after the hook's first 1.5 s)
+  const ruleFrom = first.id === "recite" ? 24 : lamp ? Math.min(46, t.scenes[1]?.from ?? 46) : (t.scenes[1]?.from ?? 0);
+  // the lamp style keeps it through the sources too (the lower half is never empty) and fades it before the loop
+  // …and gives way to the channel badge at the close (the badge then holds the bottom), so the two never meet
+  const ruleUntil = lamp ? t.total - t.loopFrames - (raw.style?.badge ? BADGE_LEN + 6 : 0) : last.from + 6;
+  const ruleOn = Math.min(c01((f - ruleFrom + 6) / 12), c01((ruleUntil - f) / 12));
   const Hook = viewOf(p, first.id);
   const seed = 7 + p.format.length * 3 + p.episode.length;
   // the light warms while the qari recites (as in the verse Reels)

@@ -7,9 +7,54 @@
 import React, { useEffect, useState } from "react";
 import { continueRender, delayRender, getRemotionEnvironment, useCurrentFrame } from "remotion";
 import { fontsReady } from "../fonts";
-import { dotBeside, probeFrame, quoteHash, wordsOf } from "./zones";
+import { GROUND, contrast, dotBeside, over, probeFrame, quoteHash, wordsOf } from "./zones";
 
-type Row = { b: number; r: string; q: string | null; x: number; y: number; w: number; h: number; s: number; S: number; o: number; n: number; d: boolean; hq: string | null };
+type Row = { b: number; r: string; q: string | null; x: number; y: number; w: number; h: number; s: number; S: number; o: number; n: number; d: boolean; hq: string | null; c: number | null; ar: boolean };
+
+/** «rgb(1, 2, 3)» or «rgba(1, 2, 3, 0.5)» as [r, g, b, a]; null for anything else. */
+function rgba(css: string): [number, number, number, number] | null {
+  const m = /rgba?\(([^)]+)\)/.exec(css);
+  if (!m) return null;
+  const v = m[1]!.split(/[\s,/]+/).filter(Boolean).map(Number);
+  return v.length >= 3 && v.slice(0, 3).every(Number.isFinite) ? [v[0]!, v[1]!, v[2]!, Number.isFinite(v[3]) ? v[3]! : 1] : null;
+}
+
+/** The golden glows of the ground (src/lamp/kit.tsx marks them): centre, reach and how strong they are now. */
+function glows() {
+  const out: { x: number; y: number; R: number; stops: [number, number][]; rgb: number[] }[] = [];
+  document.querySelectorAll("[data-glow]").forEach((g) => {
+    const o = seen(g).o;
+    if (o < 0.01) return;
+    const r = g.getBoundingClientRect();
+    const stops = (g.getAttribute("data-glow") ?? "").split(",").map((x) => x.split(":").map(Number) as [number, number]).map(([d, a]) => [d, a * o] as [number, number]);
+    // radial-gradient(circle, …) on a square reaches its farthest corner
+    out.push({ x: r.x + r.width / 2, y: r.y + r.height / 2, R: (r.width / 2) * Math.SQRT2, stops, rgb: [242, 196, 96] });
+  });
+  return out;
+}
+function glowAlpha(stops: [number, number][], d: number) {
+  if (!stops.length) return 0;
+  if (d <= stops[0]![0]) return stops[0]![1];
+  for (let i = 1; i < stops.length; i++) {
+    const [d0, a0] = stops[i - 1]!;
+    const [d1, a1] = stops[i]!;
+    if (d <= d1) return a0 + ((a1 - a0) * (d - d0)) / Math.max(1e-6, d1 - d0);
+  }
+  return stops[stops.length - 1]![1];
+}
+
+/** What is behind a point of a text: the ground's darkest cream, the glow there, and every filled box above it. */
+function behind(el: Element, cx: number, cy: number, light: ReturnType<typeof glows>) {
+  let bg: number[] = [...GROUND];
+  for (const g of light) bg = over(g.rgb, glowAlpha(g.stops, Math.hypot(cx - g.x, cy - g.y) / g.R), bg);
+  const chain: Element[] = [];
+  for (let e: Element | null = el; e && e !== document.documentElement; e = e.parentElement) chain.unshift(e);
+  for (const e of chain) {
+    const c = rgba(getComputedStyle(e).backgroundColor);
+    if (c && c[3] > 0) bg = over(c, c[3] * seen(e).o, bg);
+  }
+  return bg;
+}
 
 const ids = new WeakMap<Element, number>();
 let next = 1;
@@ -47,7 +92,8 @@ function seen(el: Element): { o: number; k: number } {
 }
 
 function measure(frame: number) {
-  const blocks = new Map<Element, { rect: DOMRect | null; text: string; s: number; S: number; o: number; r: string; q: string | null }>();
+  const light = glows();
+  const blocks = new Map<Element, { rect: DOMRect | null; text: string; s: number; S: number; o: number; r: string; q: string | null; c: number | null; ar: boolean }>();
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const text = node.textContent ?? "";
@@ -62,12 +108,20 @@ function measure(frame: number) {
     if (r.width < 1 || r.height < 1) continue;
     const size = parseFloat(getComputedStyle(el).fontSize) * k;
     const block = blockOf(el);
-    const cur = blocks.get(block) ?? { rect: null, text: "", s: Infinity, S: 0, o: 0, r: "text", q: null };
+    const cur = blocks.get(block) ?? { rect: null, text: "", s: Infinity, S: 0, o: 0, r: "text", q: null, c: null, ar: false };
+    // the letters' contrast as drawn: their colour at their own opacity over what is behind them
+    const col = rgba(getComputedStyle(el).color);
+    let c: number | null = null;
+    if (col) {
+      const bg = behind(el, r.x + r.width / 2, r.y + r.height / 2, light);
+      c = contrast(over(col, col[3] * o, bg), bg);
+    }
+    const ar = Boolean(el.closest('[lang="ar"]'));
     // the role and the quote key of the text itself (a marked span inside a plain block counts)
     const role = el.closest("[data-role]")?.getAttribute("data-role") ?? "text";
     const key = el.closest("[data-q]")?.getAttribute("data-q") ?? null;
     const u = cur.rect ? new DOMRect(Math.min(cur.rect.x, r.x), Math.min(cur.rect.y, r.y), Math.max(cur.rect.right, r.right) - Math.min(cur.rect.x, r.x), Math.max(cur.rect.bottom, r.bottom) - Math.min(cur.rect.y, r.y)) : r;
-    blocks.set(block, { rect: u, text: `${cur.text} ${text}`, s: Math.min(cur.s, size), S: Math.max(cur.S, size), o: Math.max(cur.o, o), r: cur.r !== "text" ? cur.r : role, q: cur.q ?? key });
+    blocks.set(block, { rect: u, text: `${cur.text} ${text}`, s: Math.min(cur.s, size), S: Math.max(cur.S, size), o: Math.max(cur.o, o), r: cur.r !== "text" ? cur.r : role, q: cur.q ?? key, c: c === null ? cur.c : cur.c === null ? c : Math.min(cur.c, c), ar: cur.ar || ar });
   }
   const rows: Row[] = [];
   for (const [block, v] of blocks) {
@@ -88,8 +142,18 @@ function measure(frame: number) {
       n: wordsOf(v.text).length,
       d: dotBeside(v.text),
       hq: null,
+      c: v.c === null ? null : Math.round(v.c * 10) / 10,
+      ar: v.ar,
     });
   }
+  // what fills the picture without being text (the lamp): its box only, for the gate's fill-y
+  document.querySelectorAll("[data-fill]").forEach((el) => {
+    const o = seen(el).o;
+    if (o < 0.05) return;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return;
+    rows.push({ b: idOf(el), r: "fill", q: null, x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height), s: 0, S: 0, o: Math.round(o * 100) / 100, n: 0, d: false, hq: null, c: null, ar: false });
+  });
   // a quote is hashed whole: all its blocks (a basmala and the rest of the ayah) in page order
   const quotes = new Map<string, string>();
   document.querySelectorAll("[data-q]").forEach((el) => {
