@@ -41,7 +41,7 @@ const Push: React.FC<{ dur: number; children: React.ReactNode }> = ({ dur, child
   const f = useCurrentFrame();
   // in and out again, 8 s a turn and 3 % at most, so a long recitation keeps moving too
   const k = 0.015 * (1 - Math.cos((2 * Math.PI * Math.min(f, dur)) / 240));
-  return <AbsoluteFill style={{ transform: `scale(${(1 + k).toFixed(4)})`, transformOrigin: "540px 760px" }}>{children}</AbsoluteFill>;
+  return <AbsoluteFill style={{ transform: `scale(${(1 + k).toFixed(4)})`, transformOrigin: "540px 300px" }}>{children}</AbsoluteFill>;
 };
 const BADGE_LEN = 66;
 

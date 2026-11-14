@@ -85,6 +85,7 @@ shakes or flashes.
   3.5 s), `loop`, `safe`, `text-size`, `overlap`, `source`, `quote` (letter for letter as
   served), `persian` (no «·» or «|» beside Persian), `badge`, `loudness`. A Reel that fails is
   not handed in: the worker reports it failed for good with the reason in plain Persian.
+- **Which Reels**: every verse Reel, and the insight formats whose samples passed the gate: The Only…, The Counts Test, Meccan · Medinan, One Line (`LAMP_INSIGHTS` in `scripts/render.mjs`); the other insight formats and the counts, surah cards and books keep the classic look without the gate until a sample of theirs passes (`SIRAJ_LAMP_INSIGHTS`, a list or `all`, widens it).
 - **Switches** (repository variables, unset = on): `SIRAJ_STYLE=classic` (the old look),
   `SIRAJ_BADGE=off`, `SIRAJ_GATE=warn` (report only) or `off`. Trials (`try.yml`) run the gate on
   `warn` and keep its report, a 360 px copy of the picture and a sheet of two frames a second.

@@ -29,12 +29,21 @@ import { manifestOf } from "./manifest.mjs";
 /**
  * The set style of 2026-11-14 for this job, from the repository variables (worker.yml):
  * SIRAJ_STYLE=classic brings the old look back, SIRAJ_BADGE=off removes the channel badge.
- * The lamp look is drawn for the verse and the insight Reels; the other formats keep the classic look.
+ * The lamp look is drawn for the verse Reels and the insight formats of LAMP_INSIGHTS; the others keep the classic look.
  */
 export function styleFor(props, env = process.env) {
-  if (!["verse", "insight"].includes(props.kind) || env.SIRAJ_STYLE === "classic") return null;
-  return { lamp: true, badge: env.SIRAJ_BADGE !== "off" };
+  if (env.SIRAJ_STYLE === "classic") return null;
+  const insights = (env.SIRAJ_LAMP_INSIGHTS || LAMP_INSIGHTS.join(",")).split(",").map((x) => x.trim());
+  const lamp = props.kind === "verse" || (props.kind === "insight" && (insights.includes("all") || insights.includes(props.format)));
+  return lamp ? { lamp: true, badge: env.SIRAJ_BADGE !== "off" } : null;
 }
+
+/**
+ * The insight formats drawn in the lamp look: those whose samples passed the gate (2026-11-14).
+ * The others keep the classic look, without the gate, until a sample of theirs passes;
+ * SIRAJ_LAMP_INSIGHTS (a repository variable: a list, or «all») widens it.
+ */
+export const LAMP_INSIGHTS = ["only", "myth-fact", "meccan-medinan", "one-line"];
 
 /** What the gate compares the page with: the hash of every quote it may show, and the badge's window. */
 export function gatePlan(props, inputProps, timeline) {
@@ -287,6 +296,8 @@ export async function renderJob(job, { stills = false, frames = process.env.FRAM
     const plan = gatePlan(props, inputProps, timeline);
     console.log(`${job.id}: gate on ${probes.length} measured frames`);
     const result = enforce({ probes, plan, file: final, mode: process.env.SIRAJ_GATE ?? "on", log: (l) => console.log(`${job.id}: ${l}`) });
+    // a trial keeps what the page measured too (numbers and hashes only), to check the gate again on the PC
+    if (process.env.SAMPLE_PARTS === "1") fs.writeFileSync(path.join(out, `${job.id}.probes.json`), JSON.stringify({ plan, probes }));
     if (result) fs.writeFileSync(path.join(out, `${job.id}.gate.json`), `${JSON.stringify({ ok: result.ok, checks: result.checks, loudness: loud, frames: probes.length }, null, 1)}
 `);
   }

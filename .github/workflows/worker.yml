@@ -61,6 +61,7 @@ jobs:
       SIRAJ_STYLE: ${{ vars.SIRAJ_STYLE }}
       SIRAJ_BADGE: ${{ vars.SIRAJ_BADGE }}
       SIRAJ_GATE: ${{ vars.SIRAJ_GATE }}
+      SIRAJ_LAMP_INSIGHTS: ${{ vars.SIRAJ_LAMP_INSIGHTS }}
     steps:
       - name: Anything to render?
         id: look

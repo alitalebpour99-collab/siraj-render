@@ -40,11 +40,12 @@ const HOOK = Math.round(1.5 * FPS);
 const fa = (n) => String(n).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
 const sec = (f) => (f / FPS).toFixed(1);
 /**
- * Two texts over each other: they share more than 6 px across and more than a quarter of the lower
- * one's height (the line boxes of Arabic and of large numerals reach well above and below their
- * letters; two lines that only touch there are not on each other).
- */
-const meet = (a, b) => Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 6 && Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > Math.max(6, 0.25 * Math.min(a.h, b.h));
+/** The letters' band of a text's box: the line box less the room above and below the letters. */
+const core = (r) => ({ x: r.x, y: r.y + 0.28 * r.s, w: r.w, h: Math.max(1, r.h - 0.56 * r.s) });
+const meet = (p, q) => {
+  const [a, b] = [core(p), core(q)];
+  return Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 6 && Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > Math.max(6, 0.25 * Math.min(a.h, b.h));
+};
 
 /**
  * The checks on what the page measured. `probes`: [{ f, rows }] (Probe.tsx); `plan`: { total,
