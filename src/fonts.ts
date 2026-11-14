@@ -1,4 +1,4 @@
-// The four faces, from public/fonts (SIL Open Font License 1.1; the licence files sit beside
+// The five faces, from public/fonts (SIL Open Font License 1.1; the licence files sit beside
 // them). Every frame waits for them, and text is measured only after they are in.
 import { cancelRender, continueRender, delayRender, staticFile } from "remotion";
 
@@ -7,6 +7,7 @@ const FACES = [
   { family: "Vazirmatn", file: "fonts/Vazirmatn-Variable.ttf", weight: "100 900", style: "normal" },
   { family: "EB Garamond", file: "fonts/EBGaramond-Variable.ttf", weight: "400 800", style: "normal" },
   { family: "EB Garamond", file: "fonts/EBGaramond-Italic-Variable.ttf", weight: "400 800", style: "italic" },
+  { family: "Noto Naskh Arabic", file: "fonts/NotoNaskhArabic-Variable.ttf", weight: "400 700", style: "normal" },
 ];
 
 let ready: Promise<void> | null = null;

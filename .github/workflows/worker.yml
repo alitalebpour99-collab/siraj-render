@@ -56,6 +56,11 @@ jobs:
       RENDER_GL: swangle
       RENDER_CONCURRENCY: "4"
       PYTHON: python
+      # the set style of 2026-11-14 (repository variables; unset = on): SIRAJ_STYLE=classic brings
+      # the old look back, SIRAJ_BADGE=off removes the channel badge, SIRAJ_GATE=warn|off loosens the gate
+      SIRAJ_STYLE: ${{ vars.SIRAJ_STYLE }}
+      SIRAJ_BADGE: ${{ vars.SIRAJ_BADGE }}
+      SIRAJ_GATE: ${{ vars.SIRAJ_GATE }}
     steps:
       - name: Anything to render?
         id: look

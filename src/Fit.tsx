@@ -67,7 +67,7 @@ export const Fit: React.FC<{
   );
 
   return (
-    <div ref={ref} lang={lang} dir={dir} style={{ width, ...style, fontSize: size ?? max, visibility: size === null ? "hidden" : "visible" }}>
+    <div ref={ref} lang={lang} dir={dir} data-fitting={size === null ? "1" : undefined} style={{ width, ...style, fontSize: size ?? max, visibility: size === null ? "hidden" : "visible" }}>
       {children}
     </div>
   );

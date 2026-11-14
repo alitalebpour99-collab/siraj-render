@@ -18,8 +18,50 @@ import { renderMedia, renderStill, selectComposition } from "@remotion/renderer"
 import { safeFrame } from "../src/layout.ts";
 import { textBoxes } from "../src/waitingPlan.ts";
 import { cardTimeline, countsTimeline, insightTimeline, speakerWindows, verseTimeline, wordTable } from "../src/timelines.ts";
+import { splitLeadingBasmala } from "../src/basmala.ts";
+import { quoteHash } from "../src/lamp/zones.ts";
+import { VT_LAMP } from "../src/timelines.ts";
+import { TARGET, levelFilter as level, loudness, meets } from "./finish.mjs";
+import { enforce } from "./gate.mjs";
 import { check, jobArg, runMain } from "./lib.mjs";
 import { manifestOf } from "./manifest.mjs";
+
+/**
+ * The set style of 2026-11-14 for this job, from the repository variables (worker.yml):
+ * SIRAJ_STYLE=classic brings the old look back, SIRAJ_BADGE=off removes the channel badge.
+ * The lamp look is drawn for the verse and the insight Reels; the other formats keep the classic look.
+ */
+export function styleFor(props, env = process.env) {
+  if (!["verse", "insight"].includes(props.kind) || env.SIRAJ_STYLE === "classic") return null;
+  return { lamp: true, badge: env.SIRAJ_BADGE !== "off" };
+}
+
+/** What the gate compares the page with: the hash of every quote it may show, and the badge's window. */
+export function gatePlan(props, inputProps, timeline) {
+  const quotes = {};
+  const add = (ayahs, opening, surah, whole) => {
+    for (const a of ayahs ?? []) {
+      const split = whole ? null : splitLeadingBasmala(surah, a.ayahNumber, a.text, opening);
+      quotes[`a${a.ayahNumber}`] = quoteHash(split ? split.rest : a.text);
+      if (a.translation) quotes[`t${a.ayahNumber}`] = quoteHash(a.translation);
+    }
+  };
+  // a verse Reel shows the basmala line and the rest of ayah 1 both (one quote); an insight only the rest
+  if (props.kind === "verse") add(props.ayahs, props.opening, props.surah.number, true);
+  if (props.kind === "insight" && props.recite) add(props.recite.ayahs, props.recite.opening, props.recite.surah.number, false);
+  const total = timeline.total;
+  const badgeOn = Boolean(inputProps.style?.badge);
+  let badge = null;
+  let closeFrom = 0;
+  if (props.kind === "verse") {
+    badge = { from: timeline.outro.from + timeline.outro.dur - VT_LAMP.BADGE - 6, to: timeline.outro.from + timeline.outro.dur - 6 };
+    closeFrom = timeline.outro.from;
+  } else {
+    badge = { from: total - timeline.loopFrames - 66 - 6, to: total - timeline.loopFrames - 6 };
+    closeFrom = timeline.scenes[timeline.scenes.length - 1]?.from ?? 0;
+  }
+  return { total, quotes, badgeOn, badge, closeFrom };
+}
 
 /** True when the file's top-level `moov` box comes before its `mdat` box (fast start). */
 function moovFirst(file) {
@@ -44,20 +86,6 @@ function moovFirst(file) {
   }
 }
 
-/**
- * Speech levelled to -16 LUFS in two passes (measure, then one linear gain), so that a video
- * that is mostly silence between its lines comes out as loud as one that is not.
- */
-function levelFilter(file) {
-  const target = "I=-16:TP=-1.5:LRA=11";
-  const run = spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-i", file, "-vn", "-af", `loudnorm=${target}:print_format=json`, "-f", "null", "-"], { encoding: "utf8" });
-  const json = (run.stderr ?? "").slice((run.stderr ?? "").lastIndexOf("{"));
-  const m = JSON.parse(json.slice(0, json.indexOf("}") + 1));
-  // a track with nothing heard (a trial whose narrator lines are placeholders) is left as it is
-  if (!Number.isFinite(Number(m.input_i)) || Number(m.input_i) < -70) return "anull";
-  return `loudnorm=${target}:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`;
-}
-
 const probe = (file) => JSON.parse(execFileSync("ffprobe", ["-v", "error", "-show_entries", "stream=codec_type,codec_name,sample_rate,width,height,r_frame_rate:format=duration", "-of", "json", file]).toString());
 
 /** LUFS of the window [from, to] (seconds) of the finished video, or null when nothing is heard. */
@@ -79,11 +107,12 @@ export function inputsOf(job) {
   const qari = recited ? readJson(path.join("public", "qari", job.id, "manifest.json")) : null;
   // the waiting templates (src/Waiting.tsx) are timed as the insight videos are, over their own scenes
   const scened = props.kind === "insight" || props.kind === "waiting";
-  const inputProps = { ...props, voice, ...(recited || scened ? { qari } : {}) };
+  const style = styleFor(props);
+  const inputProps = { ...props, voice, ...(recited || scened ? { qari } : {}), ...(style ? { style } : {}) };
   const loop = (props.studio?.ending ?? "loop") === "loop";
   const timeline =
     props.kind === "verse" ? verseTimeline(inputProps) : props.kind === "counts" ? countsTimeline(inputProps) : scened ? insightTimeline({ ...inputProps, loop }) : cardTimeline(inputProps);
-  return { props, voice, qari, inputProps, timeline };
+  return { props, voice, qari, inputProps, timeline, style };
 }
 
 /** The moments worth looking at (frames): the light of each clip, the middle of each line, the ends. */
@@ -117,7 +146,7 @@ function moments(props, inputProps, timeline) {
 }
 
 export async function renderJob(job, { stills = false, frames = process.env.FRAMES === "1" } = {}) {
-  const { props, voice, qari, inputProps, timeline } = inputsOf(job);
+  const { props, voice, qari, inputProps, timeline, style } = inputsOf(job);
   // an insight or a waiting template is named by its format (fa-nahj-hikma, en-mirror …)
   const want = props.kind === "insight" || props.kind === "waiting" ? `${props.lang}-${props.format}` : `${props.lang}-${props.kind}`;
   check(job.composition === want, `the job's composition ${job.composition} is ${want}`);
@@ -179,7 +208,12 @@ export async function renderJob(job, { stills = false, frames = process.env.FRAM
   const s0 = Date.now();
   const raw = path.join(out, `${job.id}.raw.mp4`);
   let last = -1;
+  // what the page measured of itself on its probe frames (src/lamp/Probe.tsx): numbers and hashes, never printed
+  const probes = [];
   await renderMedia({
+    onBrowserLog: (log) => {
+      if (log.text.startsWith("SIRAJ_PROBE ")) probes.push(JSON.parse(log.text.slice(12)));
+    },
     ...common,
     composition,
     inputProps,
@@ -201,7 +235,8 @@ export async function renderJob(job, { stills = false, frames = process.env.FRAM
     },
   });
 
-  // AAC at 48 kHz, speech levelled to -16 LUFS (no levelling of a silent track), moov at the front.
+  // AAC at 48 kHz, the sound levelled to −14 LUFS with its true peak at −1 dBTP or lower (two
+  // passes; measured on the encoded file and done once more a little lower when it is over), moov at the front.
   const final = path.join(out, `${job.id}.mp4`);
   const audible = timeline.speakers.length > 0;
   // The picture once more with a ceiling on its rate, so that the file stays under 45 MB: the
@@ -209,12 +244,21 @@ export async function renderJob(job, { stills = false, frames = process.env.FRAM
   // 114-second surah at CRF 18, was 76 MB and reached the owner as its cover only).
   const rawSeconds = Number(probe(raw).format.duration) || timeline.total / 30;
   const kbps = Math.max(1500, Math.min(6000, Math.floor((45 * 8192) / rawSeconds) - 220));
-  execFileSync("ffmpeg", [
-    "-y", "-v", "error", "-i", raw,
-    "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-maxrate", `${kbps}k`, "-bufsize", `${kbps * 2}k`, "-pix_fmt", "yuv420p", "-profile:v", "high",
-    ...(audible ? ["-af", levelFilter(raw)] : []),
-    "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", final,
-  ]);
+  const encode = (tp) =>
+    execFileSync("ffmpeg", [
+      "-y", "-v", "error", "-i", raw,
+      "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-maxrate", `${kbps}k`, "-bufsize", `${kbps * 2}k`, "-pix_fmt", "yuv420p", "-profile:v", "high",
+      ...(audible ? ["-af", level(raw, tp)] : []),
+      "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", final,
+    ]);
+  encode(-1.5);
+  let loud = audible ? loudness(final) : null;
+  if (loud && !meets(loud)) {
+    console.log(`${job.id}: sound at ${loud.lufs} LUFS, true peak ${loud.tp} dBTP: levelled once more`);
+    encode(-2.5);
+    loud = loudness(final);
+  }
+  if (loud) console.log(`${job.id}: sound ${loud.lufs} LUFS, true peak ${loud.tp} dBTP (target ${TARGET.lufs} ± ${TARGET.tolerance}, ≤ ${TARGET.tp})`);
   fs.rmSync(raw);
   const info = probe(final);
   const v = info.streams.find((s) => s.codec_type === "video");
@@ -237,6 +281,14 @@ export async function renderJob(job, { stills = false, frames = process.env.FRAM
     }
     x.lufs = windowLufs(final, x.from, x.to);
     check(x.lufs !== null && x.lufs >= -32, `${x.who} is heard in the video (${x.lufs} LUFS)`);
+  }
+  // the gate of the lamp style: what the page measured, the file, the loudness (scripts/gate.mjs)
+  if (style?.lamp) {
+    const plan = gatePlan(props, inputProps, timeline);
+    console.log(`${job.id}: gate on ${probes.length} measured frames`);
+    const result = enforce({ probes, plan, file: final, mode: process.env.SIRAJ_GATE ?? "on", log: (l) => console.log(`${job.id}: ${l}`) });
+    if (result) fs.writeFileSync(path.join(out, `${job.id}.gate.json`), `${JSON.stringify({ ok: result.ok, checks: result.checks, loudness: loud, frames: probes.length }, null, 1)}
+`);
   }
   console.log(`${job.id}: who speaks when (s, LUFS): ${segs.map((x) => `${x.who} ${x.from.toFixed(2)}-${x.to.toFixed(2)} ${x.lufs === null ? "placeholder" : x.lufs.toFixed(1)}`).join(", ") || "nobody (no sound)"}`);
 

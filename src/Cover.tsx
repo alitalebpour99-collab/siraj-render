@@ -12,6 +12,8 @@ import { Cartouche, Divider, MushafFrame, Seal, SirajMark } from "./ornament";
 import type { CardProps, CountsProps, Lang, VerseProps } from "./props";
 import { applyStudio } from "./studio";
 import { C, FONT } from "./theme";
+import { Ground } from "./lamp/kit";
+import { COL_X } from "./lamp/zones";
 
 const uiFont = (lang: Lang) => (lang === "fa" ? FONT.fa : FONT.en);
 
@@ -40,7 +42,34 @@ const Frame: React.FC<{ seed: number; source: string; lang: Lang; children: Reac
   );
 };
 
+/** The verse cover in the lamp style: cream, the lamp and its glow, the surah's name large in emerald, three lines. */
+const LampVerseCover: React.FC<VerseProps> = (p) => {
+  applyStudio(p.studio, true);
+  const { height } = useVideoConfig();
+  const tall = height > 1500;
+  const fa = p.lang === "fa";
+  const t = fa ? L.fa : L.en;
+  const ui = uiFont(p.lang);
+  const unit = p.whole ? t.verses(p.surah.ayahCount) : t.range(p.from, p.to);
+  const x = tall ? COL_X : 540;
+  return (
+    <AbsoluteFill style={{ background: C.night }}>
+      <Ground total={1} still lamp={{ x, y: tall ? 520 : 250, size: tall ? 150 : 120 }} warm={0.9} />
+      <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: tall ? 660 : 360, left: x - 400, width: 800, display: "flex", flexDirection: "column", alignItems: "center", gap: tall ? 28 : 18 }}>
+        <div style={{ fontFamily: ui, fontSize: tall ? 52 : 44, fontWeight: 600, color: C.gold, fontVariantNumeric: "lining-nums" }}>{t.of(p.surah.number, p.surahTotal)}</div>
+        <div lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: tall ? 150 : 124, lineHeight: 1.45, color: C.star }}>
+          {p.surah.nameArabic}
+        </div>
+        {fa ? null : <div style={{ fontFamily: FONT.en, fontStyle: "italic", fontSize: tall ? 72 : 60, color: C.ink }}>{p.surah.tname}</div>}
+        <div style={{ fontFamily: ui, fontSize: tall ? 56 : 48, color: C.translation }}>{unit}</div>
+      </div>
+      <div style={{ position: "absolute", bottom: tall ? 380 : 60, left: x - 300, width: 600, textAlign: "center", fontFamily: FONT.en, fontSize: tall ? 36 : 32, color: C.gold, letterSpacing: "0.04em" }}>{SITE}</div>
+    </AbsoluteFill>
+  );
+};
+
 export const VerseCover: React.FC<VerseProps> = (p) => {
+  if (p.style?.lamp) return <LampVerseCover {...p} />;
   applyStudio(p.studio);
   const { height } = useVideoConfig();
   const tall = height > 1500;
@@ -49,7 +78,7 @@ export const VerseCover: React.FC<VerseProps> = (p) => {
   const ui = uiFont(p.lang);
   const qari = p.qari?.reciter.name ?? null;
   const unit = p.whole ? t.verses(p.surah.ayahCount) : t.range(p.from, p.to);
-  const source = fa ? `${L.fa.tanzil} · ${p.source.translation.translatorName}` : `${p.source.quran.publisher} · ${p.source.translation.translatorName}`;
+  const source = fa ? `${L.fa.tanzil}، ${p.source.translation.translatorName}` : `${p.source.quran.publisher} · ${p.source.translation.translatorName}`;
   return (
     <Frame seed={p.surah.number} source={source} lang={p.lang}>
       <div dir={fa ? "rtl" : "ltr"} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: tall ? 36 : 24 }}>

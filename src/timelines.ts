@@ -60,16 +60,26 @@ export type VerseTimeline = {
   intro: { from: number; dur: number };
   cards: VerseCard[];
   outro: { from: number; dur: number };
+  /** the last frames that lead back into the first picture (the lamp style), 0 in the classic look */
+  loop: number;
   total: number;
   speakers: Speaker[];
 };
 
+/**
+ * The lamp style (2026-11-14): no opening card (the ayah is on screen from the first frame and the
+ * qari begins 0.6 s in), a shorter sources card that carries the channel badge, and a last
+ * stretch that fades back into the first picture so the Reel loops.
+ */
+export const VT_LAMP = { OUTRO: 150, LOOP: 18, BADGE: 66 };
+
 const byId = (voice: Voice | null | undefined) => new Map((voice?.lines ?? []).map((l) => [l.id, l]));
 
-export function verseTimeline(p: Pick<VerseProps, "ayahs" | "qari" | "voice">): VerseTimeline {
+export function verseTimeline(p: Pick<VerseProps, "ayahs" | "qari" | "voice"> & { style?: { lamp: boolean } | null }): VerseTimeline {
+  const lamp = Boolean(p.style?.lamp);
   const lines = byId(p.voice);
   const speakers: Speaker[] = [];
-  let at = VT.INTRO - VT.XF;
+  let at = lamp ? 0 : VT.INTRO - VT.XF;
   const cards = p.ayahs.map((a, index): VerseCard => {
     const clip = p.qari?.verses?.find((v) => v.ayah === a.ayahNumber) ?? null;
     const basmala = index === 0 ? (p.qari?.basmala ?? null) : null;
@@ -93,11 +103,12 @@ export function verseTimeline(p: Pick<VerseProps, "ayahs" | "qari" | "voice">): 
     at += dur - VT.XF;
     return card;
   });
-  return { intro: { from: 0, dur: VT.INTRO }, cards, outro: { from: at, dur: VT.OUTRO }, total: at + VT.OUTRO, speakers };
+  if (lamp) return { intro: { from: 0, dur: 0 }, cards, outro: { from: at, dur: VT_LAMP.OUTRO }, loop: VT_LAMP.LOOP, total: at + VT_LAMP.OUTRO + VT_LAMP.LOOP, speakers };
+  return { intro: { from: 0, dur: VT.INTRO }, cards, outro: { from: at, dur: VT.OUTRO }, loop: 0, total: at + VT.OUTRO, speakers };
 }
 
 /** Absolute seconds of every lit word of every clip, for the log and the record (no text). */
-export function wordTable(p: Pick<VerseProps, "ayahs" | "qari" | "voice">) {
+export function wordTable(p: Pick<VerseProps, "ayahs" | "qari" | "voice"> & { style?: { lamp: boolean } | null }) {
   const t = verseTimeline(p);
   const rows: { clip: string; mode: string; word: number; start: number; end: number }[] = [];
   for (const card of t.cards) {

@@ -34,6 +34,10 @@ jobs:
       RENDER_CONCURRENCY: "4"
       PYTHON: python
       SAMPLE_PARTS: "1"
+      # a trial is for looking: the gate reports (out/<id>.gate.json) and the run goes on
+      SIRAJ_GATE: warn
+      SIRAJ_STYLE: ${{ vars.SIRAJ_STYLE }}
+      SIRAJ_BADGE: ${{ vars.SIRAJ_BADGE }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -83,6 +87,8 @@ jobs:
         run: |
           mkdir -p keep
           cp out/frames/*.jpg out/*.jpg out/*.json keep/ 2>/dev/null || true
+          # the gate's report and the measured loudness, in the log too
+          for g in out/*.gate.json; do [ -e "$g" ] && jq -c '{ok, loudness, failed: [.checks[] | select(.ok | not) | .id]}' "$g"; done
           cp out/*.picture.mp4 keep/ 2>/dev/null || true
           if [ -d out/voice ]; then cp -r out/voice keep/voice; fi
           ls -la keep

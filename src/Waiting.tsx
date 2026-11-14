@@ -3,11 +3,11 @@
 // served:
 //   fa-nahj-hikma  «حکمت n · نهج‌البلاغه»: the Arabic appears word by word, slowly; a brass line
 //                  opens; the Persian is set word by word as the narrator reads it (lapis)
-//   fa-kumayl      «شب جمعه · دعای کمیل · بند n»: a generated candle, a slow light over the
+//   fa-kumayl      «شب جمعه؛ دعای کمیل؛ بند n»: a generated candle, a slow light over the
 //                  Arabic, then the Persian read by the narrator (night)
 //   fa-dua-story   «ذکر امروز · <weekday>»: a Story of about nine seconds, the day's dhikr and a
 //                  ring that fills as it counts; silent or with the narrator (night)
-//   fa-tafsir      «تفسیر نمونه · جلد v، ص p»: a carousel (-slide 1…5: the verse, then the
+//   fa-tafsir      «تفسیر نمونه؛ جلد v، ص p»: a carousel (-slide 1…5: the verse, then the
 //                  record's paragraphs) and its silent Reel twin, the slides turning (lapis)
 //   fa-occasion, en-occasion «بنا بر اعلام …»: the occasion's name and one line, very slow, no
 //                  glow and no flashes (pewter)
@@ -135,12 +135,12 @@ const WW = {
     translation: "ترجمه",
     recitation: "تلاوت",
     reading: "خوانش",
-    voice: "صدای مصنوعی · فقط متن راوی را می‌خواند",
+    voice: "صدای مصنوعی؛ فقط متن راوی را می‌خواند",
     plainVoice: "صدای مصنوعی",
     announced: (who: string) => `بنا بر اعلام ${who}`,
   },
 };
-const TR_VOICE = "صدای مصنوعی · فقط فارسی را می‌خواند";
+const TR_VOICE = "صدای مصنوعی؛ فقط فارسی را می‌خواند";
 
 /** The foot's source line: the service's spoken source line when the job has one (shown as said), else the book and its publisher. */
 const sourceLine = (p: WaitingProps, s: WaitSource) => p.narration.find((l) => l.id === "src")?.show ?? `${s.title} · ${s.publisher}`;
@@ -334,7 +334,7 @@ const NahjView: React.FC<VP> = ({ p, t, at }) => {
   return (
     <AbsoluteFill>
       <Lamp warm={0.4 + 0.6 * ramp(f, open.from, 60)} cy={0.3} />
-      <Chip lang="fa" f={f} text={`حکمت ${faNum(x.number ?? 0)} · نهج‌البلاغه`} />
+      <Chip lang="fa" f={f} text={`حکمت ${faNum(x.number ?? 0)}، نهج‌البلاغه`} />
       <Block box={B.arabic}>
         <Fit width={900} maxHeight={boxH(B.arabic)} max={78} min={30} measureKey={arabic} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.95, textAlign: "center", color: C.star, textWrap: "balance", whiteSpace: "pre-line" }}>
           <SlowArabic text={arabic.trim()} f={f} at={(k) => open.from + 8 + k * step} len={mk(22)} />
@@ -347,7 +347,7 @@ const NahjView: React.FC<VP> = ({ p, t, at }) => {
   );
 };
 
-/** شب جمعه · دعای کمیل: the candle is lit, a slow light passes over the Arabic, the Persian is read. */
+/** شب جمعه؛ دعای کمیل: the candle is lit, a slow light passes over the Arabic, the Persian is read. */
 const KumaylView: React.FC<VP> = ({ p, t, at }) => {
   const f = useAt(at);
   const x = p.text;
@@ -358,7 +358,7 @@ const KumaylView: React.FC<VP> = ({ p, t, at }) => {
   const lit = span01(f, candle.from + 6, candle.from + 6 + mk(40));
   const first = x.lines[0]?.number ?? 1;
   const last = x.lines[x.lines.length - 1]?.number ?? first;
-  const chip = first === last ? `شب جمعه · دعای کمیل · بند ${faNum(first)}` : `شب جمعه · دعای کمیل · بندهای ${faNum(first)} تا ${faNum(last)}`;
+  const chip = first === last ? `شب جمعه؛ دعای کمیل؛ بند ${faNum(first)}` : `شب جمعه؛ دعای کمیل؛ بندهای ${faNum(first)} تا ${faNum(last)}`;
   const rest = end.lines.find((l) => l.id === "rest");
   const endIn = ramp(f, end.from + 4, 20);
   return (
@@ -439,7 +439,7 @@ const StoryView: React.FC<VP> = ({ p, t, at }) => {
   return (
     <AbsoluteFill>
       <Lamp warm={0.45 + 0.55 * k} cy={0.33} />
-      <Chip lang="fa" f={f} text={`ذکر امروز · ${x.day ? WEEKDAY[x.day] : ""}`} />
+      <Chip lang="fa" f={f} text={`ذکر امروز، ${x.day ? WEEKDAY[x.day] : ""}`} />
       <div style={{ position: "absolute", top: B.ring[0], left: (W - size) / 2, width: size, height: size }}>
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
           <circle cx={c} cy={c} r={R} fill="none" stroke={`${C.ink}22`} strokeWidth={14} />

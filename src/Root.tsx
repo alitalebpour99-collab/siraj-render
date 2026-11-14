@@ -15,6 +15,10 @@ import { DEFAULT_STUDIO } from "./studio";
 import { FPS, H, W } from "./theme";
 import { cardTimeline, countsTimeline, insightTimeline, verseTimeline } from "./timelines";
 import { VerseReel } from "./Verse";
+import { LampVerse } from "./lamp/LampVerse";
+
+/** The verse in the set style's lamp look when the render asks for it (render.mjs: SIRAJ_STYLE), else the classic look. */
+const VerseAny: React.FC<VerseProps> = (props) => (props.style?.lamp ? <LampVerse {...props} /> : <VerseReel {...props} />);
 import { WaitingCompositions } from "./Waiting";
 
 const release: Release = {
@@ -113,7 +117,7 @@ export const Root: React.FC = () => (
   <>
     {LANGS.map((lang) => (
       <React.Fragment key={lang}>
-        <Composition id={`${lang}-verse`} component={VerseReel} {...reel} durationInFrames={300} defaultProps={emptyVerse(lang)} calculateMetadata={({ props }) => ({ durationInFrames: verseTimeline(props).total })} />
+        <Composition id={`${lang}-verse`} component={VerseAny} {...reel} durationInFrames={300} defaultProps={emptyVerse(lang)} calculateMetadata={({ props }) => ({ durationInFrames: verseTimeline(props).total })} />
         <Composition id={`${lang}-verse-cover`} component={VerseCover} {...reel} durationInFrames={1} defaultProps={emptyVerse(lang)} />
         <Composition id={`${lang}-verse-grid`} component={VerseCover} {...grid} durationInFrames={1} defaultProps={emptyVerse(lang)} />
         <Composition id={`${lang}-counts`} component={CountsReel} {...reel} durationInFrames={300} defaultProps={emptyCounts(lang)} calculateMetadata={({ props }) => ({ durationInFrames: countsTimeline(props).total })} />

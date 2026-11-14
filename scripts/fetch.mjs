@@ -63,7 +63,7 @@ function narrationOf(job, plan) {
     check(typeof line.id === "string" && allowed.has(line.id), `narration line ${line.id} has a place in the video`);
     check(typeof line.show === "string" && line.show.length > 0 && typeof line.say === "string" && line.say.length > 0, `narration line ${line.id}`);
   }
-  return n.map((l) => ({ id: l.id, show: l.show, say: l.say }));
+  return n.map((l) => ({ id: l.id, show: l.show, say: l.say, ...(typeof l.head === "string" ? { head: l.head } : {}) }));
 }
 
 async function verseProps(job) {
@@ -337,7 +337,8 @@ async function insightProps(job) {
     surahs: idx.surahs.map((s, i) => ({ number: s.surahNumber, nameArabic: s.nameArabic, tname: meta.suras[i].tname, ayahCount: s.ayahCount, place: s.revelationPlace, order: s.revelationOrder })),
     pages: meta.pages.length,
     spans,
-    narration: narration.map((l) => ({ id: l.id, show: l.show, say: l.say })),
+    // `head`: the hook's opening words of 7 or fewer (the set style), when the service sends them
+    narration: narration.map((l) => ({ id: l.id, show: l.show, say: l.say, ...(typeof l.head === "string" ? { head: l.head } : {}) })),
     recite,
     source: { quran: releaseOf(idx.release), surahMetadata: metadataOf(idx) },
     studio: p.studio ?? null,

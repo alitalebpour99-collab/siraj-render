@@ -9,6 +9,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { levelFilter, loudness as measured } from "./finish.mjs";
 import { download, getJson, level, loudness } from "./lib.mjs";
 
 const args = process.argv.slice(2);
@@ -30,14 +31,6 @@ function windowLufs(file, from, to) {
   const run = spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-ss", from.toFixed(3), "-t", Math.max(0.05, to - from).toFixed(3), "-i", file, "-vn", "-af", "ebur128=framelog=quiet", "-f", "null", "-"], { encoding: "utf8" });
   const m = [...(run.stderr ?? "").matchAll(/I:\s+(-?[\d.]+) LUFS/g)].pop();
   return m ? Number(m[1]) : null;
-}
-
-function levelFilter(file) {
-  const target = "I=-16:TP=-1.5:LRA=11";
-  const run = spawnSync("ffmpeg", ["-hide_banner", "-nostats", "-i", file, "-af", `loudnorm=${target}:print_format=json`, "-f", "null", "-"], { encoding: "utf8" });
-  const json = (run.stderr ?? "").slice((run.stderr ?? "").lastIndexOf("{"));
-  const m = JSON.parse(json.slice(0, json.indexOf("}") + 1));
-  return `loudnorm=${target}:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`;
 }
 
 const chapters = new Map();
@@ -107,5 +100,6 @@ for (const f of fs.readdirSync(trial).filter((x) => x.endsWith(".sound.json"))) 
   execFileSync("ffmpeg", ["-y", "-v", "error", "-i", picture, "-vf", `select='${picks.map((n) => `eq(n\\,${n})`).join("+")}',scale=300:-2,tile=3x3:padding=6:color=0x060a14`, "-fps_mode", "vfr", "-frames:v", "1", "-q:v", "3", path.join(outDir, "frames", `${id}-sheet.jpg`)]);
   for (const k of fs.readdirSync(trial).filter((x) => x.startsWith(`${id}-`) && x.endsWith(".jpg") && !/-m\d+\.jpg$/.test(x))) fs.copyFileSync(path.join(trial, k), path.join(outDir, k));
   fs.rmSync(work, { recursive: true, force: true });
-  console.log(`${id}: ${seconds.toFixed(1)} s, ${inputs.length} voices (${inputs.filter((x) => x.kind === "qari").length} qari), ${(fs.statSync(final).size / 1048576).toFixed(1)} MB, overlap ${overlap ?? "none"}, quiet ${quiet.length ? quiet.map((q) => q.who).join(",") : "none"}`);
+  const l = measured(final);
+  console.log(`${id}: ${seconds.toFixed(1)} s, ${l.lufs} LUFS, true peak ${l.tp} dBTP, ${inputs.length} voices (${inputs.filter((x) => x.kind === "qari").length} qari), ${(fs.statSync(final).size / 1048576).toFixed(1)} MB, overlap ${overlap ?? "none"}, quiet ${quiet.length ? quiet.map((q) => q.who).join(",") : "none"}`);
 }

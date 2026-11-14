@@ -125,11 +125,14 @@ export type VerseProps = {
   voice: Voice;
   qari: Qari | null;
   studio?: Studio;
+  /** the set style of 2026-11-14 (render.mjs: SIRAJ_STYLE, SIRAJ_BADGE); absent = the classic look */
+  style?: SetStyle;
 };
 
 /* ---------- Counts and the surah card ---------- */
 
-export type Narration = { id: string; show: string; say: string };
+/** `head`: the hook's opening words (7 or fewer) that stand on screen from the first frame (the set style). */
+export type Narration = { id: string; show: string; say: string; head?: string };
 export type Metric = "overview" | "revelation-order" | "prostrations" | "divisions";
 
 export type CountsSurah = { number: number; ayahCount: number; nameArabic: string; place: "meccan" | "medinan"; order: number };
@@ -170,6 +173,9 @@ export type CardProps = {
 };
 
 export type AnyProps = VerseProps | CountsProps | CardProps | InsightProps;
+
+/** The set style (owner, 2026-11-13: the new video style, in Siraj's own look): the lamp look with its gate, and the channel badge. */
+export type SetStyle = { lamp: boolean; badge: boolean };
 
 /* ---------- The studio (the control room's «استودیو», service §4.7) ---------- */
 
@@ -225,4 +231,5 @@ export type InsightProps = {
   voice: Voice;
   qari: Qari | null;
   studio: Studio;
+  style?: SetStyle;
 };

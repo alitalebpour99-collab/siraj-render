@@ -26,6 +26,8 @@ export const FONT = {
   quran: "'Amiri Quran', serif",
   fa: "Vazirmatn, sans-serif",
   en: "'EB Garamond', serif",
+  /** the quoted Persian of the lamp style (a translation, a saying): an elegant naskh */
+  naskh: "'Noto Naskh Arabic', serif",
 };
 
 /**

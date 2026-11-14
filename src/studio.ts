@@ -31,8 +31,29 @@ const LOOKS: Record<Look, Partial<typeof C>> = {
   paper: { night: "#efe6d2", night2: "#e6dac0", deep: "#d9cba9", band: "#7a5a2a", bandDeep: "#5e431c", gold: "#9a6a1e", brass: "#a8741f", brassDeep: "#7f5514", star: "#7a4f10", ink: "#2a2116", translation: "#3b3022", quiet: "#6d5f4a", turquoise: "#2f7f78" },
 };
 
-export type LookFlags = { glow: boolean; motes: boolean; paper: boolean };
-export const flags = { glow: true, motes: true, paper: false };
+/**
+ * The lamp look of the set style (owner, 2026-11-13; Siraj's own, never another brand's): warm
+ * cream, a deep emerald for the light of the words and the lines, dark ink for the text, a small
+ * golden glow only behind the lamp (src/lamp/Ground.tsx). No mushaf frame, no arabesque.
+ */
+export const LAMP: Partial<typeof C> = {
+  night: "#f7f0e2",
+  night2: "#f0e5cf",
+  deep: "#e8dabe",
+  band: "#125c4a",
+  bandDeep: "#0c4538",
+  gold: "#14684f",
+  brass: "#0f5f4a",
+  brassDeep: "#0b4b3a",
+  star: "#123d31",
+  ink: "#2b241a",
+  translation: "#3a3125",
+  quiet: "#6e6250",
+  turquoise: "#b07a22",
+};
+
+export type LookFlags = { glow: boolean; motes: boolean; paper: boolean; lamp: boolean };
+export const flags = { glow: true, motes: true, paper: false, lamp: false };
 /** Entrance lengths are multiplied by this (calm is slower, lively quicker). */
 export const motion = { k: 1, drift: 1 };
 
@@ -41,13 +62,17 @@ export function studioOf(s: Partial<Studio> | null | undefined): Studio {
   return { ...DEFAULT_STUDIO, ...(s ?? {}) };
 }
 
-/** Sets the palette and the motion of this render; returns the studio in force. */
-export function applyStudio(s: Partial<Studio> | null | undefined): Studio {
+/**
+ * Sets the palette and the motion of this render; returns the studio in force. With the set
+ * style's lamp the look is the lamp's whatever the studio's ground says (its motion stays).
+ */
+export function applyStudio(s: Partial<Studio> | null | undefined, lamp = false): Studio {
   const st = studioOf(s);
-  Object.assign(C, LAPIS, LOOKS[st.look] ?? {});
-  flags.glow = st.look !== "pewter";
-  flags.paper = st.look === "paper";
-  flags.motes = st.particles && st.look !== "pewter";
+  Object.assign(C, LAPIS, lamp ? LAMP : (LOOKS[st.look] ?? {}));
+  flags.lamp = lamp;
+  flags.glow = !lamp && st.look !== "pewter";
+  flags.paper = lamp || st.look === "paper";
+  flags.motes = !lamp && st.particles && st.look !== "pewter";
   motion.k = st.motion === "calm" ? 1.3 : st.motion === "lively" ? 0.78 : 1;
   motion.drift = st.motion === "calm" ? 0.7 : st.motion === "lively" ? 1.35 : 1;
   return st;

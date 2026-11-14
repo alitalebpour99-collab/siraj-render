@@ -31,11 +31,23 @@ const HOT_DARK: RGBA = [255, 219, 140, 1];
 const DIM_PAPER: RGBA = [42, 33, 22, 0.42];
 const SETTLED_PAPER: RGBA = [122, 79, 16, 1];
 const HOT_PAPER: RGBA = [168, 102, 12, 1];
+// in the lamp look (2026-11-14) the ink is dark on cream and the light is a deep emerald
+const DIM_LAMP: RGBA = [43, 36, 26, 0.5];
+const SETTLED_LAMP: RGBA = [22, 50, 40, 1];
+const HOT_LAMP: RGBA = [14, 112, 84, 1];
 const mix = (a: RGBA, b: RGBA, t: number): RGBA => [0, 1, 2, 3].map((i) => a[i]! + (b[i]! - a[i]!) * t) as RGBA;
 const rgba = (c: RGBA) => `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${c[3].toFixed(3)})`;
 
 /** A word blooms when the qari reaches it, stays bright while he recites it, then settles. */
 function wordLook(t: number, w: WordTime): React.CSSProperties {
+  if (flags.lamp) {
+    if (t < w.start) return { color: rgba(DIM_LAMP) };
+    const lit = clamp01((t - w.start) / 0.14);
+    const hot = t <= w.end ? 1 : easeOut(clamp01(1 - (t - w.end) / 0.75));
+    const color = mix(mix(DIM_LAMP, SETTLED_LAMP, lit), HOT_LAMP, hot * lit);
+    // a small warm halo only on the word being recited
+    return hot * lit > 0.02 ? { color: rgba(color), textShadow: `0 0 ${(4 + 12 * hot * lit).toFixed(1)}px rgba(236,184,82,${(0.5 * hot * lit).toFixed(3)})` } : { color: rgba(color) };
+  }
   const [DIM, SETTLED, HOT] = flags.paper ? [DIM_PAPER, SETTLED_PAPER, HOT_PAPER] : [DIM_DARK, SETTLED_DARK, HOT_DARK];
   if (t < w.start) return { color: rgba(DIM) };
   const lit = clamp01((t - w.start) / 0.14);
@@ -94,7 +106,7 @@ export const LitText: React.FC<{ text: string; clip: QariClip | null | undefined
 };
 
 /** The translation line, each word brightening as the narrator says it (when ElevenLabs gave word timings). */
-const SpokenText: React.FC<{ text: string; words: Array<[number, number]> | undefined; t: number }> = ({ text, words, t }) => {
+export const SpokenText: React.FC<{ text: string; words: Array<[number, number]> | undefined; t: number }> = ({ text, words, t }) => {
   const list = pieces(text);
   const count = list.filter((p) => p.word !== null).length;
   if (!words || words.length !== count) return <>{text}</>;

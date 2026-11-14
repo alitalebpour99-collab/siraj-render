@@ -22,6 +22,21 @@ import { C, FONT, W, arNum, easeInOut, easeOut, enNum, faGrouped, faNum } from "
 import { ST, insightTimeline, type InsightScene, type SceneLine } from "./timelines";
 import { LitText } from "./Verse";
 import { pieces, wordCount } from "./words";
+import { Badge, Emblem, Ground } from "./lamp/kit";
+import { Probe } from "./lamp/Probe";
+import { COL_X, hookHead } from "./lamp/zones";
+
+/* ---------- the lamp style (2026-11-14) ---------- */
+
+/**
+ * The lamp style draws the same pictures in Siraj's cream look inside the apps' safe zones: the
+ * whole picture is set in the safe column (x 56–888: the right 14 % stays free for the buttons) at
+ * 92 % of its size, so every text keeps at least 32 px here (29 px, 1.5 % of the frame, on screen).
+ */
+const LAMP_COLUMN = { scale: 0.92, dx: COL_X - 540 };
+/** A text size of the classic look, at least 32 px in the lamp style. */
+const lz = (n: number) => (flags.lamp ? Math.max(n, 32) : n);
+const BADGE_LEN = 66;
 
 /* ---------- layout: every text stays inside the 4:5 band (y 285–1635) and above the caption zone ---------- */
 
@@ -97,7 +112,7 @@ const Said: React.FC<{ line: SceneLine; s: InsightScene; lang: Lang; top?: numbe
         width={860}
         maxHeight={height}
         max={max ?? (fa ? 44 : 50)}
-        min={26}
+        min={lz(26)}
         measureKey={line.show}
         lang={lang}
         dir={fa ? "rtl" : "ltr"}
@@ -205,7 +220,7 @@ const Strip114: React.FC<{ p: InsightProps; f: number; at: number; top: number; 
         })}
         <line x1={STRIP.left} x2={STRIP.left + STRIP.width} y1={STRIP.height + 6} y2={STRIP.height + 6} stroke={C.gold} strokeWidth={1.2} opacity={0.6} />
       </svg>
-      <div dir="ltr" style={{ position: "absolute", top: STRIP.height + 14, left: STRIP.left, width: STRIP.width, display: "flex", justifyContent: "space-between", fontFamily: ui(p.lang), fontSize: 26, color: C.quiet }}>
+      <div dir="ltr" style={{ position: "absolute", top: STRIP.height + 14, left: STRIP.left, width: STRIP.width, display: "flex", justifyContent: "space-between", fontFamily: ui(p.lang), fontSize: lz(26), color: C.quiet }}>
         <span>{dIn(p.lang, fa ? n : 1)}</span>
         <span>{dIn(p.lang, fa ? 1 : n)}</span>
       </div>
@@ -343,7 +358,7 @@ const Tiles: React.FC<{ p: InsightProps; f: number; at: number; top: number; foc
               zIndex: isFocus ? 3 : lift > 0.05 ? 2 : 1,
               boxShadow: (isFocus || lift > 0.05) && flags.glow ? `0 ${(10 * lift).toFixed(0)}px ${(18 + 20 * glow).toFixed(0)}px rgba(${isFocus ? "227,192,120" : "0,0,0"},${(isFocus ? 0.6 * glow : 0.4 * lift).toFixed(2)})` : "none",
               fontFamily: ui(p.lang),
-              fontSize: 27,
+              fontSize: lz(27),
               fontVariantNumeric: "lining-nums tabular-nums",
               color: isFocus && glow > 0.5 ? C.night : C.ink,
               opacity: still && !isFocus ? 0.85 : 1,
@@ -526,6 +541,31 @@ const HookView: React.FC<ViewProps> = ({ p, s }) => {
   const first = s.lines[0];
   const out = c01((s.dur - f) / ST.OUT);
   const fa = p.lang === "fa";
+  if (flags.lamp && first) {
+    // the lamp style: the hook's head (7 words or fewer) stands from the first frame; what the
+    // voice says after it comes as a caption from 1.5 s on (the gate counts the words of the first 1.5 s)
+    const head = hookHead(first.show, p.narration.find((n) => n.id === first.id)?.head) ?? first.show;
+    const prefix = first.show.startsWith(head);
+    const rest = prefix ? first.show.slice(head.length).replace(/^[\s،,؛;:.—]+/, "") : first.show;
+    const skip = prefix ? pieces(head).filter((x) => x.word !== null).length : 0;
+    const after: SceneLine = { ...first, show: rest, words: first.words && prefix ? first.words.slice(skip) : first.words, from: Math.max(first.from, s.from + 46) };
+    return (
+      <AbsoluteFill style={{ opacity: out }}>
+        <div data-role="hook" style={{ position: "absolute", top: BAND.visTop, left: 0, width: W, height: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Fit width={860} maxHeight={300} max={fa ? 76 : 84} min={44} measureKey={head} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), fontWeight: 600, lineHeight: fa ? 1.6 : 1.2, textAlign: "center", textWrap: "balance", color: C.ink }}>
+            {head}
+          </Fit>
+        </div>
+        <div style={{ position: "absolute", top: 720, left: 0, width: W, height: BAND.visBottom - 720, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Hero p={p} f={f} />
+        </div>
+        {rest ? <Said line={after} s={s} lang={p.lang} keep /> : null}
+        {s.lines.slice(1).map((l) => (
+          <Said key={l.id} line={l} s={s} lang={p.lang} />
+        ))}
+      </AbsoluteFill>
+    );
+  }
   return (
     <AbsoluteFill style={{ opacity: out }}>
       <Lamp warm={0.5 + 0.5 * ramp(f, 0, 30)} cy={0.42} />
@@ -882,7 +922,7 @@ const MapView: React.FC<ViewProps> = ({ p, s }) => {
             <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", opacity: 0.25 + 0.75 * m.o, fontFamily: ui(p.lang), fontSize: 38, color: m === lastOn ? C.star : C.ink, borderBottom: `1px solid ${C.gold}44`, paddingBlock: 6 }}>
               <span>{labels[m.id]}</span>
               <span dir="ltr" style={{ color: C.brass }}>{refs[m.id]}</span>
-              <span style={{ fontSize: 30, color: C.quiet }}>{w.page(m.page)}</span>
+              <span style={{ fontSize: lz(30), color: C.quiet }}>{w.page(m.page)}</span>
             </div>
           ))}
         </div>
@@ -978,7 +1018,7 @@ const LadderView: React.FC<ViewProps> = ({ p, s }) => {
         const passed = c01((run - a) / 2);
         const left = i % 2 === 0;
         return (
-          <div key={a} dir="ltr" style={{ position: "absolute", top: top + (a - 1) * step - 12, ...(left ? { right: W / 2 + 300 } : { left: W / 2 + 300 }), fontFamily: ui(p.lang), fontSize: 22, color: C.brass, opacity: passed }}>
+          <div key={a} dir="ltr" style={{ position: "absolute", top: top + (a - 1) * step - 12, ...(left ? { right: W / 2 + 300 } : { left: W / 2 + 300 }), fontFamily: ui(p.lang), fontSize: lz(22), color: C.brass, opacity: passed }}>
             {dIn(p.lang, a)}
           </div>
         );
@@ -1063,7 +1103,7 @@ const ReciteView: React.FC<ViewProps> = ({ p, s }) => {
         <div style={{ position: "absolute", top: BAND.visTop - 6, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
           {/* the hook from the first frame, on screen: the qari fills the minute (S3e) */}
           <div dir={fa ? "rtl" : "ltr"} style={{ opacity: c01((f + 8) / 8) }}>
-            <Fit width={900} maxHeight={120} max={fa ? 44 : 46} min={26} measureKey={everyTitle(p)} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), fontWeight: 600, lineHeight: fa ? 1.6 : 1.25, textAlign: "center", color: C.ink, textWrap: "balance" }}>
+            <Fit width={900} maxHeight={120} max={fa ? 44 : 46} min={lz(26)} measureKey={everyTitle(p)} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), fontWeight: 600, lineHeight: fa ? 1.6 : 1.25, textAlign: "center", color: C.ink, textWrap: "balance" }}>
               {everyTitle(p)}
             </Fit>
           </div>
@@ -1073,7 +1113,7 @@ const ReciteView: React.FC<ViewProps> = ({ p, s }) => {
           </Label>
         </div>
         <div style={{ position: "absolute", top: 870, left: 0, width: W, display: "flex", justifyContent: "center" }}>
-          <Fit width={880} maxHeight={BAND.capTop + BAND.capH - 880} max={44} min={20} measureKey={text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.85, textAlign: "center" }}>
+          <Fit width={880} maxHeight={BAND.capTop + BAND.capH - 880} max={44} min={lz(20)} measureKey={text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.85, textAlign: "center" }}>
             <LitText text={text} clip={p.studio.wordGlow ? clip : null} t={tSec} after={<AyahSeal label={fa ? faNum(a.ayahNumber) : arNum(a.ayahNumber)} font={fa ? FONT.fa : FONT.quran} />} />
           </Fit>
         </div>
@@ -1086,7 +1126,7 @@ const ReciteView: React.FC<ViewProps> = ({ p, s }) => {
       <Lamp warm={warm} cy={0.45} />
       <div style={{ position: "absolute", top: BAND.visTop, left: 0, width: W, display: "flex", justifyContent: "center" }}>
         <Label lang={p.lang} size={40} color={C.gold}>
-          <span dir="ltr">{refText}</span>
+          <span data-role="source" dir="ltr">{refText}</span>
         </Label>
       </div>
       <div style={{ position: "absolute", top: BAND.visTop + 80, left: 0, width: W, height: BAND.capTop + BAND.capH - BAND.visTop - 100, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: many ? 10 : 30 }}>
@@ -1098,12 +1138,14 @@ const ReciteView: React.FC<ViewProps> = ({ p, s }) => {
           return (
             <div key={a.ayahNumber} style={{ display: "flex", flexDirection: "column", alignItems: "center", opacity: o }}>
               <Fit width={860} maxHeight={many ? 150 : 420} max={many ? 78 : 104} min={34} measureKey={text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.85, textAlign: "center", textWrap: "balance" }}>
-                <LitText text={text} clip={p.studio.wordGlow ? clip : null} t={(f - t0) / 30} after={<AyahSeal label={fa ? faNum(a.ayahNumber) : arNum(a.ayahNumber)} font={fa ? FONT.fa : FONT.quran} />} />
+                <span data-role="quote" data-q={`a${a.ayahNumber}`}>
+                  <LitText text={text} clip={p.studio.wordGlow ? clip : null} t={(f - t0) / 30} after={<AyahSeal label={fa ? faNum(a.ayahNumber) : arNum(a.ayahNumber)} font={fa ? FONT.fa : FONT.quran} />} />
+                </span>
               </Fit>
               {a.translation && !many ? (
                 <div style={{ marginTop: 26, opacity: c01((f - t0 - 20) / 14) }}>
-                  <Fit width={820} maxHeight={220} max={fa ? 40 : 44} min={24} measureKey={a.translation} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), lineHeight: fa ? 1.8 : 1.35, textAlign: "center", color: C.translation, textWrap: "balance" }}>
-                    {a.translation}
+                  <Fit width={820} maxHeight={220} max={fa ? 40 : 44} min={lz(24)} measureKey={a.translation} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), lineHeight: fa ? 1.8 : 1.35, textAlign: "center", color: C.translation, textWrap: "balance" }}>
+                    <span data-role="quote" data-q={`t${a.ayahNumber}`}>{a.translation}</span>
                   </Fit>
                 </div>
               ) : null}
@@ -1212,7 +1254,7 @@ const EndView: React.FC<ViewProps> = ({ p, s }) => {
   const w = I_WORDS[p.lang];
   const q = p.source.quran;
   const m = p.source.surahMetadata;
-  const label = { fontFamily: ui(p.lang), fontSize: 26, fontWeight: 600, letterSpacing: fa ? 0 : "0.16em", textTransform: fa ? "none" : "uppercase", color: C.gold } as const;
+  const label = { fontFamily: ui(p.lang), fontSize: lz(26), fontWeight: 600, letterSpacing: fa ? 0 : "0.16em", textTransform: fa ? "none" : "uppercase", color: C.gold } as const;
   const big = { fontFamily: FONT.en, fontSize: 34, color: C.ink, lineHeight: 1.3, textAlign: "center", maxWidth: 860, direction: "ltr" } as const;
   const block = (at: number, children: React.ReactNode) => <div style={{ opacity: ramp(f, at, 14), display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>{children}</div>;
   const qari = p.qari?.reciter.name ?? null;
@@ -1222,7 +1264,7 @@ const EndView: React.FC<ViewProps> = ({ p, s }) => {
     <AbsoluteFill>
       <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: BAND.visTop, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", gap: 24 }}>
         <div style={{ opacity: ramp(f, 0, 14) }}>
-          <SirajMark size={88} />
+          {flags.lamp ? <Emblem size={120} warm={0.8} /> : <SirajMark size={88} />}
         </div>
         {p.format === "every-letter" && everyOther(p) && !s.lines.length
           ? block(
@@ -1266,7 +1308,7 @@ const EndView: React.FC<ViewProps> = ({ p, s }) => {
           : null}
         <div style={{ opacity: ramp(f, 22, 14), display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginTop: 6 }}>
           <div style={{ fontFamily: FONT.en, fontSize: 44, color: C.gold, letterSpacing: "0.04em", direction: "ltr" }}>{SITE}</div>
-          {p.voice.lines.length ? <div style={{ fontFamily: ui(p.lang), fontSize: 25, color: C.quiet }}>{w.voice}</div> : null}
+          {p.voice.lines.length ? <div style={{ fontFamily: ui(p.lang), fontSize: lz(25), color: C.quiet }}>{w.voice}</div> : null}
           {p.studio.ending === "next" ? (
             <div style={{ marginTop: 14, padding: "12px 34px", borderRadius: 999, border: `2px solid ${C.brass}`, fontFamily: ui(p.lang), fontSize: 40, color: C.star }}>{w.next}</div>
           ) : null}
@@ -1303,10 +1345,10 @@ const Chip: React.FC<{ p: InsightProps; f: number }> = ({ p, f }) => {
   const fa = p.lang === "fa";
   const n = p.studio.seriesNumber ? (p.series?.n ?? null) : null;
   return (
-    <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: BAND.chip, left: 0, width: W, display: "flex", justifyContent: "center", opacity: c01((f + 10) / 10) }}>
+    <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: BAND.chip, left: 0, width: W, display: "flex", justifyContent: "center", opacity: flags.lamp ? c01((f - 45) / 12) : c01((f + 10) / 10) }}>
       <div style={{ display: "inline-flex", alignItems: "center", gap: 14, padding: "8px 26px", borderRadius: 999, border: `1.5px solid ${C.gold}88`, background: `${C.night}aa` }}>
         <Seal size={30} />
-        <span style={{ fontFamily: ui(p.lang), fontSize: fa ? 33 : 30, fontWeight: 500, letterSpacing: fa ? 0 : "0.14em", textTransform: fa ? "none" : "uppercase", color: C.gold }}>{chipOf(p.format, p.lang, n)}</span>
+        <span style={{ fontFamily: ui(p.lang), fontSize: lz(fa ? 33 : 30), fontWeight: 500, letterSpacing: fa ? 0 : "0.14em", textTransform: fa ? "none" : "uppercase", color: C.gold }}>{chipOf(p.format, p.lang, n)}</span>
       </div>
     </div>
   );
@@ -1318,7 +1360,7 @@ const RuleBox: React.FC<{ p: InsightProps; o: number }> = ({ p, o }) => {
   return (
     <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: BAND.rule, left: (W - 880) / 2, width: 880, height: BAND.ruleH, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, opacity: o }}>
       <div style={{ width: 200, height: 1.5, background: `linear-gradient(90deg, transparent, ${C.gold}, transparent)` }} />
-      <Fit width={880} maxHeight={BAND.ruleH - 14} max={26} min={18} measureKey={text} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), lineHeight: fa ? 1.7 : 1.35, textAlign: "center", color: C.quiet }}>
+      <Fit width={880} maxHeight={BAND.ruleH - 14} max={lz(26)} min={lz(18)} measureKey={text} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), lineHeight: fa ? 1.7 : 1.35, textAlign: "center", color: C.quiet }}>
         {text}
       </Fit>
     </div>
@@ -1327,8 +1369,15 @@ const RuleBox: React.FC<{ p: InsightProps; o: number }> = ({ p, o }) => {
 
 /* ---------- the reel ---------- */
 
+/** The last scene of the lamp style fades out before the first picture comes back. */
+const Tail: React.FC<{ dur: number; children: React.ReactNode }> = ({ dur, children }) => {
+  const f = useCurrentFrame();
+  return <AbsoluteFill style={{ opacity: c01((dur - f) / 12) }}>{children}</AbsoluteFill>;
+};
+
 export const InsightReel: React.FC<InsightProps> = (raw) => {
-  const studio = applyStudio(raw.studio);
+  const lamp = Boolean(raw.style?.lamp);
+  const studio = applyStudio(raw.studio, lamp);
   const p = { ...raw, studio };
   const t = insightTimeline({ scenes: p.scenes, narration: p.narration, voice: p.voice, qari: p.qari, loop: studio.ending === "loop" });
   const f = useCurrentFrame();
@@ -1338,29 +1387,48 @@ export const InsightReel: React.FC<InsightProps> = (raw) => {
   const ruleFrom = first.id === "recite" ? 24 : (t.scenes[1]?.from ?? 0);
   const ruleOn = Math.min(c01((f - ruleFrom + 6) / 12), c01((last.from - f + 6) / 12));
   const Hook = viewOf(p, first.id);
+  const seed = 7 + p.format.length * 3 + p.episode.length;
+  // the lamp style: the series chip comes after the hook's 1.5 s and leaves before the loop
+  const chipOn = lamp ? Math.min(1, c01((t.total - t.loopFrames - f) / 12)) : 1;
   return (
     <AbsoluteFill style={{ background: C.night }}>
-      <World total={t.total} seed={7 + p.format.length * 3 + p.episode.length} muted />
-      {studio.frame ? <MushafFrame /> : null}
-      <Chip p={p} f={f} />
-      {t.scenes.map((s) => {
-        const View = viewOf(p, s.id);
-        return (
-          <Sequence key={s.id} from={s.from} durationInFrames={s.dur} name={s.id}>
-            <View p={p} s={s} />
+      {lamp ? <Ground total={t.total} lamp={null} glow={{ x: COL_X, y: 820 }} seed={seed} /> : <World total={t.total} seed={seed} muted />}
+      {!lamp && studio.frame ? <MushafFrame /> : null}
+      <AbsoluteFill style={lamp ? { transform: `translateX(${LAMP_COLUMN.dx}px) scale(${LAMP_COLUMN.scale})`, transformOrigin: "540px 960px" } : undefined}>
+        <div style={{ opacity: chipOn }}>
+          <Chip p={p} f={f} />
+        </div>
+        {t.scenes.map((s) => {
+          const View = viewOf(p, s.id);
+          return (
+            <Sequence key={s.id} from={s.from} durationInFrames={s.dur} name={s.id}>
+              {lamp && s === last && t.loopFrames ? (
+                <Tail dur={s.dur}>
+                  <View p={p} s={s} />
+                </Tail>
+              ) : (
+                <View p={p} s={s} />
+              )}
+            </Sequence>
+          );
+        })}
+        <RuleBox p={p} o={ruleOn} />
+        {t.loopFrames ? (
+          <Sequence from={t.total - t.loopFrames} durationInFrames={t.loopFrames} name="loop">
+            <LoopIn frames={t.loopFrames} clear={lamp}>
+              <Freeze frame={0}>
+                <Hook p={p} s={first} />
+              </Freeze>
+            </LoopIn>
           </Sequence>
-        );
-      })}
-      <RuleBox p={p} o={ruleOn} />
-      {t.loopFrames ? (
-        <Sequence from={t.total - t.loopFrames} durationInFrames={t.loopFrames} name="loop">
-          <LoopIn frames={t.loopFrames}>
-            <Freeze frame={0}>
-              <Hook p={p} s={first} />
-            </Freeze>
-          </LoopIn>
+        ) : null}
+      </AbsoluteFill>
+      {lamp && raw.style?.badge ? (
+        <Sequence from={t.total - t.loopFrames - BADGE_LEN - 6} durationInFrames={BADGE_LEN} name="badge">
+          <Badge lang={p.lang} len={BADGE_LEN} />
         </Sequence>
       ) : null}
+      {lamp ? <Probe total={t.total} /> : null}
       {t.scenes.flatMap((s) =>
         s.lines.map((l) =>
           l.file ? (
@@ -1381,27 +1449,30 @@ export const InsightReel: React.FC<InsightProps> = (raw) => {
   );
 };
 
-const LoopIn: React.FC<{ frames: number; children: React.ReactNode }> = ({ frames, children }) => {
+const LoopIn: React.FC<{ frames: number; children: React.ReactNode; clear?: boolean }> = ({ frames, children, clear }) => {
   const f = useCurrentFrame();
-  return <AbsoluteFill style={{ opacity: c01((f + 1) / frames), background: C.night }}>{children}</AbsoluteFill>;
+  return <AbsoluteFill style={{ opacity: c01((f + 1) / frames), background: clear ? undefined : C.night }}>{children}</AbsoluteFill>;
 };
 
 /* ---------- covers and slides ---------- */
 
 /** The cover (1080×1920) and the grid crop (1080×1350): chip, the format's picture, the hook, the rule. */
 export const InsightCover: React.FC<InsightProps> = (raw) => {
-  const studio = applyStudio(raw.studio);
+  const lamp = Boolean(raw.style?.lamp);
+  const studio = applyStudio(raw.studio, lamp);
   const p = { ...raw, studio };
   const { height } = useVideoConfig();
   const tall = height > 1500;
   const fa = p.lang === "fa";
   // Every Letter has no narration since S3e: its line on screen is its hook
-  const hook = p.narration[0]?.show ?? (p.format === "every-letter" ? everyTitle(p) : "");
+  const first = p.narration[0];
+  // the lamp style's tile carries the hook's head (a few big words), the classic one the whole line
+  const hook = (lamp && first ? hookHead(first.show, first.head) : null) ?? first?.show ?? (p.format === "every-letter" ? everyTitle(p) : "");
   return (
     <AbsoluteFill style={{ background: C.night }}>
-      <World total={1} still seed={7 + p.format.length * 3 + p.episode.length} />
-      {studio.frame ? <MushafFrame drawn /> : null}
-      <Lamp warm={0.7} cy={0.45} />
+      {lamp ? <Ground total={1} still lamp={null} glow={{ x: 540, y: tall ? 900 : 640 }} /> : <World total={1} still seed={7 + p.format.length * 3 + p.episode.length} />}
+      {!lamp && studio.frame ? <MushafFrame drawn /> : null}
+      {lamp ? null : <Lamp warm={0.7} cy={0.45} />}
       <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", gap: tall ? 60 : 18, paddingInline: 70, paddingBottom: tall ? 0 : 10 }}>
         <div dir={fa ? "rtl" : "ltr"} style={{ display: "inline-flex", alignItems: "center", gap: 14, padding: "8px 26px", borderRadius: 999, border: `1.5px solid ${C.gold}88` }}>
           <Seal size={30} />

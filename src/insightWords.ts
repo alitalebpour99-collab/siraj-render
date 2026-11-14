@@ -26,7 +26,7 @@ export const FORMAT_NAME: Record<InsightFormat, Words> = {
 export function chipOf(format: InsightFormat, lang: Lang, n: number | null) {
   const name = FORMAT_NAME[format][lang];
   if (n === null) return name;
-  return lang === "fa" ? `${name} · شمارهٔ ${faNum(n)}` : `${name} № ${n}`;
+  return lang === "fa" ? `${name}، شمارهٔ ${faNum(n)}` : `${name} № ${n}`;
 }
 
 const TANZIL = { en: "Tanzil Simple 1.1", fa: "متن تنزیل ساده ۱٫۱" };
@@ -37,7 +37,7 @@ export function ruleOf(format: InsightFormat, episode: string, lang: Lang, numbe
   const fa = lang === "fa";
   const pages = Number(numbers.totalPages ?? 604);
   const p = fa ? faNum(pages) : String(pages);
-  const j = (xs: string[]) => xs.join(" · ");
+  const j = (xs: string[]) => xs.join(fa ? "؛ " : " · ");
   switch (`${format}/${episode}`) {
     case "only/no-allah":
     case "only/allah-every-verse":
@@ -47,7 +47,7 @@ export function ruleOf(format: InsightFormat, episode: string, lang: Lang, numbe
     case "only/longest-verse":
       return fa ? j([TANZIL.fa, "کلمه: هر تکهٔ جدا با فاصله که حرف دارد", NO_BASMALA.fa]) : j([TANZIL.en, "a word: a space-separated piece with a letter", NO_BASMALA.en]);
     case "myth-fact/verses-6666":
-      return fa ? "شمارش کوفی آیه‌ها، چنان‌که در متن و فرادادهٔ تنزیل است · شمارش‌های مکتب‌های دیگر: سیوطی، الاتقان" : "Kufan count of the verses, as in the Tanzil text and metadata · the other schools' counts: al-Suyuti, al-Itqan";
+      return fa ? "شمارش کوفی آیه‌ها، چنان‌که در متن و فرادادهٔ تنزیل است؛ شمارش‌های مکتب‌های دیگر: سیوطی، الاتقان" : "Kufan count of the verses, as in the Tanzil text and metadata · the other schools' counts: al-Suyuti, al-Itqan";
     case "counted/basmala":
       return fa ? j([TANZIL.fa, "چهار کلمهٔ آیهٔ ۱:۱، بی اعتنا به اعراب", "در آغاز هر سوره و درون آیه‌ها"]) : j([TANZIL.en, "the four words of 1:1, vowel marks ignored", "at the head of each surah and inside verses"]);
     case "mushaf-map/believers":
@@ -63,7 +63,7 @@ export function ruleOf(format: InsightFormat, episode: string, lang: Lang, numbe
   }
   switch (format) {
     case "meccan-medinan":
-      return fa ? "مکی و مدنی به برچسب فرادادهٔ تنزیل؛ دربارهٔ چند سوره نظرها فرق دارد · ترفندی برای یادسپاری، نه نشانه" : "Meccan and Medinan as labelled in the Tanzil metadata; scholars differ on a few surahs · a memory trick, not a sign";
+      return fa ? "مکی و مدنی به برچسب فرادادهٔ تنزیل؛ دربارهٔ چند سوره نظرها فرق دارد؛ ترفندی برای یادسپاری، نه نشانه" : "Meccan and Medinan as labelled in the Tanzil metadata; scholars differ on a few surahs · a memory trick, not a sign";
     case "revelation-order":
       return fa ? "ترتیب نزولی که فرادادهٔ تنزیل آورده: یکی از ترتیب‌های سنتی، در کنار فهرست‌های دیگر" : "The revelation order listed in the Tanzil metadata: one traditional order among others";
     case "one-line":
@@ -150,7 +150,7 @@ export const I_WORDS = {
     metadata: "فراداده",
     recitation: "تلاوت",
     translation: "ترجمه",
-    voice: "صدای مصنوعی · فقط جمله‌های شمارش را می‌خواند",
+    voice: "صدای مصنوعی؛ فقط جمله‌های شمارش را می‌خواند",
     options: ["الف", "ب", "ج"],
     answer: "پاسخ",
     verseOf: (s: number, a: number) => `${faNum(s)}:${faNum(a)}`,

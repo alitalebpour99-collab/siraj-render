@@ -8,7 +8,9 @@
 // 4. the qari (qari.mjs, verses only);
 // 5. the video and its covers, with the sound checks (render.mjs);
 // 6. the files up (video, cover, grid), then done=1 with the manifest;
-// 7. any error: failed=1 with the first line of the message only (cut to 240 characters).
+// 7. any error: failed=1 with the first line of the message only (cut to 240 characters); a Reel
+//    the lamp style's gate refused (scripts/gate.mjs) is failed for good (`final`: another attempt
+//    would draw the same), with the gate's reason in plain Persian for the owner.
 // Nothing is uploaded anywhere else (no artifact: the repository is public and the recitation
 // must not be downloadable there). Never prints the secret or a text: ids, counts and seconds.
 import { spawnSync } from "node:child_process";
@@ -120,7 +122,7 @@ try {
   console.error(`job ${job.id}: failed: ${reason}`);
   if (error?.status === 409) process.exit(1);
   try {
-    const r = await call(job.upload.failed, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ error: reason }) });
+    const r = await call(job.upload.failed, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ error: reason, ...(error?.final ? { final: true } : {}) }) });
     console.log(`job ${job.id}: reported as failed${r.final ? " (last attempt: the owner is told)" : " (it goes back to the queue)"}`);
   } catch (e) {
     console.error(`job ${job.id}: could not report the failure: ${firstLine(e)}`);
