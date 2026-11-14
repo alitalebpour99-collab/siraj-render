@@ -3,12 +3,19 @@
 // owner's rules). Every check fails, none only warns:
 //
 //   hook        the ayah (or the hook's line) is on screen from the first frame, and the other words
-//               there in the first 1.5 s are 7 or fewer (no logo or title card first)
+//               there in the first 1.5 s are 7 or fewer (no logo or title card first; the sources a
+//               quote must carry do not count)
 //   hook-motion the picture moves in the first 1.5 s (measured on the file)
 //   still       no 3.5 s without a visible change (measured)
 //   loop        the last frame looks like the first (measured)
 //   safe        every text inside the frame and outside the apps' header, rail and caption rows
-//   text-size   no text smaller than 1.5 % of the frame's height (29 px), measured as drawn
+//   text-size   no text smaller than 40 px, measured as drawn (review of 2026-11-14)
+//   contrast    the Arabic 7:1 or more against what is behind it, every other text 4.5:1, as drawn
+//               (its colour at its own opacity over the cream, the glow and any filled box); a text
+//               that only passes through a fade is not held to it, one that stays low 0.6 s is
+//   fill-y      the picture reaches the top and the bottom quarter of the safe zone (text, or the
+//               lamp) and some text stands in its lower half, in 90 % of the measured frames
+//   sync        (verse Reels) every ayah's translation is on screen whenever the ayah is, at 42 px or more
 //   overlap     no two texts over each other
 //   source      while a quote is on screen, its source (surah and verse, the translator) is too
 //   quote       the Arabic and the translation on screen are letter for letter the source's text
@@ -24,7 +31,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { FPS, MIDDLE, MIN_TEXT, ZONES, inZones } from "../src/lamp/zones.ts";
+import { CONTRAST, FILL_Y, FPS, MIDDLE, MIN_TEXT, MIN_TRANSLATION, ZONES, inZones } from "../src/lamp/zones.ts";
 import { TARGET, loudness } from "./finish.mjs";
 
 /** A Reel the gate refused: its message is the owner's reason, in plain Persian. */
@@ -57,14 +64,16 @@ const meet = (p, q) => {
 export function probeChecks(probes, plan) {
   const out = [];
   const add = (id, ok, detail, faText) => out.push({ id, ok, detail, fa: faText });
-  const frames = [...probes].sort((a, b) => a.f - b.f);
+  // the lamp and other marks without text are measured only for fill-y
+  const all = [...probes].sort((a, b) => a.f - b.f);
+  const frames = all.map((p) => ({ f: p.f, rows: p.rows.filter((r) => r.r !== "fill") }));
   const seen = (r, o = 0.5) => r.o >= o;
 
   // hook: the quote or the hook line at frame 0; the framing words of the first 1.5 s
   const zero = frames.find((p) => p.f === 0);
   const lead = Boolean(zero?.rows.some((r) => (r.r === "quote" || r.r === "hook") && seen(r, 0.6)));
   const early = frames.filter((p) => p.f <= HOOK);
-  const framing = Math.max(0, ...early.map((p) => p.rows.filter((r) => r.r !== "quote" && seen(r)).reduce((n, r) => n + r.n, 0)));
+  const framing = Math.max(0, ...early.map((p) => p.rows.filter((r) => r.r !== "quote" && r.r !== "source" && seen(r)).reduce((n, r) => n + r.n, 0)));
   add("hook", Boolean(zero) && lead && framing <= 7, `${zero ? "" : "frame 0 not measured; "}quote or hook at frame 0: ${lead}; other words in the first 1.5 s: ${framing}`, !lead ? "آیه یا جملهٔ اصلی از همان فریمِ اول روی تصویر نیست" : `در ۱٫۵ ثانیهٔ اول ${fa(framing)} واژه متنِ کناری هست (حداکثر ۷)`);
 
   const outside = [];
@@ -97,6 +106,65 @@ export function probeChecks(probes, plan) {
   add("source", !unsourced.length, unsourced.length ? `a quote without its source at ${first(unsourced)} s` : "every quote with its source", "منبعِ آیه کنارِ آن روی تصویر نیست");
   const quoted = frames.some((p) => p.rows.some((r) => r.r === "quote" && r.hq));
   add("quote", !wrong.length && (quoted || !Object.keys(plan.quotes ?? {}).length), wrong.length ? `differs from the source: ${first(wrong)}` : quoted ? "every quote letter for letter as the source" : "no quote in this Reel", "متنِ آیه یا ترجمه روی تصویر با منبع یکی نیست");
+  // contrast: per text block, the runs of measured frames where it is drawn too faint
+  const low = new Map();
+  for (const p of frames) {
+    for (const r of p.rows) {
+      if (r.c === null || r.c === undefined || !seen(r, 0.6)) continue;
+      const need = r.ar ? CONTRAST.arabic : CONTRAST.text;
+      const key = `${r.b}`;
+      const runs = low.get(key) ?? [];
+      const prev = runs[runs.length - 1];
+      if (r.c < need) {
+        if (prev && prev.open) prev.to = p.f;
+        else runs.push({ from: p.f, to: p.f, open: true, r: r.r, ar: r.ar, c: r.c });
+        if (runs.length) runs[runs.length - 1].c = Math.min(runs[runs.length - 1].c, r.c);
+      } else if (prev) prev.open = false;
+      low.set(key, runs);
+    }
+    // a block not measured in this frame closes its run
+    const here = new Set(p.rows.map((r) => `${r.b}`));
+    for (const [k, runs] of low) if (!here.has(k) && runs.length) runs[runs.length - 1].open = false;
+  }
+  const faint = [...low.values()].flat().filter((x) => x.to - x.from >= Math.round(0.6 * FPS));
+  add("contrast", !faint.length, faint.length ? `too faint: ${faint.slice(0, 4).map((x) => `${x.ar ? "Arabic" : x.r} ${x.c}:1 at ${sec(x.from)}–${sec(x.to)} s`).join("; ")}` : `the Arabic ${CONTRAST.arabic}:1 or more, every other text ${CONTRAST.text}:1 or more`, `متن کم‌رنگ است (عربی دست‌کم ${fa(7)} به ۱، بقیه ${fa(4)}٫${fa(5)} به ۱)`);
+
+  // fill-y: the picture spans the safe zone's height, and the lower half carries text
+  const zoneH = ZONES.bottom - ZONES.top;
+  const hi = ZONES.top + (1 - FILL_Y) * zoneH;
+  const lo = ZONES.top + FILL_Y * zoneH;
+  const mid = ZONES.top + zoneH / 2;
+  let filled = 0;
+  let counted = 0;
+  const thin = [];
+  for (const p of all) {
+    const text = p.rows.filter((r) => r.r !== "fill" && r.r !== "badge" && seen(r, 0.6));
+    if (!text.length) continue;
+    counted++;
+    const shown = [...text, ...p.rows.filter((r) => r.r === "fill" && seen(r, 0.3))];
+    const top = Math.min(...shown.map((r) => r.y));
+    const bottom = Math.max(...shown.map((r) => r.y + r.h));
+    const lower = text.some((r) => r.y + r.h / 2 > mid);
+    if (top <= hi && bottom >= lo && lower) filled++;
+    else thin.push(`${sec(p.f)} s y ${top}–${bottom}${lower ? "" : " (no text below the middle)"}`);
+  }
+  const share = counted ? filled / counted : 1;
+  add("fill-y", share >= 0.9, `${Math.round(100 * share)} % of ${counted} frames span y ${Math.round(hi)}–${Math.round(lo)} with text below ${Math.round(mid)}${thin.length ? `; not: ${thin.slice(0, 4).join("; ")}` : ""}`, "نیمهٔ پایینِ تصویر خالی است");
+
+  // sync: in a verse Reel the translation stands with its ayah, large enough to read while the qari recites
+  if (plan.sync) {
+    const apart = [];
+    const tiny = [];
+    for (const p of frames) {
+      for (const r of p.rows) {
+        if (r.r !== "quote" || !r.q || !seen(r, 0.6)) continue;
+        if (/^a\d+$/.test(r.q) && plan.quotes?.[`t${r.q.slice(1)}`] && !p.rows.some((x) => x.q === `t${r.q.slice(1)}` && seen(x, 0.6))) apart.push(`${sec(p.f)} s ${r.q}`);
+        if (/^t\d+$/.test(r.q) && r.s < MIN_TRANSLATION - 0.5) tiny.push(`${sec(p.f)} s ${r.q} ${r.s} px`);
+      }
+    }
+    add("sync", !apart.length && !tiny.length, apart.length || tiny.length ? [apart.length ? `an ayah without its translation at ${first(apart)}` : "", tiny.length ? `translation under ${MIN_TRANSLATION} px: ${first(tiny)}` : ""].filter(Boolean).join("; ") : `every translation with its ayah, ${MIN_TRANSLATION} px or more`, "ترجمه همراهِ آیه روی تصویر نیست یا ریز است");
+  }
+
   add("persian", !dots.length, dots.length ? `«·» or «|» beside Persian at ${first(dots)}` : "no «·» or «|» beside Persian", "کنارِ متنِ فارسی «·» یا «|» آمده است");
 
   if (plan.badgeOn) {

@@ -32,9 +32,11 @@ const DIM_PAPER: RGBA = [42, 33, 22, 0.42];
 const SETTLED_PAPER: RGBA = [122, 79, 16, 1];
 const HOT_PAPER: RGBA = [168, 102, 12, 1];
 // in the lamp look (2026-11-14) the ink is dark on cream and the light is a deep emerald
-const DIM_LAMP: RGBA = [43, 36, 26, 0.5];
+// the lamp style keeps every word at 7:1 or more on the cream (review of 2026-11-14: the waiting words were 2:1):
+// a word not yet recited is a warm brown, a recited one deep emerald, the word being recited a brighter emerald
+const DIM_LAMP: RGBA = [74, 64, 52, 1];
 const SETTLED_LAMP: RGBA = [22, 50, 40, 1];
-const HOT_LAMP: RGBA = [14, 112, 84, 1];
+const HOT_LAMP: RGBA = [10, 82, 64, 1];
 const mix = (a: RGBA, b: RGBA, t: number): RGBA => [0, 1, 2, 3].map((i) => a[i]! + (b[i]! - a[i]!) * t) as RGBA;
 const rgba = (c: RGBA) => `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${c[3].toFixed(3)})`;
 
@@ -117,7 +119,8 @@ export const SpokenText: React.FC<{ text: string; words: Array<[number, number]>
         const [s] = words[p.word]!;
         const k = clamp01((t * 1000 - s) / 160);
         return (
-          <span key={i} style={{ opacity: 0.58 + 0.42 * k }}>
+          // the lamp style shows the translation while the qari recites: a word not yet said stays readable (4.5:1 or more)
+          <span key={i} style={{ opacity: flags.lamp ? 0.8 + 0.2 * k : 0.58 + 0.42 * k }}>
             {p.text}
           </span>
         );

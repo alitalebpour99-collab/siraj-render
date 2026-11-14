@@ -26,8 +26,36 @@ export const MIDDLE = { top: Math.round(H / 3), bottom: Math.round((2 * H) / 3) 
 export const COL = { left: ZONES.left + 24, right: ZONES.right - 24 };
 export const COL_W = COL.right - COL.left;
 export const COL_X = (COL.left + COL.right) / 2;
-/** The smallest letters any text may have on screen: 1.5 % of the frame's height (STYLE_GUIDE R5). */
-export const MIN_TEXT = Math.ceil(0.015 * H);
+/**
+ * The smallest letters any text may have on screen: 40 px (the hub's frame-by-frame review of
+ * 2026-11-14: «کف اندازهٔ متن فرعی ۴۰ پیکسل»; it was 1.5 % of the height, 29 px, before).
+ */
+export const MIN_TEXT = 40;
+/** A translation is read while the qari recites: 42 px or more (review of 2026-11-14). */
+export const MIN_TRANSLATION = 42;
+/** Contrast of letters against what is behind them (WCAG): the Arabic 7:1, every other text 4.5:1. */
+export const CONTRAST = { arabic: 7, text: 4.5 };
+/** The darkest of the lamp style's cream ground (its foot); the glow is measured on top of it. */
+export const GROUND = [240, 229, 207] as const;
+
+/** Relative luminance of an sRGB colour (0–255 channels). */
+export function luminance(rgb: readonly number[]) {
+  const c = [0, 1, 2].map((i) => {
+    const x = rgb[i]! / 255;
+    return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!;
+}
+/** The contrast ratio of two opaque colours (1–21). */
+export function contrast(a: readonly number[], b: readonly number[]) {
+  const [x, y] = [luminance(a), luminance(b)];
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+/** `top` with alpha `a` laid over the opaque `under`. */
+export const over = (top: readonly number[], a: number, under: readonly number[]) => [0, 1, 2].map((i) => top[i]! * a + under[i]! * (1 - a));
+
+/** The share of the safe zone's height the lamp style's picture must span (top and bottom quarter reached). */
+export const FILL_Y = 0.75;
 
 export type Box = { x: number; y: number; w: number; h: number };
 export const inZones = (b: Box, slack = 0.5) => b.x >= ZONES.left - slack && b.y >= ZONES.top - slack && b.x + b.w <= ZONES.right + slack && b.y + b.h <= ZONES.bottom + slack;

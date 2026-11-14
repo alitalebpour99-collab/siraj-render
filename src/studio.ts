@@ -48,7 +48,7 @@ export const LAMP: Partial<typeof C> = {
   star: "#123d31",
   ink: "#2b241a",
   translation: "#3a3125",
-  quiet: "#6e6250",
+  quiet: "#5a4f41",
   turquoise: "#b07a22",
 };
 

@@ -67,13 +67,21 @@ shakes or flashes.
 
 - **The first frame** shows the ayah (or the insight's hook head, 7 words or fewer) with its
   reference; no title card, no logo first. The qari begins 0.6 s in.
-- **The source stays with the quote**: the surah and verse above every ayah, the translator under
-  every translation; the sources at the close.
+- **The title from frame 0** (review of 2026-11-14): the surah in big letters and what the Reel
+  is («سورهٔ العصر / آیه به آیه، با معنا», "Surah Al-Ikhlas / Verse by verse, with meaning"), on
+  screen to the end.
+- **Readable**: the Arabic is 7:1 or more on the cream (a waiting word is a warm brown, a recited
+  one deep emerald); the translation stands with its ayah from the card's first frame at 42 px or
+  more while the qari recites (the narrator still reads it after him); the lamp sits low, so the
+  lower half is filled with the translation, its reference and the lamp.
+- **The source stays with the quote**: «آیهٔ k از n؛ ترجمهٔ …» / "surah:verse · translator" under
+  every translation; the sources at the close as one line of 42 px or more (the details are in the
+  caption, with the «synthetic voice» label).
 - **The camera** breathes in from frame 0 and is home again on the last frame; each ayah pushes in
   a little; the last frames fade back into the first picture, so the Reel loops.
 - **The safe zones** of the apps (measured on the owner's screenshots, `src/lamp/zones.ts`): every
-  text inside x 56–888, y 232–1583, 29 px (1.5 % of the frame) or larger; the insight pictures are
-  set in that column at 92 %.
+  text inside x 56–888, y 232–1583, 40 px or larger; the insight pictures are
+  set in that column at 90 % (their smallest text 45 px there).
 - **The channel badge**: «سراج» / «Siraj», a tiny heart and a tiny follow mark, a small pill at the
   bottom left of the safe area for 2.2 s at the close, gone before the loop. One master file.
 - **Sound**: no music (the project's rule). The qari and the narrator only, levelled in two
@@ -82,10 +90,13 @@ shakes or flashes.
 - **The gate** (`scripts/gate.mjs`): the page measures itself on its probe frames
   (`src/lamp/Probe.tsx`: boxes, sizes, opacities, word counts, hashes; never a text) and the file
   is measured with ffmpeg. Checks: `hook`, `hook-motion`, `still` (a change at least every
-  3.5 s), `loop`, `safe`, `text-size`, `overlap`, `source`, `quote` (letter for letter as
+  3.5 s), `loop`, `safe`, `text-size` (40 px), `contrast` (Arabic 7:1, other text 4.5:1, as drawn over the
+  cream and the glow), `fill-y` (the picture reaches the top and bottom quarter of the safe zone and
+  the lower half carries text), `sync` (verse Reels: every translation with its ayah, 42 px or
+  more), `overlap`, `source`, `quote` (letter for letter as
   served), `persian` (no «·» or «|» beside Persian), `badge`, `loudness`. A Reel that fails is
   not handed in: the worker reports it failed for good with the reason in plain Persian.
-- **Which Reels**: every verse Reel, and the insight formats whose samples passed the gate: The Counts Test, Meccan · Medinan, One Line (The Only… waits: its recitation scene stood still 3.9 s on one long recited word) (`LAMP_INSIGHTS` in `scripts/render.mjs`); the other insight formats and the counts, surah cards and books keep the classic look without the gate until a sample of theirs passes (`SIRAJ_LAMP_INSIGHTS`, a list or `all`, widens it).
+- **Which Reels**: every verse Reel, and the insight formats whose samples passed the gate: The Only…, The Counts Test, Meccan · Medinan, One Line (`LAMP_INSIGHTS` in `scripts/render.mjs`); the other insight formats and the counts, surah cards and books keep the classic look without the gate until a sample of theirs passes (`SIRAJ_LAMP_INSIGHTS`, a list or `all`, widens it).
 - **Switches** (repository variables, unset = on): `SIRAJ_STYLE=classic` (the old look),
   `SIRAJ_BADGE=off`, `SIRAJ_GATE=warn` (report only) or `off`. Trials (`try.yml`) run the gate on
   `warn` and keep its report, a 360 px copy of the picture and a sheet of two frames a second.

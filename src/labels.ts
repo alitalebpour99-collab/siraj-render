@@ -23,6 +23,9 @@ export function firstUrl(text: string | null | undefined) {
 
 export const SITE = "siraj.ahura.cloud";
 
+/** A qari's name for a Persian line, by his Quran Foundation recitation id (the API gives it in Latin letters). */
+export const QARI_FA: Record<number, string> = { 7: "مشاری راشد العفاسی" };
+
 export const L = {
   en: {
     surah: (n: number) => `Surah ${n}`,

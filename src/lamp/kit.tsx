@@ -66,6 +66,7 @@ export const Ground: React.FC<{ total: number; still?: boolean; lamp?: { x: numb
     <AbsoluteFill style={{ background: `linear-gradient(180deg, #f8f2e6 0%, ${C.night} 45%, ${C.night2} 100%)` }}>
       <AbsoluteFill style={{ transform: `scale(${scale.toFixed(4)})`, transformOrigin: `${at.x}px ${at.y}px`, willChange: "transform" }}>
         <div
+          data-glow="0:0.58,0.24:0.26,0.46:0.08,0.64:0"
           style={{
             position: "absolute",
             left: at.x - 420,
@@ -78,7 +79,7 @@ export const Ground: React.FC<{ total: number; still?: boolean; lamp?: { x: numb
           }}
         />
         {lamp ? (
-          <div style={{ position: "absolute", left: lamp.x - lamp.size / 2, top: lamp.y - lamp.size * 0.5 + float, width: lamp.size }}>
+          <div data-fill="lamp" style={{ position: "absolute", left: lamp.x - lamp.size / 2, top: lamp.y - lamp.size * 0.5 + float, width: lamp.size }}>
             <Emblem size={lamp.size} flicker={flicker} warm={warm} />
           </div>
         ) : null}
@@ -104,8 +105,8 @@ export const Badge: React.FC<{ lang: "en" | "fa"; len: number }> = ({ lang, len 
       style={{
         position: "absolute",
         left: ZONES.left + 26,
-        top: ZONES.bottom - 92 + y,
-        height: 66,
+        top: ZONES.bottom - 96 + y,
+        height: 72,
         display: "flex",
         alignItems: "center",
         gap: 14,
@@ -117,7 +118,7 @@ export const Badge: React.FC<{ lang: "en" | "fa"; len: number }> = ({ lang, len 
         opacity: o,
       }}
     >
-      <span style={{ fontFamily: fa ? FONT.fa : FONT.en, fontSize: fa ? 34 : 36, fontWeight: fa ? 700 : 600, lineHeight: 1, color: C.gold, letterSpacing: fa ? 0 : "0.04em" }}>{fa ? "سراج" : "Siraj"}</span>
+      <span style={{ fontFamily: fa ? FONT.fa : FONT.en, fontSize: fa ? 40 : 42, fontWeight: fa ? 700 : 600, lineHeight: 1, color: C.gold, letterSpacing: fa ? 0 : "0.04em" }}>{fa ? "سراج" : "Siraj"}</span>
       <svg width={mark} height={mark} viewBox="0 0 24 24" aria-hidden>
         <path d="M12 20.5C6.6 16.4 3.5 13.4 3.5 9.6C3.5 7 5.5 5 8 5C9.7 5 11.1 5.9 12 7.3C12.9 5.9 14.3 5 16 5C18.5 5 20.5 7 20.5 9.6C20.5 13.4 17.4 16.4 12 20.5Z" fill={`${C.gold}22`} stroke={C.gold} strokeWidth={1.8} strokeLinejoin="round" />
       </svg>

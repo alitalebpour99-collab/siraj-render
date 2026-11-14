@@ -5,24 +5,30 @@ import { test } from "node:test";
 import { dotBeside, hookHead, inZones, quoteHash, wordsOf, ZONES, MIN_TEXT } from "../src/lamp/zones.ts";
 import { probeChecks, verdict } from "./gate.mjs";
 
-const row = (o) => ({ b: 1, r: "text", q: null, x: 200, y: 600, w: 400, h: 80, s: 40, o: 1, n: 3, d: false, hq: null, ...o });
+const row = (o) => ({ b: 1, r: "text", q: null, x: 200, y: 600, w: 400, h: 80, s: 40, o: 1, n: 3, d: false, hq: null, c: 9, ar: false, ...o });
+const T_HASH = quoteHash("placeholder translation");
 const QUOTE_HASH = quoteHash("placeholder quote");
 
 /** A Reel that passes: the quote and its reference from frame 0, a badge at the close. */
 function good() {
   const probes = [];
   for (let f = 0; f <= 600; f += 5) {
-    const rows = [row({ b: 1, r: "source", y: 250, h: 60, n: 4 }), row({ b: 2, r: "quote", q: "a1", hq: QUOTE_HASH, y: 600, h: 300, n: 9 })];
-    if (f >= 520 && f <= 580) rows.push(row({ b: 3, r: "badge", x: 82, y: 1491, w: 260, h: 66, n: 1, s: 34 }));
+    const rows = [
+      row({ b: 1, r: "source", y: 250, h: 60, n: 4 }),
+      row({ b: 2, r: "quote", q: "a1", hq: QUOTE_HASH, y: 500, h: 300, n: 9, s: 90, ar: true, c: 9.5 }),
+      row({ b: 4, r: "quote", q: "t1", hq: T_HASH, y: 1000, h: 140, n: 6, s: 52 }),
+      row({ b: 5, r: "fill", y: 1390, h: 100, n: 0, s: 0, c: null }),
+    ];
+    if (f >= 520 && f <= 580) rows.push(row({ b: 3, r: "badge", x: 82, y: 1491, w: 260, h: 72, n: 1, s: 40 }));
     probes.push({ f, rows });
   }
-  return { probes, plan: { total: 610, quotes: { a1: QUOTE_HASH }, badgeOn: true, badge: { from: 516, to: 582 }, closeFrom: 450 } };
+  return { probes, plan: { total: 610, quotes: { a1: QUOTE_HASH, t1: T_HASH }, sync: true, badgeOn: true, badge: { from: 516, to: 582 }, closeFrom: 450 } };
 }
 const failing = (checks) => checks.filter((c) => !c.ok).map((c) => c.id);
 
 test("the zones are the measured ones", () => {
   assert.deepEqual(ZONES, { top: 232, right: 888, left: 56, bottom: 1583 });
-  assert.equal(MIN_TEXT, 29);
+  assert.equal(MIN_TEXT, 40);
   assert.ok(inZones({ x: 56, y: 232, w: 832, h: 1351 }));
   assert.ok(!inZones({ x: 600, y: 300, w: 300, h: 40 }));
 });
@@ -35,9 +41,14 @@ test("a good Reel passes every check", () => {
 test("each fault fails only its own check", () => {
   const cases = [
     ["hook", (p) => (p.probes[0].rows = p.probes[0].rows.filter((r) => r.r !== "quote"))],
-    ["hook", (p) => p.probes[1].rows.push(row({ b: 9, y: 1200, n: 5 }))],
+    ["hook", (p) => p.probes[1].rows.push(row({ b: 9, y: 1200, n: 8 }))],
     ["safe", (p) => p.probes[10].rows.push(row({ b: 9, x: 700, w: 300, y: 1200 }))],
-    ["text-size", (p) => p.probes[10].rows.push(row({ b: 9, y: 1200, s: 22 }))],
+    ["text-size", (p) => p.probes[10].rows.push(row({ b: 9, y: 1200, s: 36 }))],
+    ["contrast", (p) => p.probes.slice(10, 16).forEach((x) => (x.rows[1].c = 3.1))],
+    ["contrast", (p) => p.probes.slice(10, 16).forEach((x) => x.rows.push(row({ b: 9, y: 1200, c: 3.9 })))],
+    ["fill-y", (p) => p.probes.forEach((x) => (x.rows = x.rows.filter((r) => r.r !== "fill").map((r) => (r.q === "t1" ? { ...r, y: 820 } : r))))],
+    ["sync", (p) => p.probes.slice(10, 12).forEach((x) => (x.rows = x.rows.filter((r) => r.q !== "t1")))],
+    ["sync", (p) => (p.probes[30].rows[2].s = 41)],
     ["overlap", (p) => p.probes[10].rows.push(row({ b: 9, y: 650, h: 80 }))],
     ["source", (p) => (p.probes[20].rows = p.probes[20].rows.filter((r) => r.r !== "source"))],
     ["quote", (p) => (p.probes[20].rows[1].hq = quoteHash("another placeholder"))],
@@ -50,6 +61,22 @@ test("each fault fails only its own check", () => {
     change(p);
     assert.deepEqual(failing(probeChecks(p.probes, p.plan)), [id], id);
   }
+});
+
+test("a text that only fades through low contrast passes; Arabic at 6:1 that stays fails", () => {
+  const p = good();
+  p.probes[10].rows[1].c = 3;
+  p.probes[11].rows[1].c = 3;
+  assert.deepEqual(failing(probeChecks(p.probes, p.plan)), []);
+  const q = good();
+  q.probes.slice(20, 30).forEach((x) => (x.rows[1].c = 6));
+  assert.deepEqual(failing(probeChecks(q.probes, q.plan)), ["contrast"]);
+});
+
+test("the sources a quote must carry are not framing words", () => {
+  const p = good();
+  p.probes[0].rows[0].n = 12;
+  assert.deepEqual(failing(probeChecks(p.probes, p.plan)), []);
 });
 
 test("a faint text does not count, a fading one is not over another", () => {
