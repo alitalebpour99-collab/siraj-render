@@ -91,7 +91,9 @@ const Card: React.FC<{ p: VerseProps; card: VerseCard; frozen?: boolean }> = ({ 
   const opacity = frozen ? 1 : cardOpacity(f, card.dur, card.index === 0);
   // the ayah pushes in a little while it is read; the first one also arrives (rises and settles)
   // in its first 1.7 s, so the opening moves from the first frame
-  const push = interpolate(f, [0, card.dur], [1, 1.025], clamp);
+  // in and out at an even pace, 6 s a turn and 3 % at most, so a long ayah (25 s) keeps moving too
+  const turn = (f % 180) / 180;
+  const push = 1 + 0.03 * (turn < 0.5 ? 2 * turn : 2 - 2 * turn);
   const arrive = card.index === 0 ? interpolate(f, [0, 50], [0, 1], { ...clamp, easing: easeInOut }) : 1;
   const camera = `translateY(${((1 - arrive) * 26).toFixed(1)}px) scale(${(push * (0.96 + 0.04 * arrive)).toFixed(4)})`;
   const tVerse = (f - card.verseAt) / fps;

@@ -233,7 +233,7 @@ const Strip114: React.FC<{ p: InsightProps; f: number; at: number; top: number; 
         })}
         <line x1={STRIP.left} x2={STRIP.left + STRIP.width} y1={STRIP.height + 6} y2={STRIP.height + 6} stroke={C.gold} strokeWidth={1.2} opacity={0.6} />
       </svg>
-      <div dir="ltr" style={{ position: "absolute", top: STRIP.height + 14, left: STRIP.left, width: STRIP.width, display: "flex", justifyContent: "space-between", fontFamily: ui(p.lang), fontSize: lz(26), color: C.quiet }}>
+      <div dir="ltr" style={{ position: "absolute", top: STRIP.height + 14, left: STRIP.left, width: STRIP.width, display: "flex", justifyContent: "space-between", fontFamily: ui(p.lang), fontSize: lz(26), color: C.quiet, paddingInline: flags.lamp ? 50 : 0, boxSizing: "border-box" }}>
         <span>{dIn(p.lang, fa ? n : 1)}</span>
         <span>{dIn(p.lang, fa ? 1 : n)}</span>
       </div>
@@ -1443,7 +1443,8 @@ export const InsightReel: React.FC<InsightProps> = (raw) => {
   // the rule box from the second scene on; a video that recites from its first second (Every Letter) shows it from the first second
   // the lamp style: from 1.5 s on, so the lower half is never empty (its words come after the hook's first 1.5 s)
   const ruleFrom = first.id === "recite" ? 24 : lamp ? Math.min(46, t.scenes[1]?.from ?? 46) : (t.scenes[1]?.from ?? 0);
-  const ruleOn = Math.min(c01((f - ruleFrom + 6) / 12), c01((last.from - f + 6) / 12));
+  // the lamp style keeps it through the sources too (the lower half is never empty) and fades it before the loop
+  const ruleOn = Math.min(c01((f - ruleFrom + 6) / 12), lamp ? c01((t.total - t.loopFrames - f) / 12) : c01((last.from - f + 6) / 12));
   const Hook = viewOf(p, first.id);
   const seed = 7 + p.format.length * 3 + p.episode.length;
   // the light warms while the qari recites (as in the verse Reels)
