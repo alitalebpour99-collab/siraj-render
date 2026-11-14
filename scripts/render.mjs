@@ -43,7 +43,7 @@ export function styleFor(props, env = process.env) {
  * The others keep the classic look, without the gate, until a sample of theirs passes;
  * SIRAJ_LAMP_INSIGHTS (a repository variable: a list, or «all») widens it.
  */
-export const LAMP_INSIGHTS = ["only", "myth-fact", "meccan-medinan", "one-line"];
+export const LAMP_INSIGHTS = ["myth-fact", "meccan-medinan", "one-line"];
 
 /** What the gate compares the page with: the hash of every quote it may show, and the badge's window. */
 export function gatePlan(props, inputProps, timeline) {
