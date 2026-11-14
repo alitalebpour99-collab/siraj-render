@@ -58,7 +58,8 @@ export const Ground: React.FC<{ total: number; still?: boolean; lamp?: { x: numb
   const early = still ? 0 : interpolate(f, [0, 45], [0, 1], { ...clamp, easing: easeOut }) * interpolate(f, [total - 45, total], [1, 0], { ...clamp, easing: easeInOut });
   const scale = 1 + 0.012 * early + 0.02 * k * motion.drift;
   const at = glow ?? (lamp ? { x: lamp.x, y: lamp.y - 6 } : { x: COL_X, y: 760 });
-  const pulse = still ? 0 : loopWave(f, total, Math.max(1, Math.round(total / 150)));
+  // the light breathes, about 6 s a breath: the picture never stands still, even on one long recited word
+  const pulse = still ? 0 : loopWave(f, total, Math.max(1, Math.round(total / 180)));
   const float = still ? 0 : 3 * loopWave(f, total, Math.max(1, Math.round(total / 120)));
   const flicker = still ? 0 : 0.6 * loopWave(f, total, Math.max(2, Math.round(total / 22))) + 0.4 * loopWave(f, total, Math.max(3, Math.round(total / 9)));
   return (
@@ -72,7 +73,7 @@ export const Ground: React.FC<{ total: number; still?: boolean; lamp?: { x: numb
             width: 840,
             height: 840,
             borderRadius: "50%",
-            opacity: Math.min(1, 0.62 + 0.3 * warm + 0.06 * pulse),
+            opacity: Math.max(0, Math.min(1, 0.58 + 0.28 * warm + 0.14 * pulse)),
             background: "radial-gradient(circle, rgba(242,196,96,0.58) 0%, rgba(242,196,96,0.26) 24%, rgba(242,196,96,0.08) 46%, rgba(242,196,96,0) 64%)",
           }}
         />

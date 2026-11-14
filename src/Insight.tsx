@@ -1397,11 +1397,13 @@ export const InsightReel: React.FC<InsightProps> = (raw) => {
   const ruleOn = Math.min(c01((f - ruleFrom + 6) / 12), c01((last.from - f + 6) / 12));
   const Hook = viewOf(p, first.id);
   const seed = 7 + p.format.length * 3 + p.episode.length;
+  // the light warms while the qari recites (as in the verse Reels)
+  const qariWarm = 0.4 + 0.5 * Math.max(0, ...t.speakers.filter((x) => x.kind === "qari").map((x) => Math.min(c01((f - x.frame + 12) / 18), c01((x.frame + x.seconds * 30 + 30 - f) / 30))));
   // the lamp style: the series chip comes after the hook's 1.5 s and leaves before the loop
   const chipOn = lamp ? Math.min(1, c01((t.total - t.loopFrames - f) / 12)) : 1;
   return (
     <AbsoluteFill style={{ background: C.night }}>
-      {lamp ? <Ground total={t.total} lamp={null} glow={{ x: COL_X, y: 820 }} seed={seed} /> : <World total={t.total} seed={seed} muted />}
+      {lamp ? <Ground total={t.total} lamp={null} glow={{ x: COL_X, y: 820 }} seed={seed} warm={qariWarm} /> : <World total={t.total} seed={seed} muted />}
       {!lamp && studio.frame ? <MushafFrame /> : null}
       <AbsoluteFill style={lamp ? { transform: `translateX(${LAMP_COLUMN.dx}px) scale(${LAMP_COLUMN.scale})`, transformOrigin: "540px 960px" } : undefined}>
         <div style={{ opacity: chipOn }}>
