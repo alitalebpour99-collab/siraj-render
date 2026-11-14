@@ -61,7 +61,7 @@ const refSay = (lang, r) => {
   const [s, a] = r.split(":");
   return lang === "fa" ? faRef(r) : `Surah ${s}, verse ${a}`;
 };
-const line = (id, show, say = show) => ({ id, show, say });
+const line = (id, show, say = show, head) => ({ id, show, say, ...(head ? { head } : {}) });
 
 /*
  * What the Persian narrator hears (S3d, owner 2026-10-28): the screen keeps its digits, the
@@ -138,13 +138,13 @@ export const INSIGHTS = {
         lines: (lang, n, s) =>
           lang === "fa"
             ? [
-                line("hook", "فقط یک سوره در همهٔ آیه‌هایش نام «الله» را دارد.", "فقط یک سوره در همهٔ آیه‌هایش نامِ الله را دارد."),
+                line("hook", "فقط یک سوره در همهٔ آیه‌هایش نام «الله» را دارد.", "فقط یک سوره در همهٔ آیه‌هایش نامِ الله را دارد.", "فقط یک سوره: «الله» در همهٔ آیه‌ها"),
                 line("count", `سورهٔ ${faDigits(n.surah)}، ${s.name}: هر ${N(lang, n.verses)} آیه.`, `سورهٔ ${W(n.surah)}، ${SN(s)}. در هر ${W(n.verses)} آیه‌اش.`),
                 line("without", `پس از آن سورهٔ ${faDigits(n.closest)} است: ${N(lang, n.closestWith)} آیه از ${N(lang, n.closestVerses)}.`, `پس از آن سورهٔ ${W(n.closest)} است، با ${W(n.closestWith)} آیه از ${W(n.closestVerses)} آیه.`),
                 line("end", "شمرده از متن تنزیل؛ قاعدهٔ شمارش روی صفحه است.", FA_COUNTED),
               ]
             : [
-                line("hook", "Only one surah has the name Allah in every verse."),
+                line("hook", "Only one surah has the name Allah in every verse.", undefined, "One surah: Allah in every verse."),
                 line("count", `Surah ${n.surah}, ${s.tname}: all ${N(lang, n.verses)} of its verses.`),
                 line("without", `The next closest is Surah ${n.closest}, with ${N(lang, n.closestWith)} of ${N(lang, n.closestVerses)}.`),
                 line("end", "Counted from the Tanzil text, with the rule on screen.", EN_COUNTED),
@@ -165,7 +165,7 @@ export const INSIGHTS = {
                 line("end", "کلمه‌ها در متن تنزیل شمرده شده‌اند؛ قاعده روی صفحه است.", `کلمه‌ها در ${FA_SOURCE.text} شمرده شده‌اند. قاعدهٔ شمارش روی تصویر است.`),
               ]
             : [
-                line("hook", "Which is the longest verse of the Quran?"),
+                line("hook", "Which is the longest verse of the Quran?", undefined, "The longest verse of the Quran?"),
                 line("count", `Verse ${refShow(lang, n.verse)}, with ${N(lang, n.words)} words.`, `${refSay(lang, n.verse)}, with ${N(lang, n.words)} words.`),
                 line("without", `The next is ${refShow(lang, n.next)}, with ${N(lang, n.nextWords)}.`, `The next is ${refSay(lang, n.next)}, with ${N(lang, n.nextWords)}.`),
                 line("end", "Words counted in the Tanzil text, with the rule on screen.", "Words counted in the Tanzil Quran text, with the counting rule on screen."),
@@ -368,13 +368,13 @@ export const INSIGHTS = {
         lines: (lang, n) =>
           lang === "fa"
             ? [
-                line("hook", `فقط ${N(lang, n.count)} سوره در هر دو ترتیب جای یکسانی دارند.`, `فقط ${W(n.count)} سوره در هر دو ترتیب جای یکسانی دارند.`),
+                line("hook", `فقط ${N(lang, n.count)} سوره در هر دو ترتیب جای یکسانی دارند.`, `فقط ${W(n.count)} سوره در هر دو ترتیب جای یکسانی دارند.`, `فقط ${N(lang, n.count)} سوره با جای یکسان`),
                 line("move", `در ترتیب مصحف و در ترتیب نزولی که تنزیل آورده، سوره‌های ${list(lang, n.same)} در همان شماره می‌مانند.`, `در ترتیبِ مصحف، و در ترتیبِ نزولی که ${FA_SOURCE.tanzil} آورده، سوره‌های ${WL(n.same)} در همان شماره می‌مانند.`),
                 line("note", "این یکی از ترتیب‌های سنتی نزول است؛ فهرست‌های دیگری هم هست.", FA_ORDER_NOTE),
                 line("end", "ترتیب از فرادادهٔ تنزیل.", FA_ORDER_END),
               ]
             : [
-                line("hook", `Only ${N(lang, n.count)} surahs keep their place in both orders.`),
+                line("hook", `Only ${N(lang, n.count)} surahs keep their place in both orders.`, undefined, `Only ${N(lang, n.count)} surahs keep their place.`),
                 line("move", `In the book's order and in the revelation order Tanzil lists, Surahs ${list(lang, n.same)} stay at the same number.`),
                 line("note", "This is one traditional order of revelation; scholars have listed others."),
                 line("end", "The order comes from the Tanzil metadata.", "The order comes from the Tanzil Quran data."),
@@ -395,7 +395,7 @@ export const INSIGHTS = {
                 line("end", "ترتیب از فرادادهٔ تنزیل.", FA_ORDER_END),
               ]
             : [
-                line("hook", `The first surah of the book was number ${N(lang, n.order)} to be revealed.`),
+                line("hook", `The first surah of the book was number ${N(lang, n.order)} to be revealed.`, undefined, `The first surah, revealed number ${N(lang, n.order)}.`),
                 line("move", `In the revelation order Tanzil lists, Surahs ${list(lang, n.first.slice(0, n.order - 1))} come before it.`),
                 line("note", "This is one traditional order of revelation; scholars have listed others."),
                 line("end", "The order comes from the Tanzil metadata.", "The order comes from the Tanzil Quran data."),
@@ -454,13 +454,13 @@ export const INSIGHTS = {
         lines: (lang, n) =>
           lang === "fa"
             ? [
-                line("hook", `${N(lang, n.surahs)} سوره با حروفی آغاز می‌شوند که جدا جدا خوانده می‌شوند.`, `${W(n.surahs)} سوره با حروفی آغاز می‌شوند که جدا جدا خوانده می‌شوند.`),
+                line("hook", `${N(lang, n.surahs)} سوره با حروفی آغاز می‌شوند که جدا جدا خوانده می‌شوند.`, `${W(n.surahs)} سوره با حروفی آغاز می‌شوند که جدا جدا خوانده می‌شوند.`, `${N(lang, n.surahs)} سوره با حروف جدا آغاز می‌شوند`),
                 line("letters", `${N(lang, n.letters)} حرف گوناگون، در ${N(lang, n.combinations)} ترکیب${n.letters * 2 === 28 ? "؛ درست نیمی از ۲۸ حرف الفبا" : ""}.`, `${W(n.letters)} حرفِ گوناگون، در ${W(n.combinations)} ترکیب.${n.letters * 2 === 28 ? " یعنی درست نیمی از بیست و هشت حرفِ الفبا." : ""}`),
                 line("alone", `در ${N(lang, n.alone)} سوره، این حروف خودشان یک آیهٔ کامل‌اند.`, `در ${W(n.alone)} سوره، این حروف خودشان یک آیهٔ کامل‌اند.`),
                 line("end", "فهرست سوره‌ها از فراداده؛ حروف از متن تنزیل.", `فهرستِ سوره‌ها از ${FA_SOURCE.data} است، و حروف از متنِ قرآنِ همین پروژه.`),
               ]
             : [
-                line("hook", `${N(lang, n.surahs)} surahs open with letters that are read one by one.`),
+                line("hook", `${N(lang, n.surahs)} surahs open with letters that are read one by one.`, undefined, `${N(lang, n.surahs)} surahs open with separate letters.`),
                 line("letters", `${N(lang, n.letters)} different letters, in ${N(lang, n.combinations)} combinations${n.letters * 2 === 28 ? ": exactly half of the alphabet's 28" : ""}.`),
                 line("alone", `In ${N(lang, n.alone)} surahs the letters are a whole verse of their own.`),
                 line("end", "The surahs from the metadata; the letters from the Tanzil text.", "The surahs from the Tanzil Quran data, the letters from the Tanzil Quran text."),
@@ -500,13 +500,13 @@ export const INSIGHTS = {
           const other = n.verses.filter((v) => v !== n.verse);
           return lang === "fa"
             ? [
-                line("hook", `${n.verses.length === 2 ? "دو آیه" : `${N(lang, n.verses.length)} آیه`} در قرآن هر ${N(lang, n.letters)} حرف الفبا را دارند.`, `${W(n.verses.length)} آیه در قرآن هر ${W(n.letters)} حرفِ الفبا را دارند.`),
+                line("hook", `${n.verses.length === 2 ? "دو آیه" : `${N(lang, n.verses.length)} آیه`} در قرآن هر ${N(lang, n.letters)} حرف الفبا را دارند.`, `${W(n.verses.length)} آیه در قرآن هر ${W(n.letters)} حرفِ الفبا را دارند.`, `${n.verses.length === 2 ? "دو آیه" : `${N(lang, n.verses.length)} آیه`} با هر ${N(lang, n.letters)} حرف الفبا`),
                 line("this", `این یکی از آن‌هاست: ${refShow(lang, n.verse)}. با تلاوت، حرف‌ها یکی‌یکی روشن می‌شوند.`, `این یکی از آن‌هاست، ${faRef(n.verse)}. با تلاوت، حرف‌ها یکی‌یکی روشن می‌شوند.`),
                 line("other", `و دیگری ${other.map((r) => refShow(lang, r)).join("، ")} است.`, other.length > 1 ? `و بقیه ${other.map((r) => faRef(r)).join(" و ")} هستند.` : `و دیگری ${other.map((r) => faRef(r)).join(" و ")} است.`),
                 line("end", "حرف‌ها در متن تنزیل شمرده شده‌اند؛ قاعده روی صفحه است.", `حرف‌ها در ${FA_SOURCE.text} شمرده شده‌اند. قاعدهٔ شمارش روی تصویر است.`),
               ]
             : [
-                line("hook", `${n.verses.length === 2 ? "Two verses" : `${N(lang, n.verses.length)} verses`} of the Quran hold all ${N(lang, n.letters)} letters of the alphabet.`),
+                line("hook", `${n.verses.length === 2 ? "Two verses" : `${N(lang, n.verses.length)} verses`} of the Quran hold all ${N(lang, n.letters)} letters of the alphabet.`, undefined, `${n.verses.length === 2 ? "Two verses" : `${N(lang, n.verses.length)} verses`} with all ${N(lang, n.letters)} letters.`),
                 line("this", `This is one of them: ${refShow(lang, n.verse)}. Watch the letters light as it is recited.`, `This is one of them: ${refSay(lang, n.verse)}. Watch the letters light as it is recited.`),
                 line("other", `The other is ${other.map((r) => refShow(lang, r)).join(", ")}.`, `The other is ${other.map((r) => refSay(lang, r)).join(", ")}.`),
                 line("end", "Letters counted in the Tanzil text, with the rule on screen.", "Letters counted in the Tanzil Quran text, with the counting rule on screen."),
@@ -568,11 +568,11 @@ export const INSIGHTS = {
           lines: (lang, n) =>
             lang === "fa"
               ? [
-                  line("hook", `${N(lang, n.verses)} آیه با این دو نام تمام می‌شوند.`, `${W(n.verses)} آیه با این دو نام تمام می‌شوند.`),
+                  line("hook", `${N(lang, n.verses)} آیه با این دو نام تمام می‌شوند.`, `${W(n.verses)} آیه با این دو نام تمام می‌شوند.`, `پایانِ ${N(lang, n.verses)} آیه با این دو نام`),
                   line("where", `در ${N(lang, n.surahs)} سوره.`, `در ${W(n.surahs)} سوره.`),
                   line("end", "دو کلمهٔ پایانی هر آیه در متن تنزیل، بی اعتنا به اعراب.", `دو کلمهٔ پایانیِ هر آیه در ${FA_SOURCE.text} سنجیده شده، بدونِ توجه به اِعراب.`),
                 ]
-              : [line("hook", `${N(lang, n.verses)} verses close with this pair of Names.`), line("where", `In ${N(lang, n.surahs)} surahs.`), line("end", "The last two words of each verse in the Tanzil text, vowel marks ignored.", "The last two words of each verse in the Tanzil Quran text, vowel marks ignored.")],
+              : [line("hook", `${N(lang, n.verses)} verses close with this pair of Names.`, undefined, `${N(lang, n.verses)} verses end with these Names.`), line("where", `In ${N(lang, n.surahs)} surahs.`), line("end", "The last two words of each verse in the Tanzil text, vowel marks ignored.", "The last two words of each verse in the Tanzil Quran text, vowel marks ignored.")],
         },
       ]),
     ),
@@ -596,7 +596,7 @@ export const INSIGHTS = {
         lines: (lang, n, s) =>
           lang === "fa"
             ? [line("question", "کدام سوره با بسم‌الله آغاز نمی‌شود؟"), line("answer", `سورهٔ ${faDigits(n.answer)}، ${s.name}. همهٔ سوره‌های دیگر با آن آغاز می‌شوند.`, `سورهٔ ${W(n.answer)}، ${SN(s)}. همهٔ سوره‌های دیگر با بسم‌الله آغاز می‌شوند.`)]
-            : [line("question", "Which surah does not open with the Basmala?"), line("answer", `Surah ${n.answer}, ${s.tname}. Every other surah opens with it.`)],
+            : [line("question", "Which surah does not open with the Basmala?", undefined, "Which surah opens without the Basmala?"), line("answer", `Surah ${n.answer}, ${s.tname}. Every other surah opens with it.`)],
       },
     },
   },

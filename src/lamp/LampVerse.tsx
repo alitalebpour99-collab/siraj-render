@@ -30,7 +30,7 @@ import { COL, COL_W, COL_X, ZONES } from "./zones";
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 const LAMP_AT = { x: COL_X, y: 420, size: 128 };
 /** the body of an ayah card: below the lamp, above the bottom of the safe zone */
-const BODY = { top: 520, bottom: ZONES.bottom - 40 };
+const BODY = { top: 520, bottom: ZONES.bottom - 90 };
 const TEXT_W = COL_W - 40;
 
 /** A card shows alone: it fades out in the first half of the cross-fade and the next fades in in the second. */
@@ -75,8 +75,11 @@ const Card: React.FC<{ p: VerseProps; card: VerseCard; frozen?: boolean }> = ({ 
   const basmalaClip = card.index === 0 ? (p.qari?.basmala ?? null) : null;
   const narration = p.voice.lines.find((l) => l.id === `a${a.ayahNumber}`);
   const opacity = frozen ? 1 : cardOpacity(f, card.dur, card.index === 0);
-  // the ayah pushes in a little while it is read
-  const push = interpolate(f, [0, card.dur], [1, 1.03], { ...clamp, easing: easeInOut });
+  // the ayah pushes in a little while it is read, from under the lamp; the first one also arrives
+  // (rises and settles) in its first 1.3 s, so the opening moves from the first frame
+  const push = interpolate(f, [0, card.dur], [1, 1.04], clamp);
+  const arrive = card.index === 0 ? interpolate(f, [0, 40], [0, 1], { ...clamp, easing: easeOut }) : 1;
+  const camera = `translateY(${((1 - arrive) * 18).toFixed(1)}px) scale(${(push * (0.975 + 0.025 * arrive)).toFixed(4)})`;
   const tVerse = (f - card.verseAt) / fps;
   const tBasmala = card.basmalaAt === null ? -1 : (f - card.basmalaAt) / fps;
   const tNarr = (f - card.narrAt) / fps;
@@ -99,8 +102,8 @@ const Card: React.FC<{ p: VerseProps; card: VerseCard; frozen?: boolean }> = ({ 
           alignItems: "center",
           justifyContent: "center",
           gap: 0,
-          transform: `scale(${push.toFixed(4)})`,
-          transformOrigin: `${COL_W / 2}px 40%`,
+          transform: camera,
+          transformOrigin: `${COL_W / 2}px ${LAMP_AT.y - BODY.top}px`,
         }}
       >
         {split ? (

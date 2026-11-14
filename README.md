@@ -56,6 +56,39 @@ the Story cut). Search forms are locators (a verse and a word span), never typed
 | `src/ornament.tsx`, `src/light.tsx` | the night, the mushaf frame, the cartouche, the seals, the moving light |
 | `public/fonts/` | Amiri Quran, Vazirmatn, EB Garamond, each with its SIL Open Font License |
 
+## The lamp style (2026-11-14)
+
+The owner approved the new video style on 13 November and asked for it in each project's own
+look. The verse and the insight Reels are drawn in Siraj's **lamp look**: warm cream, a deep
+emerald for the light of the words and the lines, dark ink, a small golden glow behind a simple
+modern oil lamp, the quoted Persian in a naskh face (Noto Naskh Arabic, OFL). No manuscript
+border, no arabesque, no figure. Calm: things drift, breathe and push in slowly; nothing cuts,
+shakes or flashes.
+
+- **The first frame** shows the ayah (or the insight's hook head, 7 words or fewer) with its
+  reference; no title card, no logo first. The qari begins 0.6 s in.
+- **The source stays with the quote**: the surah and verse above every ayah, the translator under
+  every translation; the sources at the close.
+- **The camera** breathes in from frame 0 and is home again on the last frame; each ayah pushes in
+  a little; the last frames fade back into the first picture, so the Reel loops.
+- **The safe zones** of the apps (measured on the owner's screenshots, `src/lamp/zones.ts`): every
+  text inside x 56–888, y 232–1583, 29 px (1.5 % of the frame) or larger; the insight pictures are
+  set in that column at 92 %.
+- **The channel badge**: «سراج» / «Siraj», a tiny heart and a tiny follow mark, a small pill at the
+  bottom left of the safe area for 2.2 s at the close, gone before the loop. One master file.
+- **Sound**: no music (the project's rule). The qari and the narrator only, levelled in two
+  passes to −14 LUFS with the true peak at −1 dBTP or lower, measured on the encoded file and done
+  once more when it is over (`scripts/finish.mjs`).
+- **The gate** (`scripts/gate.mjs`): the page measures itself on its probe frames
+  (`src/lamp/Probe.tsx`: boxes, sizes, opacities, word counts, hashes; never a text) and the file
+  is measured with ffmpeg. Checks: `hook`, `hook-motion`, `still` (a change at least every
+  3.5 s), `loop`, `safe`, `text-size`, `overlap`, `source`, `quote` (letter for letter as
+  served), `persian` (no «·» or «|» beside Persian), `badge`, `loudness`. A Reel that fails is
+  not handed in: the worker reports it failed for good with the reason in plain Persian.
+- **Switches** (repository variables, unset = on): `SIRAJ_STYLE=classic` (the old look),
+  `SIRAJ_BADGE=off`, `SIRAJ_GATE=warn` (report only) or `off`. Trials (`try.yml`) run the gate on
+  `warn` and keep its report, a 360 px copy of the picture and a sheet of two frames a second.
+
 ## Runs
 
 - `.github/workflows/worker.yml` — every 30 minutes and by hand: looks first (a run with nothing

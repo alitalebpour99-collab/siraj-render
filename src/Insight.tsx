@@ -33,9 +33,14 @@ import { COL_X, hookHead } from "./lamp/zones";
  * whole picture is set in the safe column (x 56–888: the right 14 % stays free for the buttons) at
  * 92 % of its size, so every text keeps at least 32 px here (29 px, 1.5 % of the frame, on screen).
  */
-const LAMP_COLUMN = { scale: 0.92, dx: COL_X - 540 };
-/** A text size of the classic look, at least 32 px in the lamp style. */
-const lz = (n: number) => (flags.lamp ? Math.max(n, 32) : n);
+const LAMP_COLUMN = { scale: 0.9, dx: COL_X - 540 };
+/** A text size of the classic look, at least 33 px in the lamp style (30 px on screen in the column). */
+const lz = (n: number) => (flags.lamp ? Math.max(n, 33) : n);
+/** Each scene of the lamp style pushes in slowly (3 %) while it stands, so the picture is never still. */
+const Push: React.FC<{ dur: number; children: React.ReactNode }> = ({ dur, children }) => {
+  const f = useCurrentFrame();
+  return <AbsoluteFill style={{ transform: `scale(${interpolate(f, [0, dur], [1, 1.03], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }).toFixed(4)})`, transformOrigin: "540px 760px" }}>{children}</AbsoluteFill>;
+};
 const BADGE_LEN = 66;
 
 /* ---------- layout: every text stays inside the 4:5 band (y 285–1635) and above the caption zone ---------- */
@@ -556,8 +561,9 @@ const HookView: React.FC<ViewProps> = ({ p, s }) => {
             {head}
           </Fit>
         </div>
-        <div style={{ position: "absolute", top: 720, left: 0, width: W, height: BAND.visBottom - 720, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Hero p={p} f={f} />
+        {/* the picture comes after the hook's 1.5 s (its labels would add to the first words) */}
+        <div style={{ position: "absolute", top: 720, left: 0, width: W, height: BAND.visBottom - 720, display: "flex", alignItems: "center", justifyContent: "center", opacity: c01((f - 42) / 16), transform: `translateY(${(16 * (1 - c01((f - 42) / 16))).toFixed(1)}px)` }}>
+          <Hero p={p} f={Math.max(0, f - 42)} />
         </div>
         {rest ? <Said line={after} s={s} lang={p.lang} keep /> : null}
         {s.lines.slice(1).map((l) => (
@@ -1402,9 +1408,11 @@ export const InsightReel: React.FC<InsightProps> = (raw) => {
           const View = viewOf(p, s.id);
           return (
             <Sequence key={s.id} from={s.from} durationInFrames={s.dur} name={s.id}>
-              {lamp && s === last && t.loopFrames ? (
-                <Tail dur={s.dur}>
-                  <View p={p} s={s} />
+              {lamp ? (
+                <Tail dur={s === last && t.loopFrames ? s.dur : Infinity}>
+                  <Push dur={s.dur}>
+                    <View p={p} s={s} />
+                  </Push>
                 </Tail>
               ) : (
                 <View p={p} s={s} />

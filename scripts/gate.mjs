@@ -69,15 +69,22 @@ export function probeChecks(probes, plan) {
     for (const r of vis) if (!inZones(r)) outside.push(`${sec(p.f)} s ${r.r} ${r.x},${r.y} ${r.w}×${r.h}`);
     for (const r of p.rows) if (seen(r) && r.s < MIN_TEXT - 0.5) small.push(`${sec(p.f)} s ${r.r} ${r.s} px`);
     const strong = p.rows.filter((r) => seen(r, 0.6));
-    for (let i = 0; i < strong.length; i++) for (let j = i + 1; j < strong.length; j++) if (strong[i].b !== strong[j].b && meet(strong[i], strong[j])) over.push(`${sec(p.f)} s ${strong[i].r}/${strong[j].r}`);
+    // two parts of one quote (a basmala line and the rest of its ayah) are one text
+    for (let i = 0; i < strong.length; i++) for (let j = i + 1; j < strong.length; j++) if (strong[i].b !== strong[j].b && !(strong[i].q && strong[i].q === strong[j].q) && meet(strong[i], strong[j])) over.push({ f: p.f, k: `${strong[i].r}/${strong[j].r} at y ${Math.min(strong[i].y, strong[j].y)}` });
     for (const r of p.rows) if (r.d && seen(r, 0.15)) dots.push(`${sec(p.f)} s`);
     if (strong.some((r) => r.r === "quote") && !p.rows.some((r) => r.r === "source" && seen(r))) unsourced.push(sec(p.f));
     for (const r of p.rows) if (r.r === "quote" && r.q && r.hq && plan.quotes?.[r.q] && r.hq !== plan.quotes[r.q]) wrong.push(`${sec(p.f)} s ${r.q}`);
   }
   const first = (list) => [...new Set(list)].slice(0, 4).join("; ");
+  /** «text/text at y 380: 0.2–3.4 s» for each pair, so a report names each fault once */
+  const spans = (list) => {
+    const by = new Map();
+    for (const x of list) by.set(x.k, [...(by.get(x.k) ?? []), x.f]);
+    return [...by].slice(0, 5).map(([k, fs]) => `${k}: ${sec(Math.min(...fs))}–${sec(Math.max(...fs))} s (${fs.length} frames)`).join("; ");
+  };
   add("safe", !outside.length, outside.length ? `outside x ${ZONES.left}–${ZONES.right}, y ${ZONES.top}–${ZONES.bottom}: ${first(outside)}` : `every text inside x ${ZONES.left}–${ZONES.right}, y ${ZONES.top}–${ZONES.bottom}`, "متنی بیرون از قابِ امن است (زیرِ نوار یا دکمه‌های برنامه)");
   add("text-size", !small.length, small.length ? `smaller than ${MIN_TEXT} px: ${first(small)}` : `every text ${MIN_TEXT} px or more`, "متنی ریزتر از حدِ خواندن است");
-  add("overlap", !over.length, over.length ? `texts over each other: ${first(over)}` : "no two texts over each other", "دو متن روی هم افتاده‌اند");
+  add("overlap", !over.length, over.length ? `texts over each other: ${spans(over)}` : "no two texts over each other", "دو متن روی هم افتاده‌اند");
   add("source", !unsourced.length, unsourced.length ? `a quote without its source at ${first(unsourced)} s` : "every quote with its source", "منبعِ آیه کنارِ آن روی تصویر نیست");
   const quoted = frames.some((p) => p.rows.some((r) => r.r === "quote" && r.hq));
   add("quote", !wrong.length && (quoted || !Object.keys(plan.quotes ?? {}).length), wrong.length ? `differs from the source: ${first(wrong)}` : quoted ? "every quote letter for letter as the source" : "no quote in this Reel", "متنِ آیه یا ترجمه روی تصویر با منبع یکی نیست");

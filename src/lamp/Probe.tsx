@@ -47,7 +47,7 @@ function seen(el: Element): { o: number; k: number } {
 }
 
 function measure(frame: number) {
-  const blocks = new Map<Element, { rect: DOMRect | null; text: string; s: number; o: number }>();
+  const blocks = new Map<Element, { rect: DOMRect | null; text: string; s: number; o: number; r: string; q: string | null }>();
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const text = node.textContent ?? "";
@@ -62,17 +62,18 @@ function measure(frame: number) {
     if (r.width < 1 || r.height < 1) continue;
     const size = parseFloat(getComputedStyle(el).fontSize) * k;
     const block = blockOf(el);
-    const cur = blocks.get(block) ?? { rect: null, text: "", s: Infinity, o: 0 };
+    const cur = blocks.get(block) ?? { rect: null, text: "", s: Infinity, o: 0, r: "text", q: null };
+    // the role and the quote key of the text itself (a marked span inside a plain block counts)
+    const role = el.closest("[data-role]")?.getAttribute("data-role") ?? "text";
+    const key = el.closest("[data-q]")?.getAttribute("data-q") ?? null;
     const u = cur.rect ? new DOMRect(Math.min(cur.rect.x, r.x), Math.min(cur.rect.y, r.y), Math.max(cur.rect.right, r.right) - Math.min(cur.rect.x, r.x), Math.max(cur.rect.bottom, r.bottom) - Math.min(cur.rect.y, r.y)) : r;
-    blocks.set(block, { rect: u, text: `${cur.text} ${text}`, s: Math.min(cur.s, size), o: Math.max(cur.o, o) });
+    blocks.set(block, { rect: u, text: `${cur.text} ${text}`, s: Math.min(cur.s, size), o: Math.max(cur.o, o), r: cur.r !== "text" ? cur.r : role, q: cur.q ?? key });
   }
   const rows: Row[] = [];
   for (const [block, v] of blocks) {
     if (!v.rect) continue;
-    const roleEl = block.closest("[data-role]");
-    const qEl = block.closest("[data-q]");
-    const r = roleEl?.getAttribute("data-role") ?? "text";
-    const q = qEl?.getAttribute("data-q") ?? null;
+    const r = v.r;
+    const q = v.q;
     rows.push({
       b: idOf(block),
       r,

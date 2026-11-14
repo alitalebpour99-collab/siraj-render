@@ -147,7 +147,7 @@ export const AyahSeal: React.FC<{ label: string; font: string }> = ({ label, fon
       <path d="M20 2.5 24.6 8.9 32.4 7.6 31.1 15.4 37.5 20 31.1 24.6 32.4 32.4 24.6 31.1 20 37.5 15.4 31.1 7.6 32.4 8.9 24.6 2.5 20 8.9 15.4 7.6 7.6 15.4 8.9Z" fill={C.gold} fillOpacity={0.14} stroke={C.gold} strokeWidth={1.3} strokeLinejoin="round" />
       <circle cx={20} cy={20} r={10.2} fill="none" stroke={C.gold} strokeWidth={1} />
     </svg>
-    <span style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", fontFamily: font, fontSize: "0.4em", lineHeight: 1, color: C.ink, direction: "rtl" }}>{label}</span>
+    <span data-probe-skip="" style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", fontFamily: font, fontSize: "0.4em", lineHeight: 1, color: C.ink, direction: "rtl" }}>{label}</span>
   </span>
 );
 
