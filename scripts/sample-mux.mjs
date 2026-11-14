@@ -9,7 +9,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { levelFilter, loudness as measured } from "./finish.mjs";
+import { levelFilter, loudness as measured, meets } from "./finish.mjs";
 import { download, getJson, level, loudness } from "./lib.mjs";
 
 const args = process.argv.slice(2);
@@ -87,7 +87,10 @@ for (const f of fs.readdirSync(trial).filter((x) => x.endsWith(".sound.json"))) 
   const final = path.join(outDir, `${id}.mp4`);
   // --small: a lighter copy for looking at (a full disk on the PC); otherwise the picture as rendered
   const video = args.includes("--small") ? ["-c:v", "libx264", "-preset", "veryfast", "-crf", "26", "-maxrate", "3000k", "-bufsize", "6000k", "-threads", "2", "-pix_fmt", "yuv420p"] : ["-c:v", "copy"];
-  execFileSync("ffmpeg", ["-y", "-v", "error", "-i", picture, "-i", mix, "-map", "0:v", "-map", "1:a", ...video, "-af", levelFilter(mix), "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-shortest", "-movflags", "+faststart", final]);
+  const mux = (tp) => execFileSync("ffmpeg", ["-y", "-v", "error", "-i", picture, "-i", mix, "-map", "0:v", "-map", "1:a", ...video, "-af", levelFilter(mix, tp), "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-shortest", "-movflags", "+faststart", final]);
+  mux(-1.5);
+  // as render.mjs does: once more a little lower when the encoded file is over the target
+  if (!meets(measured(final))) mux(-2.5);
   // every voice is heard where it is placed, and never two at once
   const sorted = [...inputs].sort((a, b) => a.at - b.at);
   let overlap = null;
