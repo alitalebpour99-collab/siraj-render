@@ -169,7 +169,7 @@ const Sources: React.FC<{ p: VerseProps; dur: number }> = ({ p, dur }) => {
     : [`Text: ${p.source.quran.publisher}`, `Translation: ${tr.translatorName}`, qari ? `Recitation: ${qari}` : null].filter(Boolean).join(". ");
   return (
     <AbsoluteFill style={{ opacity: o }}>
-      <div data-role="source" style={{ position: "absolute", top: ARABIC.top + 60, left: COL.left, width: COL_W, height: MEANING.bottom - ARABIC.top - 200, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 34 }}>
+      <div data-role="source" style={{ position: "absolute", top: ARABIC.top + 200, left: COL.left, width: COL_W, height: MEANING.bottom - ARABIC.top - 260, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 34 }}>
         <Fit width={TEXT_W} maxHeight={260} max={52} min={MIN_TEXT + 2} measureKey={line} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: fa ? FONT.fa : FONT.en, fontWeight: 500, lineHeight: 1.55, textAlign: "center", textWrap: "balance", color: C.ink }}>
           {line}
         </Fit>
