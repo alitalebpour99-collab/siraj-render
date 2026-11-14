@@ -13,8 +13,9 @@
 //   contrast    the Arabic 7:1 or more against what is behind it, every other text 4.5:1, as drawn
 //               (its colour at its own opacity over the cream, the glow and any filled box); a text
 //               that only passes through a fade is not held to it, one that stays low 0.6 s is
-//   fill-y      the picture reaches the top and the bottom quarter of the safe zone (text, or the
-//               lamp) and some text stands in its lower half, in 90 % of the measured frames
+//   fill-y      the picture reaches the top and the bottom quarter of the safe zone (text, the lamp
+//               or the closing badge) and some text (or the badge) stands in its lower half, in 90 %
+//               of the measured frames
 //   sync        (verse Reels) every ayah's translation is on screen whenever the ayah is, at 42 px or more
 //   overlap     no two texts over each other
 //   source      while a quote is on screen, its source (surah and verse, the translator) is too
@@ -141,10 +142,12 @@ export function probeChecks(probes, plan) {
     const text = p.rows.filter((r) => r.r !== "fill" && r.r !== "badge" && seen(r, 0.6));
     if (!text.length) continue;
     counted++;
-    const shown = [...text, ...p.rows.filter((r) => r.r === "fill" && seen(r, 0.3))];
+    // the lamp and, at the close, the channel badge hold the bottom too
+    const badge = p.rows.filter((r) => r.r === "badge" && seen(r, 0.6));
+    const shown = [...text, ...badge, ...p.rows.filter((r) => r.r === "fill" && seen(r, 0.3))];
     const top = Math.min(...shown.map((r) => r.y));
     const bottom = Math.max(...shown.map((r) => r.y + r.h));
-    const lower = text.some((r) => r.y + r.h / 2 > mid);
+    const lower = [...text, ...badge].some((r) => r.y + r.h / 2 > mid);
     if (top <= hi && bottom >= lo && lower) filled++;
     else thin.push(`${sec(p.f)} s y ${top}–${bottom}${lower ? "" : " (no text below the middle)"}`);
   }
