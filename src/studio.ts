@@ -49,7 +49,7 @@ export const LAMP: Partial<typeof C> = {
   ink: "#2b241a",
   translation: "#3a3125",
   quiet: "#5a4f41",
-  turquoise: "#b07a22",
+  turquoise: "#7d4f0c", // a deep amber, 5:1 on the cream (the second colour of the counts)
 };
 
 export type LookFlags = { glow: boolean; motes: boolean; paper: boolean; lamp: boolean };

@@ -89,7 +89,8 @@ const Kinetic: React.FC<{ text: string; f: number; at: number[]; color?: string 
             style={{
               display: "inline-block",
               opacity: o,
-              transform: `translateY(${((1 - o) * 20).toFixed(1)}px) scale(${(0.94 + 0.06 * o).toFixed(3)})`,
+              // the lamp style keeps every word at its full size (the 40 px floor): it only rises
+              transform: flags.lamp ? `translateY(${((1 - o) * 20).toFixed(1)}px)` : `translateY(${((1 - o) * 20).toFixed(1)}px) scale(${(0.94 + 0.06 * o).toFixed(3)})`,
               filter: o < 1 ? `blur(${((1 - o) * 5).toFixed(1)}px)` : undefined,
               color: gold ? C.brass : color,
               textShadow: gold && flags.glow ? `0 0 ${(18 * o).toFixed(1)}px rgba(224,172,79,0.45)` : undefined,
@@ -1028,6 +1029,8 @@ const LadderView: React.FC<ViewProps> = ({ p, s }) => {
         })}
       </svg>
       {places.map((a, i) => {
+        // the lamp style names only the last place reached (45 px numbers on every row would overlap)
+        if (flags.lamp && a !== Math.max(-1, ...places.filter((x) => x <= run))) return null;
         const passed = c01((run - a) / 2);
         const left = i % 2 === 0;
         return (
@@ -1403,13 +1406,18 @@ const Chip: React.FC<{ p: InsightProps; f: number }> = ({ p, f }) => {
   );
 };
 
+/**
+ * The lamp style's rule box: its 45 px lines need up to three rows; it ends at 1650 in the column,
+ * the bottom of the safe zone on screen (the column is set at 90 % around the frame's middle).
+ */
+const RULE_LAMP = { top: 1418, h: 232 };
 const RuleBox: React.FC<{ p: InsightProps; o: number }> = ({ p, o }) => {
   const fa = p.lang === "fa";
   const text = ruleOf(p.format, p.episode, p.lang, p.numbers);
   return (
-    <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: BAND.rule, left: (W - 880) / 2, width: 880, height: BAND.ruleH, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, opacity: o }}>
+    <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: flags.lamp ? RULE_LAMP.top : BAND.rule, left: (W - 880) / 2, width: 880, height: flags.lamp ? RULE_LAMP.h : BAND.ruleH, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, opacity: o }}>
       <div style={{ width: 200, height: 1.5, background: `linear-gradient(90deg, transparent, ${C.gold}, transparent)` }} />
-      <Fit width={880} maxHeight={BAND.ruleH - 14} max={lz(26)} min={lz(18)} measureKey={text} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), lineHeight: fa ? 1.7 : 1.35, textAlign: "center", color: C.quiet }}>
+      <Fit width={880} maxHeight={(flags.lamp ? RULE_LAMP.h : BAND.ruleH) - 14} max={lz(26)} min={lz(18)} measureKey={text} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), lineHeight: fa ? 1.7 : 1.35, textAlign: "center", color: C.quiet }}>
         {text}
       </Fit>
     </div>
@@ -1433,7 +1441,8 @@ export const InsightReel: React.FC<InsightProps> = (raw) => {
   const first = t.scenes[0]!;
   const last = t.scenes[t.scenes.length - 1]!;
   // the rule box from the second scene on; a video that recites from its first second (Every Letter) shows it from the first second
-  const ruleFrom = first.id === "recite" ? 24 : (t.scenes[1]?.from ?? 0);
+  // the lamp style: from 1.5 s on, so the lower half is never empty (its words come after the hook's first 1.5 s)
+  const ruleFrom = first.id === "recite" ? 24 : lamp ? Math.min(46, t.scenes[1]?.from ?? 46) : (t.scenes[1]?.from ?? 0);
   const ruleOn = Math.min(c01((f - ruleFrom + 6) / 12), c01((last.from - f + 6) / 12));
   const Hook = viewOf(p, first.id);
   const seed = 7 + p.format.length * 3 + p.episode.length;

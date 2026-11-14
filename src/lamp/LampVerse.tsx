@@ -33,13 +33,13 @@ import { COL, COL_W, COL_X, MIN_TEXT, MIN_TRANSLATION, ZONES } from "./zones";
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 /** The lamp sits low, under the translation: the lower half of the frame is never empty. */
-const LAMP_AT = { x: COL_X, y: 1432, size: 124 };
+const LAMP_AT = { x: COL_X, y: 1446, size: 150 };
 /** the title: which surah and what this Reel is, from the first frame to the last */
 const TITLE_TOP = ZONES.top + 14;
 /** the Arabic of an ayah (with the basmala line over ayah 1) */
 const ARABIC = { top: 476, bottom: 930 };
 /** the translation and its reference, under the Arabic and above the lamp */
-const MEANING = { top: 948, bottom: LAMP_AT.y - 62 };
+const MEANING = { top: 948, bottom: LAMP_AT.y - 80 };
 const TEXT_W = COL_W - 40;
 
 /** A card shows alone: it fades out in the first half of the cross-fade and the next fades in in the second. */
@@ -91,7 +91,7 @@ const Card: React.FC<{ p: VerseProps; card: VerseCard; frozen?: boolean }> = ({ 
   const opacity = frozen ? 1 : cardOpacity(f, card.dur, card.index === 0);
   // the ayah pushes in a little while it is read; the first one also arrives (rises and settles)
   // in its first 1.7 s, so the opening moves from the first frame
-  const push = interpolate(f, [0, card.dur], [1, 1.04], clamp);
+  const push = interpolate(f, [0, card.dur], [1, 1.025], clamp);
   const arrive = card.index === 0 ? interpolate(f, [0, 50], [0, 1], { ...clamp, easing: easeInOut }) : 1;
   const camera = `translateY(${((1 - arrive) * 26).toFixed(1)}px) scale(${(push * (0.96 + 0.04 * arrive)).toFixed(4)})`;
   const tVerse = (f - card.verseAt) / fps;
@@ -123,7 +123,7 @@ const Card: React.FC<{ p: VerseProps; card: VerseCard; frozen?: boolean }> = ({ 
             </span>
           </Fit>
         ) : null}
-        <Fit width={TEXT_W} maxHeight={(ARABIC.bottom - ARABIC.top) - (split ? 130 : 0)} max={108} min={52} measureKey={a.text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.85, textAlign: "center", textWrap: "balance" }}>
+        <Fit width={TEXT_W} maxHeight={ARABIC.bottom - ARABIC.top - 36 - (split ? 130 : 0)} max={108} min={52} measureKey={a.text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.85, textAlign: "center", textWrap: "balance" }}>
           <span data-role="quote" data-q={`a${a.ayahNumber}`} data-b={`ayah-${a.ayahNumber}`}>
             <LitText text={body} clip={clip} t={tVerse} after={<AyahSeal label={seal} font={fa ? FONT.fa : FONT.quran} />} />
           </span>
