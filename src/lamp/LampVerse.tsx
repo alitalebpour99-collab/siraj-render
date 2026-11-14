@@ -78,8 +78,8 @@ const Card: React.FC<{ p: VerseProps; card: VerseCard; frozen?: boolean }> = ({ 
   // the ayah pushes in a little while it is read, from under the lamp; the first one also arrives
   // (rises and settles) in its first 1.3 s, so the opening moves from the first frame
   const push = interpolate(f, [0, card.dur], [1, 1.04], clamp);
-  const arrive = card.index === 0 ? interpolate(f, [0, 40], [0, 1], { ...clamp, easing: easeOut }) : 1;
-  const camera = `translateY(${((1 - arrive) * 18).toFixed(1)}px) scale(${(push * (0.975 + 0.025 * arrive)).toFixed(4)})`;
+  const arrive = card.index === 0 ? interpolate(f, [0, 50], [0, 1], { ...clamp, easing: easeInOut }) : 1;
+  const camera = `translateY(${((1 - arrive) * 26).toFixed(1)}px) scale(${(push * (0.96 + 0.04 * arrive)).toFixed(4)})`;
   const tVerse = (f - card.verseAt) / fps;
   const tBasmala = card.basmalaAt === null ? -1 : (f - card.basmalaAt) / fps;
   const tNarr = (f - card.narrAt) / fps;

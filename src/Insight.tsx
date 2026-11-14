@@ -39,7 +39,9 @@ const lz = (n: number) => (flags.lamp ? Math.max(n, 33) : n);
 /** Each scene of the lamp style pushes in slowly (3 %) while it stands, so the picture is never still. */
 const Push: React.FC<{ dur: number; children: React.ReactNode }> = ({ dur, children }) => {
   const f = useCurrentFrame();
-  return <AbsoluteFill style={{ transform: `scale(${interpolate(f, [0, dur], [1, 1.03], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }).toFixed(4)})`, transformOrigin: "540px 760px" }}>{children}</AbsoluteFill>;
+  // in and out again, 8 s a turn and 3 % at most, so a long recitation keeps moving too
+  const k = 0.015 * (1 - Math.cos((2 * Math.PI * Math.min(f, dur)) / 240));
+  return <AbsoluteFill style={{ transform: `scale(${(1 + k).toFixed(4)})`, transformOrigin: "540px 760px" }}>{children}</AbsoluteFill>;
 };
 const BADGE_LEN = 66;
 
@@ -412,7 +414,7 @@ const Hero: React.FC<{ p: InsightProps; f: number; cover?: boolean }> = ({ p, f,
           <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
             <Seal size={90} turn={f * 0.4} />
             <Cartouche height={200} open={open}>
-              <div lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: 96, lineHeight: 1.5, color: C.star, paddingBottom: 34, textShadow: flags.glow ? "0 0 24px rgba(224,172,79,0.45)" : undefined }}>
+              <div lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: 96, lineHeight: 1.5, color: flags.lamp ? C.night : C.star, paddingBottom: 34, textShadow: flags.glow ? "0 0 24px rgba(224,172,79,0.45)" : undefined }}>
                 {s.nameArabic}
               </div>
             </Cartouche>
@@ -478,7 +480,7 @@ const Hero: React.FC<{ p: InsightProps; f: number; cover?: boolean }> = ({ p, f,
         return s ? (
           <div style={box}>
             <Cartouche height={170}>
-              <div lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: 80, lineHeight: 1.5, color: C.star, paddingBottom: 28 }}>
+              <div lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: 80, lineHeight: 1.5, color: flags.lamp ? C.night : C.star, paddingBottom: 28 }}>
                 {s.nameArabic}
               </div>
             </Cartouche>
@@ -556,7 +558,7 @@ const HookView: React.FC<ViewProps> = ({ p, s }) => {
     const after: SceneLine = { ...first, show: rest, words: first.words && prefix ? first.words.slice(skip) : first.words, from: Math.max(first.from, s.from + 46) };
     return (
       <AbsoluteFill style={{ opacity: out }}>
-        <div data-role="hook" style={{ position: "absolute", top: BAND.visTop, left: 0, width: W, height: 300, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div data-role="hook" style={{ position: "absolute", top: BAND.visTop, left: 0, width: W, height: 300, display: "flex", alignItems: "center", justifyContent: "center", transform: `translateY(${(22 * (1 - easeInOut(c01(f / 50)))).toFixed(1)}px) scale(${(0.96 + 0.04 * easeInOut(c01(f / 50))).toFixed(4)})` }}>
           <Fit width={860} maxHeight={300} max={fa ? 76 : 84} min={44} measureKey={head} lang={p.lang} dir={fa ? "rtl" : "ltr"} style={{ fontFamily: ui(p.lang), fontWeight: 600, lineHeight: fa ? 1.6 : 1.2, textAlign: "center", textWrap: "balance", color: C.ink }}>
             {head}
           </Fit>
@@ -1351,7 +1353,7 @@ const Chip: React.FC<{ p: InsightProps; f: number }> = ({ p, f }) => {
   const fa = p.lang === "fa";
   const n = p.studio.seriesNumber ? (p.series?.n ?? null) : null;
   return (
-    <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: BAND.chip, left: 0, width: W, display: "flex", justifyContent: "center", opacity: flags.lamp ? c01((f - 45) / 12) : c01((f + 10) / 10) }}>
+    <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: flags.lamp ? BAND.chip - 46 : BAND.chip, left: 0, width: W, display: "flex", justifyContent: "center", opacity: flags.lamp ? c01((f - 45) / 12) : c01((f + 10) / 10) }}>
       <div style={{ display: "inline-flex", alignItems: "center", gap: 14, padding: "8px 26px", borderRadius: 999, border: `1.5px solid ${C.gold}88`, background: `${C.night}aa` }}>
         <Seal size={30} />
         <span style={{ fontFamily: ui(p.lang), fontSize: lz(fa ? 33 : 30), fontWeight: 500, letterSpacing: fa ? 0 : "0.14em", textTransform: fa ? "none" : "uppercase", color: C.gold }}>{chipOf(p.format, p.lang, n)}</span>
