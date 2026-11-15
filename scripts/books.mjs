@@ -363,3 +363,17 @@ export function slideText(pieces, ellipsis = false) {
   }
   return ellipsis ? `${out} …` : out;
 }
+
+/**
+ * One whole sentence of a tafsir record (word-choice, 2026-11-15): paragraph `paragraph` of the
+ * record's non-empty lines, sentence `sentence` of it (sentencesOf), exactly as served; null when
+ * there is none. The episode names its SHA-256; the caller compares.
+ */
+export function tafsirSentence(text, paragraph, sentence) {
+  const paragraphs = text
+    .split(/\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const p = paragraphs[paragraph];
+  return p === undefined ? null : (sentencesOf(p)[sentence] ?? null);
+}

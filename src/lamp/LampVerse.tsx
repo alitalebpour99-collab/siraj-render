@@ -22,6 +22,7 @@ import { splitLeadingBasmala } from "../basmala";
 import { Fit } from "../Fit";
 import { L, QARI_FA, SITE } from "../labels";
 import { AyahSeal } from "../ornament";
+import { NIGHT_SERIES } from "../night";
 import type { VerseProps } from "../props";
 import { applyStudio } from "../studio";
 import { C, FONT, arNum, easeInOut, faNum } from "../theme";
@@ -48,13 +49,16 @@ const cardOpacity = (f: number, dur: number, first: boolean) =>
 
 /** The title's second line: what the Reel does (7 framing words at most with the surah's name). */
 const whatLine = (p: VerseProps) => {
+  if (p.night) return NIGHT_SERIES[p.lang];
   if (p.lang === "fa") return p.whole ? "آیه به آیه، با معنا" : L.fa.range(p.from, p.to);
   return p.whole ? "Verse by verse, with meaning" : `Verses ${p.from}–${p.to}, with meaning`;
 };
-const titleOf = (p: VerseProps) => (p.lang === "fa" ? `سورهٔ ${p.surah.nameArabic}` : `Surah ${p.surah.tname}`);
+const titleOf = (p: VerseProps) => (p.night ? p.night.title[p.lang] : p.lang === "fa" ? `سورهٔ ${p.surah.nameArabic}` : `Surah ${p.surah.tname}`);
 /** Under each translation: the verse (k of n, or surah:verse) and the translator, one line. */
 const refLine = (p: VerseProps, k: number) =>
-  p.lang === "fa" ? `آیهٔ ${faNum(k)} از ${faNum(p.ayahs.length)}؛ ترجمهٔ ${p.source.translation.translatorName}` : `${p.surah.number}:${k} · ${p.source.translation.translatorName}`;
+  p.night && p.lang === "fa"
+    ? `سورهٔ ${p.surah.nameArabic}، آیهٔ ${faNum(k)}؛ ترجمهٔ ${p.source.translation.translatorName}`
+    : p.lang === "fa" ? `آیهٔ ${faNum(k)} از ${faNum(p.ayahs.length)}؛ ترجمهٔ ${p.source.translation.translatorName}` : `${p.surah.number}:${k} · ${p.source.translation.translatorName}`;
 
 /** The title from the first frame: the surah in big letters, then what this is; the ayah dots under it. */
 const Title: React.FC<{ p: VerseProps; k: number }> = ({ p, k }) => {

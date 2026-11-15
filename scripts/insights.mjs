@@ -190,7 +190,22 @@ export function repeatFacts(m, surah) {
   const groups = new Map();
   for (const v of vs) groups.set(v.text, [...(groups.get(v.text) ?? []), v.a]);
   const best = [...groups.values()].sort((a, b) => b.length - a.length || a[0] - b[0])[0] ?? [];
-  return { surah, verses: vs.length, times: best.length, places: best, first: best[0] ?? null, last: best[best.length - 1] ?? null };
+  // the verses between one repeat and the next (R1): one, two, or three and more; and the verses before the first
+  const between = best.slice(1).map((a, i) => a - best[i] - 1);
+  const gaps = { one: between.filter((g) => g === 1).length, two: between.filter((g) => g === 2).length, more: between.filter((g) => g >= 3).length };
+  return { surah, verses: vs.length, times: best.length, places: best, first: best[0] ?? null, last: best[best.length - 1] ?? null, gaps, lead: best.length ? best[0] - 1 : 0 };
+}
+
+/**
+ * Letters in a row (R2–R4): the words of the whole text whose plain form holds these letters one
+ * after the other (code points, never a typed word), with their verses. Wide on purpose: a word
+ * the text never uses gets a zero under it, and a zero under a wide rule is a strong zero.
+ */
+export function lettersInRow(m, codes) {
+  const key = String.fromCodePoint(...codes);
+  const hits = [];
+  for (const v of m.verses) v.words.forEach((w, i) => (w.plain.includes(key) ? hits.push({ s: v.s, a: v.a, word: i }) : null));
+  return { words: hits.length, verses: uniq(hits.map((h) => `${h.s}:${h.a}`)).length, surahs: uniq(hits.map((h) => h.s)) };
 }
 
 /** The most repeated lines of all surahs, for choosing an episode (surah, times). */

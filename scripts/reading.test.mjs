@@ -104,7 +104,13 @@ const FIXTURES = {
     "same-place": [{ same: [1, 9, 54, 112, 113], count: 5 }],
     "fatiha-fifth": [{ surah: 1, order: 5, first: [96, 68, 73, 74, 1, 111] }],
   },
-  "one-line": { refrain: [{ surah: 55, verses: 78, times: 31, first: 13, last: 77 }] },
+  "one-line": {
+    refrain: [
+      { surah: 55, verses: 78, times: 31, first: 13, last: 77, one: 26, two: 4, more: 0, lead: 12 },
+      { surah: 77, verses: 50, times: 10, first: 15, last: 49, one: 2, two: 2, more: 5, lead: 14 },
+    ],
+  },
+  "word-choice": { sakan: [{ surah: 30, ayah: 21, form: 4, paired: 3, absent: 0, record: 13936 }] },
   "opening-letters": {
     group: [
       { surahs: 29, letters: 14, combinations: 14, alone: 10, surah: 19 },

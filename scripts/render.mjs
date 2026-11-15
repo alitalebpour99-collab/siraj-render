@@ -43,7 +43,7 @@ export function styleFor(props, env = process.env) {
  * The others keep the classic look, without the gate, until a sample of theirs passes;
  * SIRAJ_LAMP_INSIGHTS (a repository variable: a list, or «all») widens it.
  */
-export const LAMP_INSIGHTS = ["only", "myth-fact", "meccan-medinan", "one-line"];
+export const LAMP_INSIGHTS = ["only", "myth-fact", "meccan-medinan", "one-line", "word-choice"];
 
 /** What the gate compares the page with: the hash of every quote it may show, and the badge's window. */
 export function gatePlan(props, inputProps, timeline) {
@@ -58,6 +58,11 @@ export function gatePlan(props, inputProps, timeline) {
   // a verse Reel shows the basmala line and the rest of ayah 1 both (one quote); an insight only the rest
   if (props.kind === "verse") add(props.ayahs, props.opening, props.surah.number, true);
   if (props.kind === "insight" && props.recite) add(props.recite.ayahs, props.recite.opening, props.recite.surah.number, false);
+  // word-choice: the word (a span of the stored text) and the tafsir sentence, exactly as served
+  if (props.kind === "insight" && props.format === "word-choice") {
+    if (props.spans?.form) quotes.key = quoteHash(props.spans.form);
+    if (props.spans?.tafsir) quotes.tafsir = quoteHash(props.spans.tafsir);
+  }
   const total = timeline.total;
   const badgeOn = Boolean(inputProps.style?.badge);
   let badge = null;
@@ -158,7 +163,7 @@ function moments(props, inputProps, timeline) {
 export async function renderJob(job, { stills = false, frames = process.env.FRAMES === "1" } = {}) {
   const { props, voice, qari, inputProps, timeline, style } = inputsOf(job);
   // an insight or a waiting template is named by its format (fa-nahj-hikma, en-mirror …)
-  const want = props.kind === "insight" || props.kind === "waiting" ? `${props.lang}-${props.format}` : `${props.lang}-${props.kind}`;
+  const want = props.kind === "insight" || props.kind === "waiting" ? `${props.lang}-${props.format}` : props.kind === "verse" && props.night ? `${props.lang}-night-verse` : `${props.lang}-${props.kind}`;
   check(job.composition === want, `the job's composition ${job.composition} is ${want}`);
   const out = path.resolve("out");
   const frameDir = path.join(out, "frames");

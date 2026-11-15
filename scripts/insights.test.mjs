@@ -4,7 +4,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { INSIGHTS, insightIds } from "./episodes.mjs";
-import { ALPHABET, findForm, firstLetterWords, formWords, letterCount, middleFacts, model, plain, repeatFacts, variants, wordsOf } from "./insights.mjs";
+import { ALPHABET, findForm, firstLetterWords, formWords, letterCount, lettersInRow, middleFacts, model, plain, repeatFacts, variants, wordsOf } from "./insights.mjs";
+import { NIGHT_SERIES, NIGHT_THEMES } from "../src/night.ts";
+import { wordsOf as screenWords } from "../src/lamp/zones.ts";
+import { verseTimeline } from "../src/timelines.ts";
 import { safeFrame } from "../src/layout.ts";
 import { insightTimeline, speakerWindows } from "../src/timelines.ts";
 
@@ -59,7 +62,58 @@ test("forms are locators; prefixes only when asked", () => {
 
 test("repeats are exact equality of the stored verses", () => {
   const { m } = fake();
-  assert.deepEqual(repeatFacts(m, 2), { surah: 2, verses: 3, times: 2, places: [2, 3], first: 2, last: 3 });
+  assert.deepEqual(repeatFacts(m, 2), { surah: 2, verses: 3, times: 2, places: [2, 3], first: 2, last: 3, gaps: { one: 0, two: 0, more: 0 }, lead: 1 });
+});
+
+test("one line: the distances between repeats are counted in verses between them", () => {
+  // a made-up surah of 9 verses whose line stands at 2, 4, 7 and 8
+  const R = `${B} ${Cw}`;
+  const ayahs = Array.from({ length: 9 }, (_, i) => ({ n: i + 1, text: [2, 4, 7, 8].includes(i + 1) ? R : `${A} ${L(0x641 + i)}` }));
+  const index = { surahs: [{ surahNumber: 1, ayahCount: 9, revelationPlace: "meccan", revelationOrder: 1, nameArabic: "s1" }] };
+  const meta = { pages: [{ index: 1, sura: 1, aya: 1 }], juzs: [{ index: 1, sura: 1, aya: 1 }], suras: [{ tname: "t1" }] };
+  const m = model(index, meta, { surahs: [{ n: 1, ayahs }] });
+  const f = repeatFacts(m, 1);
+  assert.deepEqual(f.places, [2, 4, 7, 8]);
+  assert.deepEqual(f.gaps, { one: 1, two: 1, more: 0 }); // 4−2−1 = 1, 7−4−1 = 2, 8−7−1 = 0 (side by side: none of the three)
+  assert.equal(f.lead, 1);
+});
+
+test("letters in a row: inside any word, marks ignored; a zero when no word holds them", () => {
+  const { m } = fake();
+  // ت ج ح never stand in a row in the fake text; ب ت (inside A) do
+  assert.equal(lettersInRow(m, [0x62a, 0x62c, 0x62d]).words, 0);
+  const bt = lettersInRow(m, [0x628, 0x62a]);
+  assert.ok(bt.words > 0 && bt.verses > 0 && bt.surahs.length > 0);
+});
+
+test("word-choice is approve-each and Persian only; its scenes recite the ayah twice", () => {
+  const def = INSIGHTS["word-choice"];
+  assert.equal(def.approveEach, true);
+  assert.deepEqual(def.episodes.sakan.langs, ["fa"]);
+  assert.deepEqual(def.scenes.map((x) => x.id).filter((id) => id === "recite" || id === "again"), ["recite", "again"]);
+  const voice = { engine: "elevenlabs", voice: "x", lines: [] };
+  const qari = { basmala: null, verses: [{ id: "q1", ayah: 21, file: "q.wav", seconds: 5 }] };
+  const t = insightTimeline({ scenes: def.scenes, narration: [], voice, qari, loop: true });
+  assert.equal(t.speakers.filter((x) => x.kind === "qari").length, 2);
+  assert.equal(speakerWindows(t.speakers).overlap, null);
+});
+
+test("tonight's verse: short titles, mercy only, one second after the qari, no narrator", () => {
+  const ids = new Set();
+  for (const th of NIGHT_THEMES) {
+    assert.ok(!ids.has(th.id), th.id);
+    ids.add(th.id);
+    assert.ok(th.from >= 1 && th.to >= th.from && th.to - th.from <= 1, th.id);
+    for (const lang of ["fa", "en"]) assert.ok(screenWords(th.title[lang]).length + screenWords(NIGHT_SERIES[lang]).length <= 7, `${th.id} ${lang}: 7 framing words at most`);
+  }
+  const ayahs = [{ ayahNumber: 28, text: `${A} ${B}`, translation: "x".repeat(200), locator: "", textHashSha256: "" }];
+  const qari = { source: "quran-com-public", previewOnly: true, recitationId: 7, reciter: { name: "r", style: null, qirat: null }, basmala: null, verses: [{ id: "q", ayah: 28, file: "q.wav", seconds: 6, mode: "word", words: [], sirajWords: 2, qfWords: 2, verseKey: "13:28" }], fallbacks: [] };
+  const night = verseTimeline({ ayahs, qari, voice: { engine: "none", voice: null, lines: [] }, style: { lamp: true }, night: NIGHT_THEMES[0] });
+  const plainT = verseTimeline({ ayahs, qari, voice: { engine: "none", voice: null, lines: [] }, style: { lamp: true } });
+  const c = night.cards[0];
+  assert.ok(c.narrEnd - c.qariEnd <= 40, `about a second after the qari (${c.narrEnd - c.qariEnd} frames)`);
+  assert.ok(night.total < plainT.total);
+  assert.equal(night.speakers.filter((x) => x.kind === "narrator").length, 0);
 });
 
 test("the middle by verses, words and letters", () => {

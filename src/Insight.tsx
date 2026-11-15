@@ -543,6 +543,8 @@ const Hero: React.FC<{ p: InsightProps; f: number; cover?: boolean }> = ({ p, f,
       );
     case "quiz":
       return <Options p={p} f={f} at={cover ? -999 : 6} reveal={0} />;
+    case "word-choice":
+      return <KeyWord p={p} f={f} at={at + 6} size={140} />;
     default:
       return null;
   }
@@ -1281,9 +1283,10 @@ const EndView: React.FC<ViewProps> = ({ p, s }) => {
     // the lamp style (review of 2026-11-14): the sources as one line large enough to read; the
     // publisher's titles, the licence and the «synthetic voice» label are in the caption
     const qariName = p.qari ? (fa ? (QARI_FA[p.qari.recitationId] ?? null) : p.qari.reciter.name) : null;
+    const tafsirWork = p.format === "word-choice" ? ((p.data.tafsirSource as { work?: string } | undefined)?.work ?? null) : null;
     const line = fa
-      ? [`متن قرآن از ${L.fa.tanzil}`, tr ? `ترجمهٔ ${tr.translatorName}` : null, qariName ? `تلاوت ${qariName}` : null].filter(Boolean).join("، ")
-      : [`Text: ${q.publisher}`, tr ? `Translation: ${tr.translatorName}` : null, qariName ? `Recitation: ${qariName}` : null].filter(Boolean).join(". ");
+      ? [`متن قرآن از ${L.fa.tanzil}`, tr ? `ترجمهٔ ${tr.translatorName}` : null, qariName ? `تلاوت ${qariName}` : null, tafsirWork ? `تفسیر از ${tafsirWork}` : null].filter(Boolean).join("، ")
+      : [`Text: ${q.publisher}`, tr ? `Translation: ${tr.translatorName}` : null, qariName ? `Recitation: ${qariName}` : null, tafsirWork ? `Tafsir: ${tafsirWork}` : null].filter(Boolean).join(". ");
     return (
       <AbsoluteFill>
         <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: BAND.visTop, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", gap: 34 }}>
@@ -1371,6 +1374,150 @@ const EndView: React.FC<ViewProps> = ({ p, s }) => {
   );
 };
 
+/* ---------- Why this word? (2026-11-15) and One Line's distances ---------- */
+
+/** Letters as tiles (code points from the episode: a root, a word the text never uses); `crossed` draws them faint with a line through. */
+const LetterTiles: React.FC<{ codes: number[]; f: number; at: number; size?: number; crossed?: boolean }> = ({ codes, f, at, size = 96, crossed }) => (
+  <div dir="rtl" style={{ display: "flex", gap: 18, justifyContent: "center", position: "relative" }}>
+    {codes.map((code, i) => {
+      const k = ramp(f, at + i * 8, 16);
+      return (
+        <div key={i} style={{ width: size + 30, height: size + 40, display: "grid", placeItems: "center", borderRadius: 18, border: `2px solid ${C.gold}`, background: `rgba(224,172,79,${crossed ? 0.04 : (0.08 + 0.18 * k).toFixed(2)})`, opacity: c01(k * 2), transform: `translateY(${((1 - k) * 18).toFixed(1)}px)` }}>
+          <span lang="ar" style={{ fontFamily: FONT.quran, fontSize: lz(size * 0.7), lineHeight: 1, color: C.star, paddingBottom: size * 0.14 }}>
+            {String.fromCodePoint(code)}
+          </span>
+        </div>
+      );
+    })}
+    {crossed ? <div style={{ position: "absolute", top: "50%", left: -12, right: -12, height: 5, borderRadius: 3, background: C.brass, transform: `scaleX(${ramp(f, at + 30, 18).toFixed(3)}) rotate(-6deg)` }} /> : null}
+  </div>
+);
+
+/** The word of the ayah, large, with its reference (a quote of the stored text never stands without its source). */
+const KeyWord: React.FC<{ p: InsightProps; f: number; at: number; size?: number }> = ({ p, f, at, size = 128 }) => {
+  const r = p.recite;
+  if (!p.spans.form || !r) return null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, opacity: ramp(f, at, 16) }}>
+      <div lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, fontSize: size, lineHeight: 1.6, color: C.star, textShadow: flags.glow ? "0 0 28px rgba(224,172,79,0.45)" : undefined }}>
+        <span data-role="quote" data-q="key">{p.spans.form}</span>
+      </div>
+      <Label lang={p.lang} size={40} color={C.gold}>
+        <span data-role="source" dir="ltr">{refIn(p.lang, `${r.surah.number}:${r.from}`)}</span>
+      </Label>
+    </div>
+  );
+};
+
+/** The word, its root, and the other places of the same written form (those with the night marked). */
+const WordView: React.FC<ViewProps> = ({ p, s }) => {
+  const f = useCurrentFrame();
+  const w = I_WORDS[p.lang];
+  const out = c01((s.dur - f) / ST.OUT);
+  const refs = strs(p.data.refs);
+  const paired = new Set(strs(p.data.paired));
+  const placesAt = lineAt(s, "places", 70);
+  return (
+    <AbsoluteFill style={{ opacity: out }}>
+      <div style={{ position: "absolute", top: BAND.visTop - 20, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", gap: 22 }}>
+        <KeyWord p={p} f={f} at={0} size={118} />
+        <Label lang={p.lang} size={42} color={C.quiet}>{w.root}</Label>
+        <LetterTiles codes={arr(p.data.root)} f={f} at={10} size={84} />
+        <div dir={p.lang === "fa" ? "rtl" : "ltr"} style={{ display: "flex", gap: 16, flexWrap: "wrap", justifyContent: "center", maxWidth: 900, marginTop: 10 }}>
+          {refs.map((r, i) => {
+            const k = ramp(f, placesAt + i * 9, 14);
+            const own = i === refs.findIndex((x) => !paired.has(x));
+            return (
+              <div key={r} style={{ padding: "8px 22px", borderRadius: 999, border: `2px solid ${own ? C.brass : C.gold}`, background: own ? "rgba(224,172,79,0.22)" : "transparent", opacity: c01(k * 2), fontFamily: ui(p.lang), fontSize: lz(40), color: C.ink, direction: "ltr" }}>
+                {refIn(p.lang, r)}
+              </div>
+            );
+          })}
+        </div>
+        <Label lang={p.lang} size={40} color={C.gold} style={{ opacity: ramp(f, placesAt + refs.length * 9, 14) }}>
+          {`${nIn(p.lang, refs.length)} ${w.times}${sep(p.lang)}${w.sameForm}`}
+        </Label>
+      </div>
+      <Captions s={s} lang={p.lang} />
+    </AbsoluteFill>
+  );
+};
+
+/** A word the text never uses: its letters crossed, and the zero counted under the wide rule. */
+const AbsentView: React.FC<ViewProps> = ({ p, s }) => {
+  const f = useCurrentFrame();
+  const w = I_WORDS[p.lang];
+  const out = c01((s.dur - f) / ST.OUT);
+  return (
+    <AbsoluteFill style={{ opacity: out }}>
+      <div style={{ position: "absolute", top: BAND.visTop + 20, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", gap: 30 }}>
+        <LetterTiles codes={arr(p.data.absentLetters)} f={f} at={4} size={110} crossed />
+        <BigNumber lang={p.lang} value={Number(p.numbers.absent)} f={f} at={30} size={230} />
+        <Label lang={p.lang} size={44} color={C.translation}>{w.lettersInRow}</Label>
+      </div>
+      <Captions s={s} lang={p.lang} />
+    </AbsoluteFill>
+  );
+};
+
+/** One sentence of a named tafsir, exactly as Siraj serves it, under the lamp; its source with it. */
+const TafsirView: React.FC<ViewProps> = ({ p, s }) => {
+  const f = useCurrentFrame();
+  const w = I_WORDS[p.lang];
+  const out = c01((s.dur - f) / ST.OUT);
+  const text = p.spans.tafsir ?? "";
+  const src = (p.data.tafsirSource ?? {}) as { work?: string; author?: string };
+  const r = p.recite;
+  const ref = r ? (p.lang === "fa" ? `سورهٔ ${r.surah.nameArabic}، آیهٔ ${faNum(r.from)}` : `${r.surah.number}:${r.from}`) : "";
+  const fa = p.lang === "fa";
+  return (
+    <AbsoluteFill style={{ opacity: out }}>
+      <div style={{ position: "absolute", top: BAND.visTop - 30, left: 0, width: W, height: BAND.visBottom - BAND.visTop + 40, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 26 }}>
+        <div data-fill="lamp" style={{ opacity: ramp(f, 0, 14) }}>
+          <Emblem size={96} warm={0.85} />
+        </div>
+        <div style={{ opacity: ramp(f, 4, 16) }}>
+          <Fit width={860} maxHeight={470} max={lz(56)} min={lz(40)} measureKey={text} lang="fa" dir="rtl" style={{ fontFamily: FONT.naskh, fontWeight: 600, lineHeight: 1.8, textAlign: "center", textWrap: "balance", color: C.translation }}>
+            <span data-role="quote" data-q="tafsir">{text}</span>
+          </Fit>
+        </div>
+        <div data-role="source" dir={fa ? "rtl" : "ltr"} style={{ opacity: ramp(f, 4, 16), fontFamily: ui(p.lang), fontSize: lz(40), color: C.gold, textAlign: "center", maxWidth: 860, lineHeight: 1.5 }}>
+          {w.tafsirOf(src.work ?? "", src.author ?? "", ref)}
+        </div>
+      </div>
+      <Captions s={s} lang={p.lang} />
+    </AbsoluteFill>
+  );
+};
+
+/** One Line: how far apart the repeats stand, in verses (one, two, three or more between), and the verses before the first. */
+const GapsView: React.FC<ViewProps> = ({ p, s }) => {
+  const f = useCurrentFrame();
+  const w = I_WORDS[p.lang];
+  const n = p.numbers;
+  const out = c01((s.dur - f) / ST.OUT);
+  const cols = [Number(n.one ?? 0), Number(n.two ?? 0), Number(n.more ?? 0)].map((v, i) => ({ v, label: w.gap[i]! })).filter((c) => c.v > 0);
+  return (
+    <AbsoluteFill style={{ opacity: out }}>
+      <div style={{ position: "absolute", top: BAND.visTop, left: 0, width: W, display: "flex", flexDirection: "column", alignItems: "center", gap: 40 }}>
+        <Label lang={p.lang} size={44} color={C.gold}>{w.between}</Label>
+        <div dir={p.lang === "fa" ? "rtl" : "ltr"} style={{ display: "flex", gap: 70, alignItems: "flex-end", justifyContent: "center" }}>
+          {cols.map((c, i) => (
+            <div key={c.label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+              <BigNumber lang={p.lang} value={c.v} f={f} at={8 + i * 10} size={cols.length > 2 ? 170 : 210} suffix="×" />
+              <Label lang={p.lang} size={44}>{c.label}</Label>
+            </div>
+          ))}
+        </div>
+        <Label lang={p.lang} size={42} color={C.translation} style={{ opacity: ramp(f, 40, 14) }}>
+          {w.lead(nIn(p.lang, Number(n.lead ?? 0)))}
+        </Label>
+      </div>
+      <Captions s={s} lang={p.lang} />
+    </AbsoluteFill>
+  );
+};
+
 const VIEWS: Record<string, React.FC<ViewProps>> = {
   hook: HookView,
   claim: HookView,
@@ -1383,6 +1530,11 @@ const VIEWS: Record<string, React.FC<ViewProps>> = {
   columns: ColumnsView,
   ladder: LadderView,
   recite: ReciteView,
+  again: ReciteView,
+  word: WordView,
+  absent: AbsentView,
+  tafsir: TafsirView,
+  gaps: GapsView,
   think: ThinkView,
   answer: AnswerView,
   note: VerdictView,
@@ -1505,7 +1657,7 @@ export const InsightReel: React.FC<InsightProps> = (raw) => {
       )}
       {t.scenes.flatMap((s) =>
         s.clips.map((c) => (
-          <Sequence key={`q-${c.id}`} from={c.from} durationInFrames={c.len + 2} name={`qari ${c.id}`}>
+          <Sequence key={`q-${s.id}-${c.id}`} from={c.from} durationInFrames={c.len + 2} name={`qari ${c.id}`}>
             <Audio src={staticFile(c.file)} />
           </Sequence>
         )),

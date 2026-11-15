@@ -127,7 +127,12 @@ export type VerseProps = {
   studio?: Studio;
   /** the set style of 2026-11-14 (render.mjs: SIRAJ_STYLE, SIRAJ_BADGE); absent = the classic look */
   style?: SetStyle;
+  /** «یک آیه برای امشب» (2026-11-15): the theme's title on screen from frame 0, no narrator (src/night.ts) */
+  night?: NightTheme | null;
 };
+
+/** A theme of «یک آیه برای امشب»: its id, its ayah and its titles (src/night.ts). */
+export type NightTheme = { id: string; surah: number; from: number; to: number; title: Record<Lang, string> };
 
 /* ---------- Counts and the surah card ---------- */
 
@@ -198,7 +203,7 @@ export type Studio = {
 
 /* ---------- The insight formats (S3b) ---------- */
 
-export type InsightFormat = "only" | "myth-fact" | "meccan-medinan" | "counted" | "mushaf-map" | "middle" | "revelation-order" | "one-line" | "opening-letters" | "every-letter" | "names" | "closing-names" | "quiz";
+export type InsightFormat = "only" | "myth-fact" | "meccan-medinan" | "counted" | "mushaf-map" | "middle" | "revelation-order" | "one-line" | "opening-letters" | "every-letter" | "names" | "closing-names" | "quiz" | "word-choice";
 
 /** One scene of an insight video: the narration ids it carries, its shortest length (frames). */
 export type ScenePlan = { id: string; lines: string[]; min: number };
@@ -224,7 +229,7 @@ export type InsightProps = {
   surahs: IndexSurah[];
   pages: number;
   /** spans of the stored text the picture shows (a counted form, the opening letters), exactly as served */
-  spans: { form: string | null; groups: string[] };
+  spans: { form: string | null; groups: string[]; tafsir?: string };
   narration: Narration[];
   recite: Recite | null;
   source: { quran: Release; surahMetadata: MetadataSource };

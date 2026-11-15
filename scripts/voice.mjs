@@ -34,6 +34,8 @@ function failureShape(log) {
 
 /** The lines to voice, with their texts in memory only. */
 export function linesOf(props, free) {
+  // «یک آیه برای امشب»: the qari and the translation on screen only, no narrator
+  if (props.kind === "verse" && props.night) return [];
   if (props.kind === "verse") return props.ayahs.map((a) => ({ id: `a${a.ayahNumber}`, text: a.translation }));
   return props.narration.map((n) => ({ id: n.id, text: free ? spoken(n.say, props.lang) : n.say }));
 }
