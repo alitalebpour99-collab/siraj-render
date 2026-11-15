@@ -11,7 +11,8 @@ import { Lamp, World } from "./light";
 import { Cartouche, Divider, MushafFrame, Seal, SirajMark } from "./ornament";
 import type { CardProps, CountsProps, Lang, VerseProps } from "./props";
 import { applyStudio } from "./studio";
-import { C, FONT } from "./theme";
+import { C, FONT, faNum } from "./theme";
+import { NIGHT_SERIES } from "./night";
 import { Ground } from "./lamp/kit";
 import { COL_X } from "./lamp/zones";
 
@@ -52,6 +53,21 @@ const LampVerseCover: React.FC<VerseProps> = (p) => {
   const ui = uiFont(p.lang);
   const unit = p.whole ? t.verses(p.surah.ayahCount) : t.range(p.from, p.to);
   const x = tall ? COL_X : 540;
+  if (p.night) {
+    // «یک آیه برای امشب»: the series, the theme large, the surah and the ayah
+    const ref = fa ? `سورهٔ ${p.surah.nameArabic}، ${p.from === p.to ? `آیهٔ ${faNum(p.from)}` : `آیه‌های ${faNum(p.from)} و ${faNum(p.to)}`}` : `Surah ${p.surah.tname} ${p.surah.number}:${p.from === p.to ? p.from : `${p.from}–${p.to}`}`;
+    return (
+      <AbsoluteFill style={{ background: C.night }}>
+        <Ground total={1} still lamp={{ x, y: tall ? 520 : 250, size: tall ? 150 : 120 }} warm={0.95} />
+        <div dir={fa ? "rtl" : "ltr"} style={{ position: "absolute", top: tall ? 660 : 360, left: x - 400, width: 800, display: "flex", flexDirection: "column", alignItems: "center", gap: tall ? 30 : 20 }}>
+          <div style={{ fontFamily: ui, fontSize: tall ? 52 : 44, fontWeight: 600, color: C.gold }}>{NIGHT_SERIES[p.lang]}</div>
+          <div style={{ fontFamily: ui, fontSize: tall ? 104 : 86, fontWeight: 800, lineHeight: 1.35, color: C.star, textAlign: "center", textWrap: "balance" }}>{p.night.title[p.lang]}</div>
+          <div style={{ fontFamily: ui, fontSize: tall ? 52 : 44, color: C.translation, fontVariantNumeric: "lining-nums" }}>{ref}</div>
+        </div>
+        <div style={{ position: "absolute", bottom: tall ? 380 : 60, left: x - 300, width: 600, textAlign: "center", fontFamily: FONT.en, fontSize: tall ? 36 : 32, color: C.gold, letterSpacing: "0.04em" }}>{SITE}</div>
+      </AbsoluteFill>
+    );
+  }
   return (
     <AbsoluteFill style={{ background: C.night }}>
       <Ground total={1} still lamp={{ x, y: tall ? 520 : 250, size: tall ? 150 : 120 }} warm={0.9} />

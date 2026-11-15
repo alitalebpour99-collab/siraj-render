@@ -14,7 +14,9 @@ import { INSIGHTS, episodeOf, insightIds, scenesFor } from "./episodes.mjs";
 import { ALPHABET, OPENING_LETTER_SURAHS, endingFacts, firstLetterWords, formWords, model, wordsOf } from "./insights.mjs";
 import { API, DataChanged, UA, check, checkTrust, jobArg, releaseOf, runMain, same, sha256, siraj, sleep } from "./lib.mjs";
 import { cardNumbers, countNumbers, juzOf, loadTanzil } from "./tanzil.mjs";
-import { WAITING_FORMATS, waitingProps } from "./waiting.mjs";
+import { IO, WAITING_FORMATS, waitingProps } from "./waiting.mjs";
+import { tafsirSentence } from "./books.mjs";
+import { nightTheme } from "../src/night.ts";
 import { CARD_SCENES, COUNT_SCENES, planIds } from "../src/timelines.ts";
 
 /** The surah index of the exposed text release, checked as the service checks it. */
@@ -123,6 +125,12 @@ async function verseProps(job) {
     facts,
     studio: p.studio ?? null,
   };
+  // «یک آیه برای امشب»: the theme of the list (src/night.ts), its ayahs exactly those of the job
+  if (p.format === "night-verse") {
+    const theme = nightTheme(String(p.night?.theme ?? ""));
+    check(theme && theme.surah === p.surah && theme.from === p.from && theme.to === p.to && !p.whole, "night-verse: the theme and its ayahs");
+    props.night = theme;
+  }
   console.log(`${job.id}: verse ${p.surah}:${p.from}-${p.to} (${p.whole ? "whole" : "part"}), ${props.ayahs.length} ayahs, text ${e.textRelease}, translation ${tr.release?.releaseKey}`);
   console.log(`${job.id}: lengths (text/translation) ${props.ayahs.map((a) => `${a.text.length}/${a.translation.length}`).join(" ")}`);
   return props;
@@ -304,6 +312,21 @@ async function insightProps(job) {
   }
   if (p.format === "every-letter" && !data.alphabet) data.alphabet = ALPHABET;
   const spans = { form: null, groups: [] };
+  // «چرا این واژه؟»: ONE sentence of Tafsir Nemooneh, read again from Siraj's tafsir route, exactly
+  // as served; it must be the sentence the episode was chosen with (its SHA-256) and the record
+  // must cover the recited ayah
+  if (p.format === "word-choice") {
+    const t = data.tafsir;
+    const ex = await IO.exegesis(t.record);
+    const r = ex.range ?? {};
+    const at = (s, a) => s * 10_000 + a;
+    const here = at(recite.surah.number, recite.from);
+    check(at(r.startSurahNumber, r.startAyahNumber) <= here && here <= at(r.endSurahNumber, r.endAyahNumber), "word-choice: the tafsir record covers the ayah");
+    const sentence = tafsirSentence(ex.text, t.paragraph, t.sentence);
+    if (!sentence || sha256(sentence) !== t.sha256) throw new DataChanged("word-choice: the tafsir sentence");
+    spans.tafsir = sentence;
+    data.tafsirSource = { work: ex.workTitle, author: ex.author, locator: ex.locator ?? null, release: ex.release?.releaseKey ?? null };
+  }
   if (m && data.form) spans.form = formWords(m, data.form).text;
   if (m && data.ending) spans.form = endingFacts(m, data.ending).text;
   if (m && p.format === "opening-letters") {
@@ -351,7 +374,7 @@ async function insightProps(job) {
 /** props/<id>.json for one job; returns the props. */
 export async function fetchJob(job) {
   const format = job.props?.format;
-  const props = format === "verse" ? await verseProps(job) : format === "counts" ? await countsProps(job) : format === "surah-card" ? await cardProps(job) : INSIGHTS[format] ? await insightProps(job) : WAITING_FORMATS.has(format) ? await waitingProps(job) : null;
+  const props = format === "verse" || format === "night-verse" ? await verseProps(job) : format === "counts" ? await countsProps(job) : format === "surah-card" ? await cardProps(job) : INSIGHTS[format] ? await insightProps(job) : WAITING_FORMATS.has(format) ? await waitingProps(job) : null;
   check(props, `a format this renderer draws (${format})`);
   props.sourceApi = API;
   props.fetchedAt = new Date().toISOString();

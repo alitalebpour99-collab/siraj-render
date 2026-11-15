@@ -7,7 +7,7 @@
 //
 // The research behind the list: siraj-social/research/viral-insights.md (top 12, §6); its
 // approve-first ideas are marked `needsApproval` and are never planned by the clock.
-import { OPENING_LETTER_SURAHS, basmalaFacts, endingFacts, everyLetterFacts, findForm, formFacts, middleFacts, nameFacts, onlyFacts, openingFacts, orderFacts, placeFacts, repeatFacts } from "./insights.mjs";
+import { OPENING_LETTER_SURAHS, basmalaFacts, endingFacts, everyLetterFacts, findForm, formFacts, lettersInRow, middleFacts, nameFacts, onlyFacts, openingFacts, orderFacts, placeFacts, repeatFacts } from "./insights.mjs";
 import { FA_SOURCE, faName, faNumberList, faOrdinal, faRef, faWords } from "./spoken.mjs";
 
 /* ---------- Forms (locators, never typed words; research R5) ---------- */
@@ -34,6 +34,25 @@ export const NAME_FORMS = {
 };
 export const ENDING_FORMS = {
   "ghafur-rahim": { verse: "2:173", last: 2 },
+};
+
+/**
+ * «چرا این واژه؟» (word-choice): per episode the word (a locator, the exact written form), the
+ * second form whose verses are named (a locator), the root and the absent word (code points of
+ * letters, no text), and ONE sentence of Tafsir Nemooneh: its record on Siraj's tafsir route,
+ * its paragraph and sentence (scripts/books.mjs sentencesOf) and the SHA-256 of the sentence as
+ * served on 2026-11-15; the renderer reads it again and stops when it differs. Chosen by a
+ * person, so every post waits for the owner's yes.
+ *   sakan: 30:21 «…لِتَسْكُنُوا إِلَيْهَا…» (word 9), the night (10:67 word 5), root s-k-n, absent ʿ-sh-q.
+ */
+export const WORD_CHOICE = {
+  sakan: {
+    form: { verse: "30:21", from: 8, to: 8 },
+    pair: { verse: "10:67", from: 4, to: 4 },
+    root: [0x633, 0x643, 0x646],
+    absent: [0x639, 0x634, 0x642],
+    tafsir: { record: 13936, paragraph: 25, sentence: 0, sha256: "595e9d1245fdadcee9f06df873bc740d83e650ef44bf24938ec5977ab56d74d7" },
+  },
 };
 
 /** A name's facts: occurrences, verses, surahs lit on the strip. */
@@ -405,31 +424,113 @@ export const INSIGHTS = {
   },
 
   "one-line": {
+    // «یک جمله، N بار» (viral formats of 2026-11-15, §4.3): the big number, the line once in the
+    // qari's voice, the surah's map with every repeat lit, then how far apart the repeats stand,
+    // counted in verses (one, two, three or more between), never what the verses between say.
     scenes: [
       { id: "hook", lines: ["hook"], min: 75 },
       { id: "recite", lines: [], min: 60 },
       { id: "ladder", lines: ["places"], min: 150 },
+      { id: "gaps", lines: ["gaps"], min: 120 },
       { id: "end", lines: ["end"], min: 75 },
     ],
     episodes: {
       refrain: {
         surah: 55,
         recite: "repeated",
+        // the surahs the planner may pick (repeats with at least two of the three distances; 55 and 77 on 2026-11-15)
+        picks: [55, 77],
         facts: ({ m }, ep) => {
           const f = repeatFacts(m, ep.surah);
-          return { numbers: { surah: ep.surah, verses: f.verses, times: f.times, first: f.first, last: f.last }, data: { places: f.places, verses: f.verses } };
+          return { numbers: { surah: ep.surah, verses: f.verses, times: f.times, first: f.first, last: f.last, one: f.gaps.one, two: f.gaps.two, more: f.gaps.more, lead: f.lead }, data: { places: f.places, verses: f.verses } };
         },
-        lines: (lang, n) =>
-          lang === "fa"
+        lines: (lang, n) => {
+          const fa = lang === "fa";
+          // the distances that occur, in order: «۲۶ بار یک آیه» …
+          const parts = [
+            [n.one, fa ? "یک آیه" : "one verse"],
+            [n.two, fa ? "دو آیه" : "two verses"],
+            [n.more, fa ? "سه آیه یا بیشتر" : "three or more"],
+          ].filter(([k]) => Number(k) > 0);
+          const gapsShow = fa
+            ? `میان دو تکرار: ${parts.map(([k, w]) => `${N(lang, k)} بار ${w}`).join("، ")}. پیش از بار اول: ${N(lang, n.lead)} آیه.`
+            : `Between two repeats: ${parts.map(([k, w]) => `${w}, ${N(lang, k)} times`).join("; ")}. Before the first: ${N(lang, n.lead)} verses.`;
+          const gapsSay = fa ? `میانِ دو تکرار، ${parts.map(([k, w]) => `${W(k)} بار ${w}`).join("، و ")} فاصله است. و پیش از بارِ اول، ${W(n.lead)} آیه.` : gapsShow;
+          return fa
             ? [
                 line("hook", `یک جمله، ${N(lang, n.times)} بار، در سوره‌ای ${N(lang, n.verses)} آیه‌ای.`, `یک جمله، ${W(n.times)} بار، در سوره‌ای با ${W(n.verses)} آیه.`),
                 line("places", `اول در آیهٔ ${faDigits(n.first)}، آخر در آیهٔ ${faDigits(n.last)}؛ همان جمله، حرف به حرف.`, `بارِ اول در آیهٔ ${W(n.first)}، و بارِ آخر در آیهٔ ${W(n.last)}. همان جمله، حرف به حرف.`),
+                line("gaps", gapsShow, gapsSay),
                 line("end", "آیه‌های یکسان در متن تنزیل پیدا شده‌اند، حرف به حرف.", `این آیه‌های یکسان در ${FA_SOURCE.text} پیدا شده‌اند، حرف به حرف.`),
               ]
             : [
                 line("hook", `One line, ${N(lang, n.times)} times, in a surah of ${N(lang, n.verses)} verses.`),
                 line("places", `First at verse ${n.first}, last at verse ${n.last}. The same line, letter for letter.`),
+                line("gaps", gapsShow),
                 line("end", "Found in the Tanzil text by exact equality of the verses.", "Found in the Tanzil Quran text by exact equality of the verses."),
+              ];
+        },
+      },
+    },
+  },
+
+  "word-choice": {
+    // «چرا این واژه؟» (viral formats of 2026-11-15, §4.1, approved by the owner): the question,
+    // the ayah in the qari's voice with the word light, the word, its root and the other places
+    // of the same written form (counted in the text), a word the text never uses (a zero under a
+    // wide rule), ONE sentence of a named tafsir exactly as Siraj serves it; the loop goes back to
+    // the question. (The second recitation of the brief was dropped after the first sample: the
+    // qari's 30:21 is about 30 s, and twice it made a two-minute Reel.)
+    // Interpretive: the hook, the root and the tafsir sentence were chosen by a person, so every
+    // post of this format waits for the owner's yes in the bot (the service: approveEach).
+    // Persian only: Siraj serves no English tafsir yet.
+    approveEach: true,
+    scenes: [
+      { id: "hook", lines: ["hook"], min: 75 },
+      { id: "recite", lines: [], min: 60 },
+      { id: "word", lines: ["root", "places"], min: 150 },
+      { id: "absent", lines: ["absent"], min: 105 },
+      { id: "tafsir", lines: ["tafsir"], min: 150 },
+      { id: "end", lines: ["end"], min: 75 },
+    ],
+    episodes: {
+      sakan: {
+        langs: ["fa"],
+        recite: { surah: 30, from: 21, to: 21 },
+        facts: ({ m }, ep) => {
+          const w = WORD_CHOICE[ep.word ?? "sakan"];
+          const f = findForm(m, w.form);
+          const [s, a] = w.form.verse.split(":").map(Number);
+          const refs = f.hits.map((h) => `${h.s}:${h.a}`);
+          if (!refs.includes(w.form.verse)) throw new Error("word-choice: the form is not in its own verse");
+          // the other places whose verse also holds the second form (the night, in this episode)
+          const withPair = new Set(findForm(m, w.pair).hits.map((h) => `${h.s}:${h.a}`));
+          const paired = refs.filter((r) => r !== w.form.verse && withPair.has(r));
+          const absent = lettersInRow(m, w.absent);
+          if (absent.words !== 0) throw new Error(`word-choice: the absent letters stand in ${absent.words} words`);
+          return {
+            numbers: { surah: s, ayah: a, form: f.hits.length, paired: paired.length, absent: absent.words, record: w.tafsir.record },
+            data: { form: w.form, refs, paired, root: w.root, absentLetters: w.absent, tafsir: w.tafsir },
+          };
+        },
+        lines: (lang, n) =>
+          lang === "fa"
+            ? [
+                line("hook", "چرا قرآن برای همسر گفت «آرامش»، نه «عشق»؟", "چرا قرآن برای همسر گفت آرامش، نه عشق؟", "چرا قرآن برای همسر گفت «آرامش»"),
+                line("root", "ریشهٔ این واژه «س ک ن» است: آرام گرفتن، ساکن شدن.", "ریشهٔ این واژه سین، کاف، نون است. یعنی آرام گرفتن، ساکن شدن."),
+                line("places", `همین واژه، به همین شکل، ${N(lang, n.form)} بار در قرآن آمده است؛ ${N(lang, n.paired)} بار دیگر در آیه‌ای که «شب» هم در آن هست.`, `همین واژه، به همین شکل، ${W(n.form)} بار در قرآن آمده است. ${W(n.paired)} بارِ دیگر، در آیه‌ای که نامِ شب هم در آن هست.`),
+                line("absent", `و واژه‌ای با سه حرف «ع ش ق» پشت سر هم، در همهٔ متن قرآن: ${N(lang, n.absent)} بار.`, "و واژه‌ای که سه حرفِ عین، شین، قاف پشت سر هم در آن باشد، حتی یک بار در متنِ قرآن نیامده است."),
+                line("tafsir", "تفسیر نمونه دربارهٔ این آیه:", "تفسیرِ نمونه می‌گوید. قرآن در این آیه، هدفِ ازدواج را سکون و آرامش قرار داده است."),
+                line("end", "شمرده از متن تنزیل؛ تفسیر از سایت سراج، عین متن.", `این عددها از ${FA_SOURCE.text} شمرده شده‌اند. و جملهٔ تفسیر، عینِ متنِ تفسیرِ نمونه است.`),
+              ]
+            : [
+                // the English page has no episode of this format (no English tafsir on Siraj yet); the lines exist for the tests
+                line("hook", "Why did the Quran say 'rest' for a spouse, not 'love'?", undefined, "Why did the Quran say 'rest'"),
+                line("root", "The root of this word is s-k-n: to rest, to settle."),
+                line("places", `The same word, in this very form, stands ${N(lang, n.form)} times in the Quran; ${N(lang, n.paired)} more times in a verse that also names the night.`),
+                line("absent", `And a word with the three letters ʿ-sh-q in a row stands ${N(lang, n.absent)} times in the text.`),
+                line("tafsir", "Tafsir Nemooneh on this verse:"),
+                line("end", "Counted from the Tanzil text; the tafsir sentence exactly as Siraj serves it."),
               ],
       },
     },

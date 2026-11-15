@@ -71,11 +71,13 @@ export type VerseTimeline = {
  * qari begins 0.6 s in), a shorter sources card that carries the channel badge, and a last
  * stretch that fades back into the first picture so the Reel loops.
  */
-export const VT_LAMP = { OUTRO: 150, LOOP: 18, BADGE: 66 };
+export const VT_LAMP = { OUTRO: 150, NIGHT_OUTRO: 105, LOOP: 18, BADGE: 66 };
+/** «یک آیه برای امشب»: the silence after the qari (with TR_GAP, NARR_AFTER_TR and BREATH, about a second). */
+export const NIGHT_SILENCE = 12;
 
 const byId = (voice: Voice | null | undefined) => new Map((voice?.lines ?? []).map((l) => [l.id, l]));
 
-export function verseTimeline(p: Pick<VerseProps, "ayahs" | "qari" | "voice"> & { style?: { lamp: boolean } | null }): VerseTimeline {
+export function verseTimeline(p: Pick<VerseProps, "ayahs" | "qari" | "voice"> & { style?: { lamp: boolean } | null; night?: unknown }): VerseTimeline {
   const lamp = Boolean(p.style?.lamp);
   const lines = byId(p.voice);
   const speakers: Speaker[] = [];
@@ -92,7 +94,8 @@ export function verseTimeline(p: Pick<VerseProps, "ayahs" | "qari" | "voice"> & 
     const narrAt = trAt + VT.NARR_AFTER_TR;
     const line = lines.get(`a${a.ayahNumber}`);
     // without a voice, the time a calm reader needs for the translation
-    const speak = line ? fr(line.seconds) : Math.max(60, 24 + Math.ceil(a.translation.length * 2.4));
+    // «یک آیه برای امشب»: the translation stands with the ayah while the qari recites, then one second of silence
+    const speak = line ? fr(line.seconds) : p.night && clip ? NIGHT_SILENCE : Math.max(60, 24 + Math.ceil(a.translation.length * 2.4));
     const narrEnd = narrAt + speak;
     // the last XF frames of a card are its cross-fade into the next one
     const dur = Math.max(VT.MIN_CARD, narrEnd + VT.BREATH + VT.XF);
@@ -103,7 +106,9 @@ export function verseTimeline(p: Pick<VerseProps, "ayahs" | "qari" | "voice"> & 
     at += dur - VT.XF;
     return card;
   });
-  if (lamp) return { intro: { from: 0, dur: 0 }, cards, outro: { from: at, dur: VT_LAMP.OUTRO }, loop: VT_LAMP.LOOP, total: at + VT_LAMP.OUTRO + VT_LAMP.LOOP, speakers };
+  // «یک آیه برای امشب»: a short Reel, so a shorter close (the sources line and the badge still fit)
+  const outro = p.night ? VT_LAMP.NIGHT_OUTRO : VT_LAMP.OUTRO;
+  if (lamp) return { intro: { from: 0, dur: 0 }, cards, outro: { from: at, dur: outro }, loop: VT_LAMP.LOOP, total: at + outro + VT_LAMP.LOOP, speakers };
   return { intro: { from: 0, dur: VT.INTRO }, cards, outro: { from: at, dur: VT.OUTRO }, loop: 0, total: at + VT.OUTRO, speakers };
 }
 
@@ -225,7 +230,8 @@ export function insightTimeline(p: { scenes: ScenePlan[]; narration: Narration[]
   const scenes = p.scenes.map((s, si): InsightScene => {
     let cursor = at + (si === 0 ? IT.FIRST : ST.IN + ST.LEAD);
     const clips: ReciteClip[] = [];
-    if (s.id === "recite" && p.qari) {
+    // «again» (word-choice): the same ayah once more, after «حالا دوباره بشنو»
+    if ((s.id === "recite" || s.id === "again") && p.qari) {
       cursor = at + IT.CLIP_IN;
       for (const c of [p.qari.basmala ?? null, ...p.qari.verses].filter((x): x is NonNullable<typeof x> => Boolean(x))) {
         const len = fr(c.seconds);

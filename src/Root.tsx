@@ -107,7 +107,7 @@ const emptyInsight = (lang: Lang, format: InsightFormat): InsightProps => ({
 });
 
 /** The insight formats of S3b (one composition each per language, with covers and slides). */
-export const INSIGHT_FORMATS: InsightFormat[] = ["only", "myth-fact", "meccan-medinan", "counted", "mushaf-map", "middle", "revelation-order", "one-line", "opening-letters", "every-letter", "names", "closing-names", "quiz"];
+export const INSIGHT_FORMATS: InsightFormat[] = ["only", "myth-fact", "meccan-medinan", "counted", "mushaf-map", "middle", "revelation-order", "one-line", "opening-letters", "every-letter", "names", "closing-names", "quiz", "word-choice"];
 
 const reel = { width: W, height: H, fps: FPS };
 const grid = { width: 1080, height: 1350, fps: FPS };
@@ -120,6 +120,10 @@ export const Root: React.FC = () => (
         <Composition id={`${lang}-verse`} component={VerseAny} {...reel} durationInFrames={300} defaultProps={emptyVerse(lang)} calculateMetadata={({ props }) => ({ durationInFrames: verseTimeline(props).total })} />
         <Composition id={`${lang}-verse-cover`} component={VerseCover} {...reel} durationInFrames={1} defaultProps={emptyVerse(lang)} />
         <Composition id={`${lang}-verse-grid`} component={VerseCover} {...grid} durationInFrames={1} defaultProps={emptyVerse(lang)} />
+        {/* «یک آیه برای امشب» (2026-11-15): the verse Reel with the night's theme, no narrator */}
+        <Composition id={`${lang}-night-verse`} component={VerseAny} {...reel} durationInFrames={300} defaultProps={emptyVerse(lang)} calculateMetadata={({ props }) => ({ durationInFrames: verseTimeline(props).total })} />
+        <Composition id={`${lang}-night-verse-cover`} component={VerseCover} {...reel} durationInFrames={1} defaultProps={emptyVerse(lang)} />
+        <Composition id={`${lang}-night-verse-grid`} component={VerseCover} {...grid} durationInFrames={1} defaultProps={emptyVerse(lang)} />
         <Composition id={`${lang}-counts`} component={CountsReel} {...reel} durationInFrames={300} defaultProps={emptyCounts(lang)} calculateMetadata={({ props }) => ({ durationInFrames: countsTimeline(props).total })} />
         <Composition id={`${lang}-counts-cover`} component={CountsCover} {...reel} durationInFrames={1} defaultProps={emptyCounts(lang)} />
         <Composition id={`${lang}-counts-grid`} component={CountsCover} {...grid} durationInFrames={1} defaultProps={emptyCounts(lang)} />

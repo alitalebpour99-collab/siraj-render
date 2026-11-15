@@ -20,6 +20,7 @@ export const FORMAT_NAME: Record<InsightFormat, Words> = {
   names: { en: "Named in the Quran", fa: "نام‌ها در قرآن" },
   "closing-names": { en: "Names that close verses", fa: "نام‌های پایان آیه" },
   quiz: { en: "Quiz", fa: "مسابقه" },
+  "word-choice": { en: "Why this word?", fa: "چرا این واژه؟" },
 };
 
 /** The chip at the top: the series with its number, or the format's name. */
@@ -67,7 +68,7 @@ export function ruleOf(format: InsightFormat, episode: string, lang: Lang, numbe
     case "revelation-order":
       return fa ? "ترتیب نزولی که فرادادهٔ تنزیل آورده: یکی از ترتیب‌های سنتی، در کنار فهرست‌های دیگر" : "The revelation order listed in the Tanzil metadata: one traditional order among others";
     case "one-line":
-      return fa ? j([TANZIL.fa, "آیه‌هایی که حرف به حرف یکسان‌اند، با اعراب"]) : j([TANZIL.en, "verses equal letter for letter, marks included"]);
+      return fa ? j([TANZIL.fa, "آیه‌هایی که حرف به حرف یکسان‌اند، با اعراب", "فاصله: شمار آیه‌های میان دو تکرار"]) : j([TANZIL.en, "verses equal letter for letter, marks included", "distance: the verses between two repeats"]);
     case "opening-letters":
       return fa ? j(["فهرست ۲۹ سوره: شماره‌ها", "حروف: نخستین کلمهٔ آیهٔ نخست (و آیهٔ دوم، اگر آن هم یک کلمه باشد)", "بی بسم‌الله"]) : j(["the 29 surahs: a list of numbers", "the letters: the first word of verse 1 (and of verse 2 when that is one word too)", "the Basmala not counted"]);
     case "every-letter":
@@ -80,6 +81,10 @@ export function ruleOf(format: InsightFormat, episode: string, lang: Lang, numbe
       return fa ? j([TANZIL.fa, "دو کلمهٔ پایانی هر آیه، بی اعتنا به اعراب"]) : j([TANZIL.en, "the last two words of each verse, vowel marks ignored"]);
     case "quiz":
       return fa ? "از متن و فرادادهٔ تنزیل" : "From the Tanzil text and metadata";
+    case "word-choice":
+      return fa
+        ? j([TANZIL.fa, "واژه با همان شکل نوشتاری، بی اعتنا به اعراب", "سه حرف پشت سر هم درون هر کلمه", "تفسیر: یک جمله، عین متن"])
+        : j([TANZIL.en, "the word in its exact written form, marks ignored", "three letters in a row inside any word", "tafsir: one sentence, exactly as served"]);
     default:
       return fa ? TANZIL.fa : TANZIL.en;
   }
@@ -122,6 +127,15 @@ export const I_WORDS = {
     // Every Letter (S3e): what the narrator said before, now on screen (the qari fills the minute)
     everyTitle: (verses: string, letters: string) => `One of ${verses} verses that hold all ${letters} letters`,
     everyOther: (refs: string) => `The other: ${refs}`,
+    // Why this word? and One Line's distances (2026-11-15)
+    root: "the root",
+    lettersInRow: "three letters in a row, in the whole text",
+    sameForm: "the same written form",
+    withNight: "with the night in the same verse",
+    tafsirOf: (work: string, author: string, ref: string) => `${work}, ${author}, on ${ref}`,
+    between: "verses between two repeats",
+    gap: ["one", "two", "three or more"],
+    lead: (n: string) => `${n} verses before the first`,
   },
   fa: {
     claim: "ادعا",
@@ -158,5 +172,13 @@ export const I_WORDS = {
     with: "با آن",
     everyTitle: (verses: string, letters: string) => `یکی از ${verses} آیه‌ای که هر ${letters} حرف الفبا را دارند`,
     everyOther: (refs: string) => `آیهٔ دیگر: ${refs}`,
+    root: "ریشه",
+    lettersInRow: "سه حرف پشت سر هم، در همهٔ متن",
+    sameForm: "همین شکل نوشتاری",
+    withNight: "با «شب» در همان آیه",
+    tafsirOf: (work: string, author: string, ref: string) => `${work}، ${author}، ذیل ${ref}`,
+    between: "آیه‌های میان دو تکرار",
+    gap: ["یک آیه", "دو آیه", "سه یا بیشتر"],
+    lead: (n: string) => `${n} آیه پیش از بار اول`,
   },
 };
