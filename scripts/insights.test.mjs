@@ -86,15 +86,15 @@ test("letters in a row: inside any word, marks ignored; a zero when no word hold
   assert.ok(bt.words > 0 && bt.verses > 0 && bt.surahs.length > 0);
 });
 
-test("word-choice is approve-each and Persian only; its scenes recite the ayah twice", () => {
+test("word-choice is approve-each and Persian only; the ayah is recited once (a 30 s ayah twice made a two-minute Reel)", () => {
   const def = INSIGHTS["word-choice"];
   assert.equal(def.approveEach, true);
   assert.deepEqual(def.episodes.sakan.langs, ["fa"]);
-  assert.deepEqual(def.scenes.map((x) => x.id).filter((id) => id === "recite" || id === "again"), ["recite", "again"]);
+  assert.deepEqual(def.scenes.map((x) => x.id).filter((id) => id === "recite" || id === "again"), ["recite"]);
   const voice = { engine: "elevenlabs", voice: "x", lines: [] };
   const qari = { basmala: null, verses: [{ id: "q1", ayah: 21, file: "q.wav", seconds: 5 }] };
   const t = insightTimeline({ scenes: def.scenes, narration: [], voice, qari, loop: true });
-  assert.equal(t.speakers.filter((x) => x.kind === "qari").length, 2);
+  assert.equal(t.speakers.filter((x) => x.kind === "qari").length, 1);
   assert.equal(speakerWindows(t.speakers).overlap, null);
 });
 

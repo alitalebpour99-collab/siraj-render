@@ -478,7 +478,9 @@ export const INSIGHTS = {
     // «چرا این واژه؟» (viral formats of 2026-11-15, §4.1, approved by the owner): the question,
     // the ayah in the qari's voice with the word light, the word, its root and the other places
     // of the same written form (counted in the text), a word the text never uses (a zero under a
-    // wide rule), ONE sentence of a named tafsir exactly as Siraj serves it, then the ayah again.
+    // wide rule), ONE sentence of a named tafsir exactly as Siraj serves it; the loop goes back to
+    // the question. (The second recitation of the brief was dropped after the first sample: the
+    // qari's 30:21 is about 30 s, and twice it made a two-minute Reel.)
     // Interpretive: the hook, the root and the tafsir sentence were chosen by a person, so every
     // post of this format waits for the owner's yes in the bot (the service: approveEach).
     // Persian only: Siraj serves no English tafsir yet.
@@ -488,8 +490,7 @@ export const INSIGHTS = {
       { id: "recite", lines: [], min: 60 },
       { id: "word", lines: ["root", "places"], min: 150 },
       { id: "absent", lines: ["absent"], min: 105 },
-      { id: "tafsir", lines: ["tafsir", "again"], min: 150 },
-      { id: "again", lines: [], min: 60 },
+      { id: "tafsir", lines: ["tafsir"], min: 150 },
       { id: "end", lines: ["end"], min: 75 },
     ],
     episodes: {
@@ -520,7 +521,6 @@ export const INSIGHTS = {
                 line("places", `همین واژه، به همین شکل، ${N(lang, n.form)} بار در قرآن آمده است؛ ${N(lang, n.paired)} بار دیگر در آیه‌ای که «شب» هم در آن هست.`, `همین واژه، به همین شکل، ${W(n.form)} بار در قرآن آمده است. ${W(n.paired)} بارِ دیگر، در آیه‌ای که نامِ شب هم در آن هست.`),
                 line("absent", `و واژه‌ای با سه حرف «ع ش ق» پشت سر هم، در همهٔ متن قرآن: ${N(lang, n.absent)} بار.`, "و واژه‌ای که سه حرفِ عین، شین، قاف پشت سر هم در آن باشد، حتی یک بار در متنِ قرآن نیامده است."),
                 line("tafsir", "تفسیر نمونه دربارهٔ این آیه:", "تفسیرِ نمونه می‌گوید. قرآن در این آیه، هدفِ ازدواج را سکون و آرامش قرار داده است."),
-                line("again", "حالا دوباره بشنو.", "حالا دوباره بشنو."),
                 line("end", "شمرده از متن تنزیل؛ تفسیر از سایت سراج، عین متن.", `این عددها از ${FA_SOURCE.text} شمرده شده‌اند. و جملهٔ تفسیر، عینِ متنِ تفسیرِ نمونه است.`),
               ]
             : [
@@ -530,7 +530,6 @@ export const INSIGHTS = {
                 line("places", `The same word, in this very form, stands ${N(lang, n.form)} times in the Quran; ${N(lang, n.paired)} more times in a verse that also names the night.`),
                 line("absent", `And a word with the three letters ʿ-sh-q in a row stands ${N(lang, n.absent)} times in the text.`),
                 line("tafsir", "Tafsir Nemooneh on this verse:"),
-                line("again", "Now hear it again."),
                 line("end", "Counted from the Tanzil text; the tafsir sentence exactly as Siraj serves it."),
               ],
       },

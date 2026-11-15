@@ -71,7 +71,7 @@ export type VerseTimeline = {
  * qari begins 0.6 s in), a shorter sources card that carries the channel badge, and a last
  * stretch that fades back into the first picture so the Reel loops.
  */
-export const VT_LAMP = { OUTRO: 150, LOOP: 18, BADGE: 66 };
+export const VT_LAMP = { OUTRO: 150, NIGHT_OUTRO: 105, LOOP: 18, BADGE: 66 };
 /** «یک آیه برای امشب»: the silence after the qari (with TR_GAP, NARR_AFTER_TR and BREATH, about a second). */
 export const NIGHT_SILENCE = 12;
 
@@ -106,7 +106,9 @@ export function verseTimeline(p: Pick<VerseProps, "ayahs" | "qari" | "voice"> & 
     at += dur - VT.XF;
     return card;
   });
-  if (lamp) return { intro: { from: 0, dur: 0 }, cards, outro: { from: at, dur: VT_LAMP.OUTRO }, loop: VT_LAMP.LOOP, total: at + VT_LAMP.OUTRO + VT_LAMP.LOOP, speakers };
+  // «یک آیه برای امشب»: a short Reel, so a shorter close (the sources line and the badge still fit)
+  const outro = p.night ? VT_LAMP.NIGHT_OUTRO : VT_LAMP.OUTRO;
+  if (lamp) return { intro: { from: 0, dur: 0 }, cards, outro: { from: at, dur: outro }, loop: VT_LAMP.LOOP, total: at + outro + VT_LAMP.LOOP, speakers };
   return { intro: { from: 0, dur: VT.INTRO }, cards, outro: { from: at, dur: VT.OUTRO }, loop: 0, total: at + VT.OUTRO, speakers };
 }
 
