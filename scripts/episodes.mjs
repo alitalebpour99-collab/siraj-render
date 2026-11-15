@@ -442,7 +442,6 @@ export const INSIGHTS = {
         picks: [55, 77],
         facts: ({ m }, ep) => {
           const f = repeatFacts(m, ep.surah);
-          if (f.times < 3) throw new Error(`one-line: surah ${ep.surah} repeats no line three times`);
           return { numbers: { surah: ep.surah, verses: f.verses, times: f.times, first: f.first, last: f.last, one: f.gaps.one, two: f.gaps.two, more: f.gaps.more, lead: f.lead }, data: { places: f.places, verses: f.verses } };
         },
         lines: (lang, n) => {
