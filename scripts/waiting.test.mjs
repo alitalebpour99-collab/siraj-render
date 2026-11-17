@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { CheckError, DataChanged, sha256 } from "./lib.mjs";
 import { MAFATIH, NAHJ, duaPath, nahjPath } from "./books.mjs";
+import { readingProblems } from "./spoken.mjs";
 import { WAITING_FORMATS, WEEKDAYS, waitingProps, waitingShape } from "./waiting.mjs";
 import { CROP, safeFrame } from "../src/layout.ts";
 import { FPS, insightTimeline, speakerWindows } from "../src/timelines.ts";
@@ -63,7 +64,35 @@ const VERSES = (job, surah, ayahs) => ({
   quran: { releaseKey: "quran-x1" },
   metadata: { sha256: "m1" },
 });
-const io = (pages = {}, record = RECORD()) => ({ page: async (path) => pages[path] ?? (() => { throw new Error(`${path}: HTTP 404`); })(), exegesis: async () => record, verses: async (...a) => VERSES(...a) });
+/** A made-up owner writing in the shape of /api/writings/<slug>: two ayahs, then a narration. */
+const WSLUG = "w-20261118-a1b2c3";
+const WRITING_BODY = (over = {}) => ({
+  service: "siraj-public-writing",
+  writing: {
+    slug: WSLUG,
+    title: `${LET(3)} ۷`,
+    sections: [
+      { lead: `${LET(5)}: ${LET(2)}`, passage: { kind: "quran", id: "q:2:3-4", surahNumber: 2, surahName: "ن۱", fromAyah: 3, toAyah: 4, ayahs: [{ ayahNumber: 3, text: AR(6), translation: FA(9) }, { ayahNumber: 4, text: AR(5), translation: FA(8) }], translatorName: "م۱", textCredit: "c1 · c2" } },
+      { lead: LET(6), passage: { kind: "hadith", id: "h:r1", recordKey: "r1", matn: AR(7), translation: FA(10), attributedTo: "ک۱", locator: "ج۱", sourceTitle: "ک۲", textCredit: "c3", assessments: [{ assessorName: "ن۲", gradeLabel: "د۱" }] } },
+    ],
+    publishedAt: "2026-11-18T06:00:00.000Z",
+    ...over,
+  },
+  trust: { reviewed_by: "site_owner_only", texts_verbatim_from_gated_corpus: true, ai_can_publish: false },
+});
+const W_HASHES = (b = WRITING_BODY()) => {
+  const w = b.writing;
+  const out = [sha256(w.title)];
+  for (const s of w.sections) {
+    out.push(sha256(s.lead));
+    const pairs = s.passage.kind === "quran" ? s.passage.ayahs.map((a) => [a.text, a.translation]) : [[s.passage.matn, s.passage.translation]];
+    for (const [a, f] of pairs) out.push(sha256(a), sha256(f));
+  }
+  return out;
+};
+const REVIEW = { id: "review", show: "فقط مالک سایت بازبینی کرده است", say: "این نوشته را فقط مالکِ سایت بازبینی کرده است." };
+
+const io = (pages = {}, record = RECORD(), writing = WRITING_BODY()) => ({ page: async (path) => pages[path] ?? (() => { throw new Error(`${path}: HTTP 404`); })(), exegesis: async () => record, verses: async (...a) => VERSES(...a), writing: async () => writing });
 
 const SRC_LINE = { id: "src", show: `${LET(3)} · ${LET(2)}`, say: `${LET(3)}، ${LET(2)}` };
 const REST_LINE = { id: "rest", show: LET(4), say: LET(4) };
@@ -89,6 +118,7 @@ const FIXTURES = {
       },
       { textRelease: "quran-x1" },
     ),
+  writing: () => job({ format: "writing", lang: "fa", writing: { slug: WSLUG }, narration: [REVIEW] }, { textRelease: `writing:${WSLUG}`, textHashes: W_HASHES(), numbers: { sections: 2, ayahs: 2 } }),
 };
 const PAGES = { [nahjPath(12)]: hadithPage([SAYING]), [duaPath(MAFATIH.kumayl)]: duaPage(KUMAYL), [duaPath(MAFATIH.weekdays[1])]: duaPage(DAY) };
 
@@ -106,10 +136,11 @@ const BROKEN = {
     (j) => (j.props.mirror.center = 1),
     (j) => (j.props.narration = j.props.narration.filter((l) => l.id !== "hook")),
   ],
+  writing: [(j) => (j.props.writing.slug = "w-1"), (j) => (j.props.narration = []), (j) => (j.props.narration = [{ ...REVIEW, say: "یک ۲" }]), (j) => delete j.props.writing],
 };
 
-test("six waiting formats, each with its languages, scenes and fixtures", () => {
-  assert.deepEqual([...WAITING_FORMATS].sort(), ["dua-story", "kumayl", "mirror", "nahj-hikma", "occasion", "tafsir"]);
+test("seven waiting formats, each with its languages, scenes and fixtures", () => {
+  assert.deepEqual([...WAITING_FORMATS].sort(), ["dua-story", "kumayl", "mirror", "nahj-hikma", "occasion", "tafsir", "writing"]);
   assert.deepEqual(WAITING_LANGS.mirror, ["en", "fa"]);
   for (const f of WAITING_FORMATS) {
     assert.ok(FIXTURES[f], f);
@@ -132,6 +163,32 @@ for (const f of Object.keys(FIXTURES)) {
     }
   });
 }
+
+test("an owner writing: read from Siraj, every string hash-checked, the narrator never on the Arabic, the honest line last", async () => {
+  const p = await waitingProps(FIXTURES.writing(), io());
+  assert.deepEqual(p.narration.map((l) => l.id), ["title", "l1", "t1_1", "t1_2", "l2", "t2_1", "review"]);
+  const b = WRITING_BODY().writing;
+  // the served Persian is read as served; the title and the leads in spoken Persian (no digit, no colon)
+  assert.equal(p.narration[2].say, b.sections[0].passage.ayahs[0].translation);
+  for (const l of p.narration.filter((x) => ["title", "l1", "l2", "review"].includes(x.id))) assert.deepEqual(readingProblems(l.say), [], l.id);
+  const arabic = new Set([...b.sections[0].passage.ayahs.map((a) => a.text), b.sections[1].passage.matn]);
+  for (const l of p.narration) assert.ok(!arabic.has(l.say), `${l.id} is not the Arabic`);
+  assert.deepEqual(p.texts.map((t) => t.textHashSha256), W_HASHES());
+  assert.deepEqual(p.facts, { sections: 2, ayahs: 2 });
+  assert.equal(p.source.text.releaseKey, `writing:${WSLUG}`);
+  assert.deepEqual(p.writing.sections.map((s) => s.lines.length), [2, 1]);
+  assert.deepEqual(p.scenes.map((s) => s.id), ["hook", "s1", "s1b1", "s1b2", "s2", "s2b1", "sources", "end"]);
+  // a source's «·» is never shown beside Persian
+  assert.ok(!p.writing.sources.join("\n").includes("·"));
+  // a changed string, a broken trust block, another writing: refused
+  const changed = WRITING_BODY();
+  changed.writing.sections[1].lead = LET(4);
+  await assert.rejects(waitingProps(FIXTURES.writing(), io({}, RECORD(), changed)), DataChanged);
+  await assert.rejects(waitingProps(FIXTURES.writing(), io({}, RECORD(), { ...WRITING_BODY(), trust: { ai_can_publish: true } })), CheckError);
+  const other = FIXTURES.writing();
+  other.expect.textRelease = "writing:w-20261118-000000";
+  await assert.rejects(waitingProps(other, io()), DataChanged);
+});
 
 test("a saying is read from its page: verbatim, hash-checked, the narrator reads its Persian then the source", async () => {
   const p = await waitingProps(FIXTURES["nahj-hikma"](), io(PAGES));
@@ -260,6 +317,14 @@ test("kumayl: within a minute, the passage's lines one after another, the rest l
   const segs = sound(p, t);
   assert.deepEqual(segs.map((s) => s.who), ["narrator tr1", "narrator tr2", "narrator tr3", "narrator rest"]);
   assert.ok(seconds(t) >= 20 && seconds(t) <= 60, `${seconds(t)} s`);
+});
+
+test("writing: the title, each lead and band in order, the sources, the honest line last", async () => {
+  const p = await waitingProps(FIXTURES.writing(), io());
+  const t = timeline(p, voiceOf({ title: 3, l1: 5, t1_1: 6, t1_2: 5, l2: 4, t2_1: 7, review: 3 }));
+  const segs = sound(p, t);
+  assert.deepEqual(segs.map((s) => s.who), ["narrator title", "narrator l1", "narrator t1_1", "narrator t1_2", "narrator l2", "narrator t2_1", "narrator review"]);
+  assert.ok(seconds(t) >= 30 && seconds(t) <= 75, `${seconds(t)} s`);
 });
 
 test("dua-story: about nine seconds, silent or with the narrator", async () => {
