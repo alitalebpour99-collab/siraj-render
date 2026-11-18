@@ -4,7 +4,7 @@
 // narration ids each scene carries) and where its text stands. No imports and no text, so that
 // the build scripts can read it too (node --experimental-strip-types).
 
-export type WaitingFormat = "nahj-hikma" | "kumayl" | "dua-story" | "tafsir" | "occasion" | "mirror";
+export type WaitingFormat = "nahj-hikma" | "kumayl" | "dua-story" | "tafsir" | "occasion" | "mirror" | "writing";
 export type WaitingLang = "en" | "fa";
 type Plan = { id: string; lines: string[]; min: number };
 type Box = readonly [number, number];
@@ -17,6 +17,7 @@ export const WAITING_LANGS: Record<WaitingFormat, WaitingLang[]> = {
   tafsir: ["fa"],
   occasion: ["fa", "en"],
   mirror: ["en", "fa"],
+  writing: ["fa"],
 };
 
 /** The look a format takes when the studio names none (the occasion is always pewter: no glow, no motes). */
@@ -27,13 +28,33 @@ export const WAITING_LOOK: Record<WaitingFormat, "lapis" | "night" | "pewter"> =
   tafsir: "lapis",
   occasion: "pewter",
   mirror: "lapis",
+  writing: "lapis",
 };
 
 /** The narrator's lines of a served translation, in order (a Kumayl passage: one a line of the dua). */
 export const TR_LINES = ["tr1", "tr2", "tr3", "tr4", "tr5", "tr6"];
 
 /** The service's own fixed lines a format may carry (plain spoken Persian): the source said by name, «the rest on Siraj». */
-export const FIXED_LINES: Record<WaitingFormat, string[]> = { "nahj-hikma": ["src"], kumayl: ["rest"], "dua-story": [], tafsir: [], occasion: [], mirror: [] };
+export const FIXED_LINES: Record<WaitingFormat, string[]> = { "nahj-hikma": ["src"], kumayl: ["rest"], "dua-story": [], tafsir: [], occasion: [], mirror: [], writing: ["review"] };
+
+/** An owner writing (siraj ADR-039): its most sections, and the most ayahs of one section. */
+export const WRITING_MAX = { sections: 5, ayahs: 5 };
+
+/**
+ * An owner writing's draft video: the title (the hook), then for each section its lead sentence and
+ * one band for each ayah (a narration: one band), the Arabic shown and its Persian read; then the
+ * sources card; then «فقط مالک سایت بازبینی کرده است». `bands`: the bands of each section, in order.
+ * The ids (title, l<k>, t<k>_<j>, review) are the service's (src/content/writing.ts).
+ */
+export const writingScenes = (bands: number[]): Plan[] => [
+  { id: "hook", lines: ["title"], min: 120 },
+  ...bands.flatMap((n, i) => [
+    { id: `s${i + 1}`, lines: [`l${i + 1}`], min: 75 },
+    ...Array.from({ length: Math.max(1, n) }, (_, j) => ({ id: `s${i + 1}b${j + 1}`, lines: [`t${i + 1}_${j + 1}`], min: 105 })),
+  ]),
+  { id: "sources", lines: [], min: 150 },
+  { id: "end", lines: ["review"], min: 105 },
+];
 
 /** The narration ids of the Mirror (approved prose, read by the narrator; never over the qari). */
 export const MIRROR_LINES = ["hook", "fold", "fold2", "pair", "pair2", "end"];
@@ -55,7 +76,7 @@ export const kumaylScenes = (bands: number): Plan[] => [
  * The scenes of each format. The narrator's lines follow one another; the qari is heard only in
  * the Mirror's «recite» scene, before its narration and never under it (insightTimeline).
  */
-export const WAITING_SCENES: Record<Exclude<WaitingFormat, "tafsir" | "kumayl">, Plan[]> = {
+export const WAITING_SCENES: Record<Exclude<WaitingFormat, "tafsir" | "kumayl" | "writing">, Plan[]> = {
   // the Arabic words appear slowly and a brass line opens; the Persian as the narrator reads it; the source said by name
   "nahj-hikma": [
     { id: "open", lines: [], min: 135 },
@@ -82,8 +103,9 @@ export const WAITING_SCENES: Record<Exclude<WaitingFormat, "tafsir" | "kumayl">,
   ],
 };
 
-/** The scene plan of one job (`bands`: the lines of a Kumayl passage). */
-export const scenesOf = (format: WaitingFormat, bands = 1): Plan[] => (format === "tafsir" ? tafsirScenes() : format === "kumayl" ? kumaylScenes(bands) : WAITING_SCENES[format]);
+/** The scene plan of one job (`bands`: the lines of a Kumayl passage; `parts`: the bands of each section of a writing). */
+export const scenesOf = (format: WaitingFormat, bands = 1, parts: number[] = [1, 1]): Plan[] =>
+  format === "tafsir" ? tafsirScenes() : format === "kumayl" ? kumaylScenes(bands) : format === "writing" ? writingScenes(parts) : WAITING_SCENES[format];
 
 /**
  * Where text stands, [top, bottom] in pixels of the 1080×1920 frame. Every box sits inside the
@@ -99,6 +121,7 @@ export const WBOX = {
   story: { ring: [384, 872], arabic: [892, 1124], persian: [1142, 1404] },
   occasion: { authority: [548, 610], name: [626, 846], line: [892, 1164] },
   mirror: { surah: [376, 470], bars: [486, 1160], verses: [716, 1160], end: [380, 1160] },
+  writing: { title: [420, 1160], lead: [376, 600], arabic: [616, 900], persian: [916, 1404], sources: [380, 1404] },
 } as const satisfies Record<string, Box | Record<string, Box>>;
 
 /** The tafsir slide (1080×1350); in the Reel the slide stands in the 4:5 crop, from y 285. */
@@ -132,6 +155,8 @@ export function textBoxes(format: WaitingFormat): Box[] {
       return [WBOX.occasion.authority, WBOX.occasion.name, WBOX.occasion.line, ...foot];
     case "mirror":
       return [WBOX.chip, WBOX.mirror.surah, WBOX.mirror.bars, WBOX.mirror.verses, WBOX.mirror.end, WBOX.caption, ...foot];
+    case "writing":
+      return [WBOX.chip, WBOX.writing.title, WBOX.writing.lead, WBOX.writing.arabic, WBOX.writing.persian, WBOX.writing.sources, ...foot];
     case "tafsir":
       return SLIDE_TEXT.map(([a, b]) => [a + SLIDE.top, b + SLIDE.top] as const);
   }

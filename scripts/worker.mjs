@@ -31,7 +31,13 @@ const { renderJob } = await import("./render.mjs");
 
 const BASE = (process.env.SIRAJ_SOCIAL_URL ?? "").replace(/\/+$/, "");
 const SECRET = process.env.SIRAJ_RENDER_SECRET ?? "";
-const CAN = process.env.CAN ?? "en-verse,fa-verse,en-counts:overview";
+/**
+ * What this code draws beyond the workflow's CAN line: the owner writings' draft videos
+ * (fa-writing, 2026-11-18). Kept here because the workflow file can only be changed with a
+ * token that has the `workflow` scope; once worker.yml names it too, nothing changes.
+ */
+const EXTRA_CAN = ["fa-writing"];
+const CAN = [...new Set([...(process.env.CAN ?? "en-verse,fa-verse,en-counts:overview").split(",").map((c) => c.trim()).filter(Boolean), ...EXTRA_CAN])].join(",");
 if (!/^https:\/\//.test(BASE) || SECRET.length < 24) {
   console.error("worker: SIRAJ_SOCIAL_URL (https) and SIRAJ_RENDER_SECRET must be set");
   process.exit(2);

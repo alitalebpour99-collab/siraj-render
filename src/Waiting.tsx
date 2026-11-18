@@ -49,6 +49,14 @@ export type WaitVerses = { surah: WaitSurah; from: number; to: number; ayahs: Ay
 export type WaitTafsir = { verse: WaitVerses | null; slides: string[]; work: { title: string; author: string }; source: { url: string | null; publisher: string; siraj: string } };
 export type WaitOccasion = { authority: string; name: string; line: string; url: string | null };
 export type WaitMirror = { surah: number; scholar: { name: string; work: string }; sections: Array<{ from: number; to: number }>; center: number; pair: [number, number] };
+/** An owner writing (siraj ADR-039), read from /api/writings/<slug> in the run: each section's lead and its passage as served, the sources card. */
+export type WaitWriting = {
+  slug: string;
+  title: string;
+  siraj: string;
+  sections: Array<{ lead: string; ref: string; kind: "quran" | "hadith"; lines: WaitLine[] }>;
+  sources: string[];
+};
 
 export type WaitingProps = {
   kind: "waiting";
@@ -61,6 +69,8 @@ export type WaitingProps = {
   tafsir: WaitTafsir | null;
   occasion: WaitOccasion | null;
   mirror: WaitMirror | null;
+  /** the owner writing of a fa-writing draft (null otherwise) */
+  writing?: WaitWriting | null;
   /** the verses the qari recites (the Mirror only) */
   recite: WaitVerses | null;
   /** no narrator, whatever voice was made (the tafsir carousel, a silent dhikr Story) */
@@ -849,7 +859,127 @@ const TafsirReel: React.FC<VP> = ({ p, t, at }) => {
   );
 };
 
-const VIEWS: Record<WaitingFormat, React.FC<VP>> = { "nahj-hikma": NahjView, kumayl: KumaylView, "dua-story": StoryView, tafsir: TafsirReel, occasion: OccasionView, mirror: MirrorView };
+/** The words of the writing video (interface words only; the writing's own words come from Siraj). */
+const WRITING_CHIP = "نوشته‌ای از سراج";
+const OWNER_ONLY = "فقط مالک سایت بازبینی کرده است";
+
+/**
+ * نوشتهٔ تأییدشده: the title as the hook; for each section its lead sentence, then each ayah (or the
+ * narration) as a band: the Arabic under a slow light (nobody recites it), its Persian as the
+ * narrator reads it; then the sources card; then «فقط مالک سایت بازبینی کرده است» (lapis).
+ */
+const WritingView: React.FC<VP> = ({ p, t, at }) => {
+  const f = useAt(at);
+  const x = p.writing;
+  if (!x) return null;
+  const B = WBOX.writing;
+  const hook = sceneOf(t, "hook");
+  const sources = sceneOf(t, "sources");
+  const end = sceneOf(t, "end");
+  const title = hook.lines.find((l) => l.id === "title");
+  const hookOut = 1 - ramp(f, hook.from + hook.dur - 14, 14);
+  // the section on screen now (its lead scene to the end of its last band)
+  const spans = x.sections.map((s, i) => {
+    const lead = sceneOf(t, `s${i + 1}`);
+    const last = sceneOf(t, `s${i + 1}b${Math.max(1, s.lines.length)}`);
+    return { lead, from: lead.from, to: last.from + last.dur };
+  });
+  const k = spans.findIndex((s) => f >= s.from - 4 && f < s.to);
+  const chip = k >= 0 ? x.sections[k]!.ref : WRITING_CHIP;
+  const review = end.lines.find((l) => l.id === "review");
+  const srcIn = Math.min(ramp(f, sources.from, 18), 1 - ramp(f, sources.from + sources.dur - 12, 12));
+  const endIn = ramp(f, end.from + 4, 20);
+  return (
+    <AbsoluteFill>
+      <Lamp warm={0.45 + 0.55 * ramp(f, hook.from, 50)} cy={0.3} />
+      <Chip lang="fa" f={f} text={chip} />
+      {hookOut > 0 && f < hook.from + hook.dur ? (
+        <div style={{ opacity: hookOut }}>
+          <Block box={B.title}>
+            <Fit width={900} maxHeight={boxH(B.title) - 80} max={86} min={40} measureKey={x.title} lang="fa" dir="rtl" style={{ fontFamily: FONT.fa, fontWeight: 700, lineHeight: 1.6, textAlign: "center", color: C.ink, textWrap: "balance" }}>
+              {title ? <Kinetic text={x.title} f={f} at={wordTimes(title)} /> : x.title}
+            </Fit>
+          </Block>
+          <BrassLine top={B.title[1] - 60} k={span01(f, hook.from + 20, hook.from + hook.dur - 20)} />
+        </div>
+      ) : null}
+      {x.sections.map((s, i) => {
+        const span = spans[i]!;
+        const o = Math.min(ramp(f, span.from - 4, 16), 1 - ramp(f, span.to - 14, 14));
+        if (o <= 0) return null;
+        const lead = span.lead.lines.find((l) => l.id === `l${i + 1}`);
+        return (
+          <div key={i} style={{ opacity: o }}>
+            <Block box={B.lead}>
+              <Fit width={880} maxHeight={boxH(B.lead)} max={46} min={26} measureKey={s.lead} lang="fa" dir="rtl" style={{ fontFamily: FONT.fa, fontWeight: 500, lineHeight: 1.75, textAlign: "center", color: C.ink, textWrap: "balance" }}>
+                {lead ? <Kinetic text={s.lead} f={f} at={wordTimes(lead)} /> : s.lead}
+              </Fit>
+            </Block>
+            {s.lines.map((line, j) => {
+              const b = sceneOf(t, `s${i + 1}b${j + 1}`);
+              // the first band shows faintly while the lead is read, then each band in its own time
+              const shown = j === 0 ? Math.max(0.3 * ramp(f, span.lead.from + 10, 20), ramp(f, b.from - 4, 16)) : ramp(f, b.from - 4, 16);
+              const bo = Math.min(shown, 1 - ramp(f, b.from + b.dur - 14, 14));
+              if (bo <= 0) return null;
+              const text = line.arabic.trim();
+              const { count } = wordParts(text);
+              const tr = b.lines[0];
+              const sweepSpan = Math.max(30, (tr ? tr.from + tr.len - b.from : b.dur) - 18);
+              const step = Math.max(2, sweepSpan / Math.max(1, count));
+              const sweep: QariClip = {
+                id: `light-${i}-${j}`,
+                ayah: null,
+                file: "",
+                seconds: b.dur / FPS,
+                mode: "word",
+                words: Array.from({ length: count }, (_, q) => ({ start: (8 + q * step) / FPS, end: (8 + (q + 1.8) * step) / FPS })),
+                sirajWords: count,
+                qfWords: count,
+                verseKey: "",
+              };
+              return (
+                <React.Fragment key={j}>
+                  <Block box={B.arabic} style={{ opacity: bo }}>
+                    <Fit width={900} maxHeight={boxH(B.arabic)} max={66} min={24} measureKey={text} lang="ar" dir="rtl" style={{ fontFamily: FONT.quran, lineHeight: 1.95, textAlign: "center", textWrap: "balance" }}>
+                      <LitText text={text} clip={sweep} t={(f - b.from) / FPS} />
+                    </Fit>
+                  </Block>
+                  <div style={{ opacity: bo }}>
+                    <Read lines={b.lines} f={f} box={B.persian} max={42} />
+                  </div>
+                </React.Fragment>
+              );
+            })}
+          </div>
+        );
+      })}
+      {srcIn > 0 && f >= sources.from ? (
+        <div dir="rtl" style={{ position: "absolute", top: B.sources[0], left: (W - 900) / 2, width: 900, height: boxH(B.sources), display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, opacity: srcIn }}>
+          <div style={{ fontFamily: FONT.fa, fontSize: 40, fontWeight: 700, color: C.gold }}>منبع‌ها</div>
+          <div style={{ width: 220, height: 1.5, background: `linear-gradient(90deg, transparent, ${C.gold}, transparent)` }} />
+          <Fit width={900} maxHeight={boxH(B.sources) - 140} max={34} min={18} measureKey={x.sources.join("\n")} lang="fa" dir="rtl" style={{ fontFamily: FONT.fa, lineHeight: 1.7, textAlign: "center", color: C.ink, whiteSpace: "pre-line" }}>
+            {x.sources.join("\n")}
+          </Fit>
+        </div>
+      ) : null}
+      {f >= end.from ? (
+        <div dir="rtl" style={{ position: "absolute", top: B.lead[0], left: 0, width: W, height: B.persian[1] - B.lead[0], display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 26, opacity: endIn }}>
+          <Seal size={96} />
+          <Fit width={860} maxHeight={260} max={52} min={28} measureKey={review?.show ?? OWNER_ONLY} lang="fa" dir="rtl" style={{ fontFamily: FONT.fa, fontWeight: 700, lineHeight: 1.7, textAlign: "center", color: C.ink, textWrap: "balance" }}>
+            {review ? <Kinetic text={review.show} f={f} at={wordTimes(review)} /> : OWNER_ONLY}
+          </Fit>
+          <div style={{ width: 260, height: 1.5, background: `linear-gradient(90deg, transparent, ${C.gold}, transparent)` }} />
+          <Fit width={920} maxHeight={60} max={30} min={18} measureKey={x.siraj} lang="en" dir="ltr" style={{ fontFamily: FONT.en, lineHeight: 1.4, textAlign: "center", color: C.gold, whiteSpace: "nowrap", letterSpacing: "0.02em" }}>
+            {bare(x.siraj)}
+          </Fit>
+        </div>
+      ) : null}
+      <Foot lang="fa" f={f} source={OWNER_ONLY} showAt={hook.from + 30} endAt={end.from} voice={p.voice.lines.length ? TR_VOICE : null} />
+    </AbsoluteFill>
+  );
+};
+
+const VIEWS: Record<WaitingFormat, React.FC<VP>> = { "nahj-hikma": NahjView, kumayl: KumaylView, "dua-story": StoryView, tafsir: TafsirReel, occasion: OccasionView, mirror: MirrorView, writing: WritingView };
 
 /* ---------- the reel, the covers, the slides ---------- */
 
@@ -906,6 +1036,11 @@ export function settledFrame(p: Pick<WaitingProps, "format">, t: InsightTimeline
   if (p.format === "kumayl") {
     const b = sceneOf(t, "b1");
     return Math.max(b.from, b.from + b.dur - 20);
+  }
+  // a writing's cover is its title, set and underlined
+  if (p.format === "writing") {
+    const h = sceneOf(t, "hook");
+    return Math.max(h.from, h.from + h.dur - 22);
   }
   return Math.min(t.total - 1, sceneOf(t, "end").from + 36);
 }
@@ -964,6 +1099,7 @@ const emptyWaiting = (lang: Lang, format: WaitingFormat): WaitingProps => ({
   tafsir: null,
   occasion: null,
   mirror: null,
+  writing: null,
   recite: null,
   silent: format === "tafsir",
   source: { quran: { releaseKey: null }, surahMetadata: { sha256: null }, text: null },

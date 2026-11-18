@@ -43,11 +43,20 @@
 //     mirror: { surah, scholar: { name, work }, sections: [{ from, to }, …] (3–15, odd, in order,
 //               covering the surah), center, recite: { ayahs: [a, b] } }
 //     narration (required): ids hook, fold, fold2?, pair, pair2?, end — hook at least.
+//
+//   writing (fa)     an owner writing's DRAFT video (siraj ADR-039; the service never posts it)
+//     writing: { slug }                      // /api/writings/<slug>, read in the run (scripts/writing.mjs)
+//     narration: [{ id: "review", show, say }] // required: «فقط مالک سایت بازبینی کرده است» (a fixed line)
+//     expect: { textRelease: "writing:<slug>", textHashes: [title, lead 1, ar, fa, …, lead 2, …],
+//               numbers: { sections, ayahs } }
+//     the title, each lead with its ayahs (or narration) as bands, the sources card, the review line;
+//     the narrator reads the title, the leads and the Persian, never the Arabic.
 // ---------------------------------------------------------------------------------------------
 import { API, DataChanged, UA, check, checkTrust, releaseOf, same, sha256, siraj, sleep } from "./lib.mjs";
 import { FIT, MAFATIH, NAHJ, WEEKDAYS, dayIndex, duaLineUrl, duaPassage, duaPath, nahjFits, nahjPath, quranPath, readDuaPage, readHadithPage, slideText, storyLine, tafsirSlides, trParts, wordsOf } from "./books.mjs";
 import { readingProblems } from "./spoken.mjs";
 import { FIXED_LINES, MIRROR_LINES, TAFSIR_SLIDES, TR_LINES, WAITING_LANGS, WAITING_LOOK, scenesOf } from "../src/waitingPlan.ts";
+import { WRITING_SLUG, readWriting, servedTexts, sourceLines, writingNarration } from "./writing.mjs";
 
 export { WEEKDAYS };
 
@@ -88,7 +97,7 @@ async function exegesis(id) {
   return body;
 }
 
-export const IO = { page, exegesis, verses: (job, surah, ayahs) => versesOf(job, surah, ayahs) };
+export const IO = { page, exegesis, verses: (job, surah, ayahs) => versesOf(job, surah, ayahs), writing: (slug) => siraj(`/api/writings/${slug}`) };
 
 /* ---------- the shape of a job (no network) ---------- */
 
@@ -186,6 +195,7 @@ export function waitingShape(job) {
     tafsir: null,
     occasion: null,
     mirror: null,
+    writing: null,
     recite: null,
     silent: f === "tafsir" || p.voice?.engine === "none",
     source: { quran: { releaseKey: null }, surahMetadata: { sha256: null }, text: null },
@@ -193,7 +203,7 @@ export function waitingShape(job) {
     studio: studioFor(p),
     facts: {},
   };
-  const need = { page: null, exegesis: null, verses: null };
+  const need = { page: null, exegesis: null, verses: null, writing: null };
   let bands = 1;
   if (f === "nahj-hikma") {
     const x = p.nahj;
@@ -224,6 +234,13 @@ export function waitingShape(job) {
     need.exegesis = { id: x.record };
     need.verses = { surah: x.surah, ayahs: range(x.from, x.to) };
     props.facts = { surah: x.surah, from: x.from, to: x.to, record: x.record };
+  } else if (f === "writing") {
+    const x = p.writing;
+    check(x && typeof x.slug === "string" && WRITING_SLUG.test(x.slug), "writing: writing.slug (w-<date>-<hex>)");
+    props.narration = fixedLines(p, FIXED_LINES[f]);
+    // the honest line «only the site owner reviewed it» is never left out
+    check(props.narration.some((l) => l.id === "review"), "writing: the review line");
+    need.writing = { slug: x.slug };
   } else if (f === "occasion") {
     const o = occasionOf(p);
     props.occasion = o.occasion;
@@ -238,7 +255,7 @@ export function waitingShape(job) {
   props.scenes = scenesOf(f, bands);
   // what is known before reading is compared now; the rest after the read (factsAfterRead)
   for (const [k, v] of Object.entries(job.expect?.numbers ?? {})) if (k in props.facts && !same(props.facts[k], v)) throw new DataChanged(`${f}: ${k}`);
-  return { props, need: need.page || need.exegesis || need.verses ? need : null };
+  return { props, need: need.page || need.exegesis || need.verses || need.writing ? need : null };
 }
 
 /* ---------- reading Siraj ---------- */
@@ -377,6 +394,23 @@ export async function waitingProps(job, io = IO) {
     };
     props.facts = { ...props.facts, slides: TAFSIR_SLIDES, pieces: cut.pieces };
     props.scenes = scenesOf(f);
+  } else if (f === "writing") {
+    const slug = need.writing.slug;
+    if (e.textRelease !== `writing:${slug}`) throw new DataChanged("the writing the job names");
+    const w = readWriting(await io.writing(slug), slug);
+    props.texts = servedTexts(w);
+    checkHashes(job, props.texts);
+    props.writing = {
+      slug,
+      title: w.title,
+      siraj: `${SITE}/writings/${slug}`,
+      sections: w.sections.map((s) => ({ lead: s.lead, ref: s.passage.ref, kind: s.passage.kind, lines: s.passage.lines })),
+      sources: sourceLines(w),
+    };
+    props.narration = [...writingNarration(w), ...props.narration];
+    props.facts = { sections: w.sections.length, ayahs: w.sections.reduce((k, s) => k + (s.passage.kind === "quran" ? s.passage.lines.length : 0), 0) };
+    props.scenes = scenesOf(f, 1, w.sections.map((s) => s.passage.lines.length));
+    props.source.text = { releaseKey: `writing:${slug}` };
   } else if (f === "mirror") {
     const v = await io.verses(job, need.verses.surah, need.verses.ayahs);
     props.source = { quran: v.quran, surahMetadata: v.metadata, text: null };
@@ -385,7 +419,13 @@ export async function waitingProps(job, io = IO) {
     props.recite = { surah: v.surah, from: need.verses.ayahs[0], to: need.verses.ayahs[1], ayahs: v.ayahs, opening: v.opening, basmala: false, translation: v.translation };
   }
   for (const [k, val] of Object.entries(e.numbers ?? {})) if (!same(props.facts[k], val)) throw new DataChanged(`${f}: ${k}`);
-  const lengths = props.text ? `, lines ${props.text.lines.map((l) => `${l.arabic.length}/${l.persian.length}`).join(" ")}` : props.tafsir ? `, slides ${props.tafsir.slides.map((t) => t.length).join("/")}` : "";
+  const lengths = props.text
+    ? `, lines ${props.text.lines.map((l) => `${l.arabic.length}/${l.persian.length}`).join(" ")}`
+    : props.tafsir
+      ? `, slides ${props.tafsir.slides.map((t) => t.length).join("/")}`
+      : props.writing
+        ? `, sections ${props.writing.sections.map((s) => s.lines.map((l) => `${l.arabic.length}/${l.persian.length}`).join("+")).join(" ")}`
+        : "";
   console.log(`${job.id}: ${f} (${props.lang}), ${props.narration.length} narration lines (${props.narration.map((l) => l.id).join(",")}), ${props.scenes.length} scenes${lengths}${props.silent ? ", silent" : ""}`);
   return props;
 }
