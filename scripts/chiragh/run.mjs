@@ -116,7 +116,7 @@ export async function chiraghJob(job, { stills = false } = {}) {
   const align = refineQari(qari);
   const m = materialOf(props, voice, qari);
   const recent = Array.isArray(job.props?.chiragh?.recent) ? job.props.chiragh.recent : [];
-  const concepts = await writeConcepts(m, recent);
+  const concepts = (await writeConcepts(m, recent)).map((c) => (m.forcedKey ? { ...c, key_word: m.forcedKey } : c));
   const ranked = rank(m, concepts, recent);
   console.log(`${job.id}: ${m.template}, concepts ranked ${ranked.map((r) => `${r.c.anchor.art}(like ${r.like}${r.breaks.length ? `, ${r.breaks.length} rule${r.breaks.length > 1 ? "s" : ""}` : ""})`).join(" > ")}`);
   const out = path.resolve("out");

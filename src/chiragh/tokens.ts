@@ -40,10 +40,10 @@ export const GRID = {
   safe: { left: 56, right: 888, top: 232, bottom: 1583 },
   colX: 472,
   colW: 792,
-  title: { top: 244, h: 150 },
+  title: { top: 236, h: 140 },
   /** the anchor's stage: the line art lives here and the camera moves inside it */
-  stage: { top: 404, bottom: 1004, left: 0, right: 1080 },
-  text: { top: 1012, bottom: 1578 },
+  stage: { top: 380, bottom: 1072, left: 0, right: 1080 },
+  text: { top: 1078, bottom: 1580 },
   lamp: { x: 472, y: 1716, size: 150 },
 } as const;
 

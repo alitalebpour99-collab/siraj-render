@@ -278,11 +278,15 @@ export function direct(m, c, { videoId, fps = 30 } = {}) {
     let to;
     if (i === 0) to = { region: visit[0], scale: 1.0 };
     else if (last) to = { region: visit[0], scale: 1.0 };
-    else if (isKey) to = { region: c.anchor.key_region && regionIds(art).includes(c.anchor.key_region) ? c.anchor.key_region : visit[Math.min(1, visit.length - 1)], scale: 1.18 };
-    else if (queue.length || draw.length) to = { region: visit[0], scale: 1.0 + 0.03 * (i % 3) };
-    else {
+    else if (isKey) to = { region: c.anchor.key_region && regionIds(art).includes(c.anchor.key_region) ? c.anchor.key_region : visit[Math.min(1, visit.length - 1)], scale: 1.35 };
+    else if (draw.length) {
+      // while it draws, the camera follows the group being drawn (or pushes in on the whole)
+      const g = draw[0];
+      const near = art.regions.find((r) => r.id === g || g.startsWith(r.id) || r.id.startsWith(g));
+      to = near ? { region: near.id, scale: 1.15 } : { region: visit[0], scale: 1.0 + 0.06 * (i % 3) };
+    } else {
       visitIdx = (visitIdx + 1) % visit.length;
-      to = { region: visit[visitIdx], scale: visitIdx === 0 ? 1.02 : 1.1 };
+      to = { region: visit[visitIdx], scale: visitIdx === 0 ? 1.05 : 1.25 };
     }
     const prev = shots[shots.length - 1]?.motion.to ?? { region: to.region, scale: to.scale * 0.94 };
     const camera = prev.region !== to.region ? "pan" : to.scale > prev.scale + 0.005 ? "push" : to.scale < prev.scale - 0.005 ? "pull" : "breathe";

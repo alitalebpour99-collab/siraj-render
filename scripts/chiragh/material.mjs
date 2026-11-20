@@ -69,9 +69,12 @@ function versesOf(props, qari, recite, refLine) {
   return out;
 }
 
+/** The reciters' names in Persian (the Persian card never shows a Latin name). */
+export const RECITERS_FA = { 7: "مشاری راشد العفاسی" };
+
 /** The sources line of the close (one line; the details are in the caption). */
 function creditsOf(lang, translator, qari) {
-  const reciter = qari?.reciter?.name ?? null;
+  const reciter = qari ? (lang === "fa" ? (RECITERS_FA[qari.recitationId] ?? null) : qari.reciter?.name ?? null) : null;
   if (lang === "fa") return noBars(["متن: پروژهٔ تنزیل", translator ? `ترجمه: ${translator}` : null, reciter ? `قاری: ${reciter}` : null].filter(Boolean).join("؛ "));
   return ["Text: Tanzil Project", translator ? `Translation: ${translator}` : null, reciter ? `Recitation: ${reciter}` : null].filter(Boolean).join(" · ");
 }
@@ -135,12 +138,17 @@ export function materialOf(props, voice, qari) {
         const n = props.narration.find((x) => x.id === id);
         const l = lineOf(voice, id);
         if (!n) continue;
-        m.lines.push({ id, text: n.show, say: n.say, file: l?.file ?? null, seconds: l?.seconds ?? Math.max(2.2, words(n.show) * 0.42), words: l?.words && n.say === n.show ? l.words : null, scene: sc.id });
+        // «چرا این واژه؟»: the tafsir's one sentence stands on screen exactly as Siraj served it, after its line
+        const shown = id === "tafsir" && props.spans?.tafsir ? `${n.show} «${props.spans.tafsir}»` : n.show;
+        m.lines.push({ id, text: shown, say: n.say, file: l?.file ?? null, seconds: l?.seconds ?? Math.max(2.2, words(n.show) * 0.42), words: l?.words && n.say === shown ? l.words : null, scene: sc.id });
         m.order.push({ kind: "narr", line: id, silent: !l });
       }
     }
     m.data = dataArt(template, props);
     m.anchorFixed = m.data?.id ?? null;
+    // «چرا این واژه؟»: the key word is the word the episode is about (its place in the stored text), never a model's choice
+    const form = props.data?.form;
+    if (template === "word-choice" && form && props.recite && `${props.recite.surah.number}:${props.recite.from}` === form.verse) m.forcedKey = { verse: `a${props.recite.from}`, index: form.from };
     m.credits = creditsOf(lang, tr, qari);
     return m;
   }

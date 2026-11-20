@@ -29,11 +29,11 @@ export const artOf = (sb: Storyboard): InlineArt => sb.anchor.inline ?? (ART[sb.
 function cameraTransform(art: InlineArt, region: string, scale: number) {
   const r = art.regions.find((x) => x.id === region) ?? art.regions[0]!;
   const fit = Math.min(1080 / r.w, STAGE_H / r.h);
-  const z = Math.max(0.96, Math.min(1.4, Math.min(fit, 1.3) * scale));
+  const z = Math.max(0.96, Math.min(1.95, Math.min(fit, 1.6) * scale));
   // the camera leans towards a region but keeps the anchor near the column (one centred grid)
   const all = art.regions[0]!;
-  const fx = 0.5 * (r.x + r.w / 2) + 0.5 * (all.x + all.w / 2);
-  const fy = 0.6 * (r.y + r.h / 2) + 0.4 * (all.y + all.h / 2);
+  const fx = 0.75 * (r.x + r.w / 2) + 0.25 * (all.x + all.w / 2);
+  const fy = 0.8 * (r.y + r.h / 2) + 0.2 * (all.y + all.h / 2);
   return { z, tx: GRID.colX - fx * z, ty: STAGE_H / 2 - fy * z };
 }
 
@@ -159,7 +159,7 @@ const CaptionBlock: React.FC<{ c: Caption; t: number; lang: "en" | "fa" }> = ({ 
   const size = n <= 10 ? 58 : n <= 18 ? 52 : n <= 28 ? 46 : 42;
   let k = 0;
   return (
-    <div style={{ position: "absolute", top: GRID.text.top + 30, left: GRID.colX - GRID.colW / 2, width: GRID.colW, display: "flex", justifyContent: "center" }}>
+    <FitZone k={c.id}>
       <div data-q={c.id} data-role="caption" dir={fa ? "rtl" : "ltr"} style={{ fontFamily: fa ? FONT.fa : FONT.en, fontSize: size, lineHeight: 1.6, fontWeight: fa ? 600 : 500, textAlign: "center", color: INK.ink }}>
         {parts.map((p, i) => {
           if (/^\s+$/u.test(p)) return <span key={i}>{p}</span>;
@@ -175,7 +175,7 @@ const CaptionBlock: React.FC<{ c: Caption; t: number; lang: "en" | "fa" }> = ({ 
           );
         })}
       </div>
-    </div>
+    </FitZone>
   );
 };
 
@@ -253,12 +253,14 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
   const k = cam.k;
   // the move to the shot's region, then a slow push around the stage's centre (never still)
   const z0 = a.z + (b.z - a.z) * k;
-  const z = z0 * (1 + 0.022 * cam.breathe);
+  const z = z0 * (1 + 0.04 * cam.breathe);
   const tx = GRID.colX - (GRID.colX - (a.tx + (b.tx - a.tx) * k)) * (z / z0);
   const ty = STAGE_H / 2 - (STAGE_H / 2 - (a.ty + (b.ty - a.ty) * k)) * (z / z0);
   const raw = drawProgress(sb, t);
-  const back = ease((sb.total - t) / 1.6);
-  const progress = Object.fromEntries(Object.entries(raw).map(([g, p]) => [g, t > sb.total - 1.6 ? Math.min(p, back) : p]));
+  const progress = raw;
+  // the loop: in the last second the drawing fades out as one (nothing flies apart) and the first text comes back, so the last frame is the first
+  const artOp = t > sb.total - 1.0 ? ease((sb.total - t) / 1.0) : 1;
+  const loopIn = ease((t - (sb.total - 0.6)) / 0.6);
   const speaking = sb.sounds.find((s) => t >= s.at && t < s.at + s.seconds);
   const warm = speaking?.who === "qari" ? 1 : speaking ? 0.5 : 0.2;
   const flicker = 0.6 * Math.sin(t * 7.1) + 0.4 * Math.sin(t * 12.7);
@@ -276,13 +278,13 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
   const changing = ahead !== shot && layerOf(ahead) !== layerOf(shot);
   const lead = changing ? ease((t - (ahead.start - LEAD)) / 0.3) : 0;
   const fadeIn = 1;
-  const textLayer = (s: typeof shot, op: number) => {
+  const textLayer = (s: typeof shot, op: number, tt: number = t) => {
     if (op <= 0.01) return null;
     if (s.text.layer === "verse") {
       const v = sb.verses.find((x) => x.id === s.text.ref);
       return v ? (
         <div key={`v-${v.id}`} style={{ opacity: op }}>
-          <VerseBlock v={v} t={t} lang={sb.lang} />
+          <VerseBlock v={v} t={tt} lang={sb.lang} />
         </div>
       ) : null;
     }
@@ -290,7 +292,7 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
       const c = sb.captions.find((x) => x.id === s.text.ref);
       return c ? (
         <div key={`c-${c.id}`} style={{ opacity: op }}>
-          <CaptionBlock c={{ ...c, keyword: s.text.keyword ?? c.keyword }} t={t} lang={sb.lang} />
+          <CaptionBlock c={{ ...c, keyword: s.text.keyword ?? c.keyword }} t={tt} lang={sb.lang} />
         </div>
       ) : null;
     }
@@ -301,7 +303,7 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
   const end = sb.badge ? t >= sb.badge.from - 0.4 : false;
   const badgeOp = sb.badge ? Math.min(clamp01((t - sb.badge.from) / 0.3), clamp01((sb.badge.to - t) / 0.3)) : 0;
   const probe = still === null && (f % 15 === 0 || f === sb.total - 1 || sb.verses.some((v) => v.chunks.some((c) => Math.round(c.from * fps) + 2 === f)));
-  const titleSize = sb.title.main.length > 26 ? 66 : sb.title.main.length > 18 ? 74 : 84;
+  const titleSize = sb.title.main.length > 34 ? 46 : sb.title.main.length > 24 ? 54 : sb.title.main.length > 18 ? 70 : 84;
   return (
     <AbsoluteFill ref={root} style={{ background: `linear-gradient(180deg, ${INK.cream} 0%, ${INK.cream} 55%, ${INK.cream2} 100%)` }}>
       {sb.sounds.map((s) => (
@@ -312,14 +314,14 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
       <AbsoluteFill style={{ pointerEvents: "none", background: "radial-gradient(120% 80% at 46% 40%, rgba(120,90,40,0) 60%, rgba(120,90,40,0.10) 100%)" }} />
       <Lamp warm={warm} flicker={flicker} rise={rise} />
       {/* the anchor on its stage, with the camera */}
-      <div style={{ position: "absolute", left: 0, top: GRID.stage.top, width: 1080, height: STAGE_H, overflow: "hidden", WebkitMaskImage: "linear-gradient(180deg, transparent 0%, #000 7%, #000 93%, transparent 100%)", maskImage: "linear-gradient(180deg, transparent 0%, #000 7%, #000 93%, transparent 100%)" }}>
+      <div style={{ position: "absolute", left: 0, top: GRID.stage.top, width: 1080, height: STAGE_H, overflow: "hidden", opacity: artOp, WebkitMaskImage: "linear-gradient(180deg, transparent 0%, #000 7%, #000 93%, transparent 100%)", maskImage: "linear-gradient(180deg, transparent 0%, #000 7%, #000 93%, transparent 100%)" }}>
         <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: STAGE_H, transformOrigin: "0 0", transform: `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) scale(${z.toFixed(4)})` }}>
           <EmeraldLineArt art={art} progress={progress} height={STAGE_H} uid={sb.video_id.replace(/[^a-z0-9]/gi, "")} flicker={flicker} />
         </div>
       </div>
       {/* the title, from the first frame to the last */}
       <div style={{ position: "absolute", top: GRID.title.top, left: GRID.colX - GRID.colW / 2, width: GRID.colW, textAlign: "center" }} dir={fa ? "rtl" : "ltr"}>
-        <div data-role="title" style={{ fontFamily: fa ? FONT.fa : FONT.en, fontWeight: fa ? 800 : 600, fontSize: titleSize, lineHeight: 1.25, color: INK.emeraldDeep, whiteSpace: "nowrap" }}>
+        <div data-role="title" style={{ fontFamily: fa ? FONT.fa : FONT.en, fontWeight: fa ? 800 : 600, fontSize: titleSize, lineHeight: 1.22, color: INK.emeraldDeep, textWrap: "balance" }}>
           {sb.title.main}
         </div>
         <div data-role="sub" style={{ fontFamily: fa ? FONT.fa : FONT.en, fontWeight: fa ? 600 : 500, fontSize: 44, lineHeight: 1.35, color: INK.emeraldSoft }}>
@@ -329,9 +331,10 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
       {/* the text under the anchor */}
       {changing && !end ? textLayer(ahead, lead) : null}
       {textLayer(shot, end ? 1 - clamp01((t - (sb.badge!.from - 0.4)) / 0.3) : changing ? 1 - lead : fadeIn)}
+      {loopIn > 0 ? textLayer(sb.shots[0]!, loopIn, 0) : null}
       {/* the close: the sources (one line), the badge */}
       {end ? (
-        <div style={{ position: "absolute", top: GRID.text.top + 120, left: GRID.colX - GRID.colW / 2, width: GRID.colW, textAlign: "center", opacity: clamp01((t - (sb.badge!.from - 0.3)) / 0.3) * clamp01((sb.total - t) / 0.35) }}>
+        <div style={{ position: "absolute", top: GRID.text.top + 120, left: GRID.colX - GRID.colW / 2, width: GRID.colW, textAlign: "center", opacity: clamp01((t - (sb.badge!.from - 0.3)) / 0.3) * clamp01((sb.total - 0.6 - t) / 0.3) }}>
           <div data-role="credits" dir={fa ? "rtl" : "ltr"} style={{ fontFamily: fa ? FONT.fa : FONT.en, fontSize: 40, lineHeight: 1.5, color: INK.quiet }}>
             {sb.credits}
           </div>

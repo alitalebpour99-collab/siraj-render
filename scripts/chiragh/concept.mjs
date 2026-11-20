@@ -15,6 +15,35 @@ export const PROJECT_RULES =
 export const ENDINGS = ["loop", "callback", "question"];
 export const CLAUDE_MODEL = process.env.SIRAJ_CONCEPT_MODEL || "claude-opus-5-5";
 
+const str = { type: "string" };
+/** The concepts' JSON schema (structured output; every object closed, every field required). */
+export const CONCEPTS_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["concepts"],
+  properties: {
+    concepts: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["one_line", "idea_family", "hook", "anchor", "key_word", "beats", "twist_at_beat", "ending", "new_because"],
+        properties: {
+          one_line: str,
+          idea_family: str,
+          hook: { type: "object", additionalProperties: false, required: ["type", "choice"], properties: { type: str, choice: { type: "integer" } } },
+          anchor: { type: "object", additionalProperties: false, required: ["art", "regions", "key_region"], properties: { art: str, regions: { type: "array", items: str }, key_region: str } },
+          key_word: { anyOf: [{ type: "null" }, { type: "object", additionalProperties: false, required: ["verse", "index"], properties: { verse: str, index: { type: "integer" } } }] },
+          beats: { type: "array", items: str },
+          twist_at_beat: { type: "integer" },
+          ending: { type: "object", additionalProperties: false, required: ["type"], properties: { type: str } },
+          new_because: { type: "array", items: str },
+        },
+      },
+    },
+  },
+};
+
 /** What the concept writer is shown: the material without its sound files, the library, the recent fingerprints. */
 export function brief(m, recent) {
   return {
@@ -118,7 +147,8 @@ async function fromClaude(text) {
     max_tokens: 8000,
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
-    output_config: { effort: "low" },
+    // structured output: the answer is JSON of this schema, always (no parsing by hand)
+    output_config: { effort: "low", format: { type: "json_schema", schema: CONCEPTS_SCHEMA } },
     messages: [{ role: "user", content: text }],
   });
   if (res.stop_reason === "refusal") throw new Error("claude: refused");

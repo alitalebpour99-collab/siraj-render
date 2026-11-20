@@ -136,24 +136,28 @@ function mihrab(): ArtDef {
   const base = 574;
   const ys = 318;
   const W1 = 420;
-  const H1 = 286;
+  const H1 = 258;
   const band = 36;
-  const outer = archPts(CX, ys, W1, H1, 60);
-  const innerBand = offsetArch(CX, ys, W1, H1, band);
-  const mid = offsetArch(CX, ys, W1, H1, band / 2);
-  // the band: a zigzag between its two edges, an 8-pointed star at every third turn (a simple girih)
-  const pts = along(mid, 21);
-  const zig: Pt[] = pts.map((p, i) => {
-    const [x, y] = p;
-    const dx = x - CX;
-    const dy = y - ys;
-    const len = Math.hypot(dx, dy) || 1;
-    const s = (i % 2 ? 1 : -1) * (band / 2 - 4);
-    return [x + (dx / len) * s, y + (dy / len) * s];
-  });
-  const stars = pts.filter((_, i) => i % 3 === 1).map(([x, y]) => star(x, y, band / 2 - 3, 0.45));
-  const frame = [poly([[CX - W1 / 2 - 34, base], [CX - W1 / 2 - 34, ys - H1 - 18], [CX + W1 / 2 + 34, ys - H1 - 18], [CX + W1 / 2 + 34, base]]), poly([[CX - W1 / 2 - 22, base], [CX - W1 / 2 - 22, ys - H1 - 6], [CX + W1 / 2 + 22, ys - H1 - 6], [CX + W1 / 2 + 22, base]])];
-  const spandrels = [star(CX - W1 / 2 + 22, ys - H1 + 36, 22, 0.45), star(CX + W1 / 2 - 22, ys - H1 + 36, 22, 0.45), star(CX - W1 / 2 + 22, ys - H1 + 36, 12, 0.45, 8, -Math.PI / 2 + Math.PI / 8), star(CX + W1 / 2 - 22, ys - H1 + 36, 12, 0.45, 8, -Math.PI / 2 + Math.PI / 8)];
+  // the band: an interlaced lattice between its two edges (every point of the outer edge tied to the next of the inner, and back), an 8-pointed star at every fourth knot
+  const N = 26;
+  const o = archPts(CX, ys, W1, H1, N);
+  const n = archPts(CX, ys, W1 - 2 * band, H1 - band, N);
+  const m = archPts(CX, ys, W1 - band, H1 - band / 2, N);
+  const lattice: string[] = [];
+  for (let i = 0; i + 1 < o.length; i++) {
+    lattice.push(line(o[i]!, n[i + 1]!));
+    lattice.push(line(n[i]!, o[i + 1]!));
+  }
+  const stars = m.filter((_, i) => i % 4 === 2).map(([x, y]) => star(x, y, band / 2 - 6, 0.45));
+  const top = ys - H1 - 18;
+  const frame = [poly([[CX - W1 / 2 - 34, base], [CX - W1 / 2 - 34, top], [CX + W1 / 2 + 34, top], [CX + W1 / 2 + 34, base]]), poly([[CX - W1 / 2 - 22, base], [CX - W1 / 2 - 22, top + 12], [CX + W1 / 2 + 22, top + 12], [CX + W1 / 2 + 22, base]])];
+  // the frieze above the frame: a row of small 8-pointed stars between two lines
+  const frieze = [line([CX - W1 / 2 - 34, top - 28], [CX + W1 / 2 + 34, top - 28]), ...Array.from({ length: 15 }, (_, k) => star(CX - W1 / 2 - 20 + k * ((W1 + 40) / 14), top - 14, 9, 0.45))];
+  // the spandrels: in each upper corner an 8-pointed star in its octagon, ringed by four small stars
+  const spandrel = (x: number, y: number) => [octagon(x, y, 30), star(x, y, 26, 0.45), star(x, y, 13, 0.45, 8, -Math.PI / 2 + Math.PI / 8), ...[0, 1, 2, 3].map((k) => star(x + 44 * Math.cos((k * Math.PI) / 2 + Math.PI / 4), y + 44 * Math.sin((k * Math.PI) / 2 + Math.PI / 4), 7, 0.45))];
+  const spandrels = [...spandrel(CX - W1 / 2 + 6, top + 52), ...spandrel(CX + W1 / 2 - 6, top + 52)];
+  const outer = o;
+  const innerBand = n;
   const inner = archPts(CX, ys, W1 - 2 * band - 24, H1 - band - 20);
   const niche = archPts(CX, ys + 40, 236, 176);
   const flutes = [-96, -64, -32, 0, 32, 64, 96].map((dx) => line([CX + dx, base], [CX + dx, ys + 40 + 10 - Math.abs(dx) * 0.05]));
@@ -164,10 +168,11 @@ function mihrab(): ArtDef {
     groups: [
       { id: "ground", paths: [line([96, base], [848, base]), line([130, base + 10], [814, base + 10])] },
       { id: "frame", paths: frame },
+      { id: "frieze", paths: frieze },
       { id: "piers", paths: [line([CX - W1 / 2, base], [CX - W1 / 2, ys]), line([CX + W1 / 2, base], [CX + W1 / 2, ys]), line([CX - W1 / 2 + band, base], [CX - W1 / 2 + band, ys]), line([CX + W1 / 2 - band, base], [CX + W1 / 2 - band, ys])] },
       { id: "outer-arch", paths: [poly(outer), poly(innerBand)] },
       ...mosqueLamp(CX, ys - 150, 330, 1),
-      { id: "band", paths: [poly(zig)] },
+      { id: "band", paths: lattice },
       { id: "band-stars", paths: stars },
       { id: "spandrels", paths: spandrels },
       { id: "inner-arch", paths: [poly(inner), line([CX - (W1 - 2 * band - 24) / 2, base], [CX - (W1 - 2 * band - 24) / 2, ys]), line([CX + (W1 - 2 * band - 24) / 2, base], [CX + (W1 - 2 * band - 24) / 2, ys])] },
@@ -206,6 +211,14 @@ function mishkat(): ArtDef {
     groups: [
       { id: "frame", paths: [line([CX - 190, shelf + 30], [CX - 190, ys]), line([CX + 190, shelf + 30], [CX + 190, ys]), poly(archPts(CX, ys, 380, 250))] },
       { id: "niche", paths: [poly(niche), line([CX - 150, shelf], [CX - 150, ys]), line([CX + 150, shelf], [CX + 150, ys])] },
+      // the wall around the niche: a lattice of 8-pointed stars (girih), only outside the niche
+      {
+        id: "tiles",
+        paths: Array.from({ length: 9 * 12 }, (_, k): Pt => [CX - 176 + (k % 9) * 44, 70 + Math.floor(k / 9) * 44])
+          .filter(([x, y]) => Math.abs(x - CX) > 160 || y < ys - 210)
+          .filter(([x, y]) => Math.abs(x - CX) < 182 && y < shelf + 20)
+          .map(([x, y]) => star(x, y, 11, 0.45)),
+      },
       { id: "shelf", paths: [line([CX - 170, shelf], [CX + 170, shelf]), line([CX - 160, shelf + 12], [CX + 160, shelf + 12])] },
       { id: "glass", paths: [circle(CX, shelf - 92, 62), `M${CX - 30} ${shelf - 36}L${CX - 40} ${shelf}L${CX + 40} ${shelf}L${CX + 30} ${shelf - 36}`, `M${CX - 36} ${shelf - 140}Q${CX - 52} ${shelf - 110} ${CX - 44} ${shelf - 80}`] },
       { id: "flame", gold: true, fill: true, weight: 0, paths: [`M${CX} ${shelf - 64}C${CX - 12} ${shelf - 80} ${CX - 8} ${shelf - 104} ${CX} ${shelf - 124}C${CX + 8} ${shelf - 104} ${CX + 12} ${shelf - 80} ${CX} ${shelf - 64}Z`] },
@@ -298,29 +311,46 @@ function gate(): ArtDef {
 }
 
 function nightSky(): ArtDef {
-  const hills = `M60 520Q240 430 420 500T780 470T1020 520`;
-  const crescent = `M${CX + 120} 70A92 92 0 1 0 ${CX + 120} 254A74 74 0 1 1 ${CX + 120} 70Z`;
-  const stars: Pt[] = [[160, 120], [300, 70], [700, 110], [820, 220], [240, 260], [610, 300], [380, 200]];
+  const ground = 520;
+  // the land: two long hills and the line of the ground
+  const hills = [`M40 ${ground}Q220 ${ground - 70} 400 ${ground - 18}T760 ${ground - 30}T1040 ${ground}`, line([40, ground + 26], [1040, ground + 26])];
+  // a small mosque on the horizon, in lines only: drum, dome, finial, two minarets, three doors
+  const mx = CX + 10;
+  const mosque = [
+    poly([[mx - 120, ground + 26], [mx - 120, ground - 70], [mx + 120, ground - 70], [mx + 120, ground + 26]]),
+    `M${mx - 80} ${ground - 70}C${mx - 86} ${ground - 140} ${mx - 30} ${ground - 176} ${mx} ${ground - 186}C${mx + 30} ${ground - 176} ${mx + 86} ${ground - 140} ${mx + 80} ${ground - 70}`,
+    line([mx, ground - 186], [mx, ground - 210]),
+    star(mx, ground - 220, 8),
+    ...[-1, 1].flatMap((k) => [line([mx + k * 160, ground + 26], [mx + k * 160, ground - 170]), line([mx + k * 180, ground + 26], [mx + k * 180, ground - 170]), `M${mx + k * 160} ${ground - 170}Q${mx + k * 170} ${ground - 214} ${mx + k * 180} ${ground - 170}`, line([mx + k * 152, ground - 120], [mx + k * 188, ground - 120])]),
+    ...[-60, 0, 60].map((dx) => poly(archPts(mx + dx, ground - 10, 34, 30, 10))),
+  ];
+  // the crescent with an inner rim
+  const moon = [`M${CX + 230} 40A96 96 0 1 0 ${CX + 230} 232A76 76 0 1 1 ${CX + 230} 40Z`, `M${CX + 222} 60A80 80 0 1 0 ${CX + 222} 212`];
+  // the stars: 8-pointed, of three sizes, and one constellation line between a few of them
+  const big: Pt[] = [[150, 110], [330, 60], [560, 150], [800, 260]];
+  const mid: Pt[] = [[240, 220], [430, 130], [680, 70], [900, 140], [120, 300], [980, 330]];
+  const small: Pt[] = [[200, 160], [370, 250], [500, 60], [620, 230], [760, 160], [880, 60], [60, 200], [1000, 230], [300, 330], [700, 340]];
   return {
     id: "night",
-    tags: ["night", "rest", "sleep", "moon", "stars", "time", "signs", "calm"],
+    tags: ["night", "rest", "sleep", "moon", "stars", "time", "signs", "calm", "remembrance"],
     figures: false,
     groups: [
-      { id: "horizon", paths: [hills, `M60 556Q300 520 520 548T1020 556`] },
-      { id: "moon", paths: [crescent] },
-      { id: "stars-a", paths: stars.slice(0, 4).map(([x, y]) => star(x, y, 14)) },
-      { id: "stars-b", paths: stars.slice(4).map(([x, y]) => star(x, y, 10)) },
-      { id: "dome", paths: [`M${CX - 70} 500Q${CX} 380 ${CX + 70} 500`, line([CX, 420], [CX, 400]), line([CX - 160, 500], [CX - 160, 400]), line([CX - 150, 500], [CX - 150, 400]), `M${CX - 166} 400Q${CX - 155} 380 ${CX - 144} 400`] },
+      { id: "land", paths: hills },
+      { id: "mosque", paths: mosque },
+      { id: "moon", paths: moon },
+      { id: "stars-a", paths: big.map(([x, y]) => star(x, y, 18, 0.42)) },
+      { id: "stars-b", paths: mid.map(([x, y]) => star(x, y, 11, 0.42)) },
+      { id: "stars-c", paths: small.map(([x, y]) => star(x, y, 6, 0.5)) },
+      { id: "constellation", paths: [poly([big[0]!, mid[0]!, big[1]!, mid[1]!, big[2]!])] },
     ],
     regions: [
-      { id: "whole", x: 60, y: 20, w: 960, h: 560 },
-      { id: "moon", x: 470, y: 30, w: 260, h: 260 },
-      { id: "sky", x: 120, y: 40, w: 420, h: 300 },
-      { id: "land", x: 200, y: 340, w: 560, h: 240 },
+      { id: "whole", x: 40, y: 20, w: 1000, h: 570 },
+      { id: "moon", x: 520, y: 20, w: 300, h: 260 },
+      { id: "sky", x: 100, y: 30, w: 520, h: 320 },
+      { id: "mosque", x: 262, y: 280, w: 440, h: 300 },
     ],
   };
 }
-
 function oliveTree(): ArtDef {
   const trunk = `M${CX - 20} 580C${CX - 30} 500 ${CX - 50} 440 ${CX - 10} 380C${CX + 20} 340 ${CX - 10} 300 ${CX} 260`;
   const trunk2 = `M${CX + 20} 580C${CX + 30} 500 ${CX + 50} 450 ${CX + 18} 390`;

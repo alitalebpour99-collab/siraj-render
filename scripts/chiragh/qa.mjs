@@ -192,8 +192,18 @@ export const CRITERIA = [
   "calm: calm and respectful, but never static",
 ];
 
-/** The vision judge: the 1 fps contact sheet beside the approved style frame, scored against the criteria. */
+/** The vision judge, twice (it is not steady from one look to the next): the median of the two looks, and both kept. */
 export async function visionScore(sheetFile, styleFile) {
+  const looks = [];
+  for (let k = 0; k < 2; k++) looks.push(await visionOnce(sheetFile, styleFile));
+  const scores = looks.map((l) => l.score).filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
+  // the median of two is their mean; a look that failed does not count
+  const score = scores.length ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : null;
+  const pick = looks.reduce((a, b) => (Math.abs((a.score ?? 0) - (score ?? 0)) <= Math.abs((b.score ?? 0) - (score ?? 0)) ? a : b));
+  return { ...pick, score, looks: looks.map((l) => l.score), person: looks.some((l) => l.person) };
+}
+
+async function visionOnce(sheetFile, styleFile) {
   if (!vertexReady()) return { score: null, why: "the Vertex proxy is not configured" };
   const parts = [
     { text: "Image 1: the APPROVED style frame of Siraj's video style «Chiragh» (the verse area is left empty on purpose)." },
