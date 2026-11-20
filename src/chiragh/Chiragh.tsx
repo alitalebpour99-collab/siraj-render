@@ -30,8 +30,10 @@ function cameraTransform(art: InlineArt, region: string, scale: number) {
   const r = art.regions.find((x) => x.id === region) ?? art.regions[0]!;
   const fit = Math.min(1080 / r.w, STAGE_H / r.h);
   const z = Math.max(0.96, Math.min(1.4, Math.min(fit, 1.3) * scale));
-  const fx = r.x + r.w / 2;
-  const fy = r.y + r.h / 2;
+  // the camera leans towards a region but keeps the anchor near the column (one centred grid)
+  const all = art.regions[0]!;
+  const fx = 0.5 * (r.x + r.w / 2) + 0.5 * (all.x + all.w / 2);
+  const fy = 0.6 * (r.y + r.h / 2) + 0.4 * (all.y + all.h / 2);
   return { z, tx: GRID.colX - fx * z, ty: STAGE_H / 2 - fy * z };
 }
 
@@ -268,7 +270,12 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
   if (prevShot?.transition_out === "lamp-rise") rise = Math.max(rise, 1 - ease((t - shot.start) / 0.45));
   // the text layer: the shot's, the previous one fading out over 0.25 s
   const layerOf = (s: typeof shot) => `${s.text.layer}:${s.text.ref ?? ""}`;
-  const fadeIn = prevShot && layerOf(prevShot) !== layerOf(shot) ? ease((t - shot.start) / 0.3) : 1;
+  // a new text comes in BEFORE its shot (0.45 s ahead), so a verse stands on screen before its first word is recited
+  const LEAD = 0.45;
+  const ahead = shotAt(sb, t + LEAD);
+  const changing = ahead !== shot && layerOf(ahead) !== layerOf(shot);
+  const lead = changing ? ease((t - (ahead.start - LEAD)) / 0.3) : 0;
+  const fadeIn = 1;
   const textLayer = (s: typeof shot, op: number) => {
     if (op <= 0.01) return null;
     if (s.text.layer === "verse") {
@@ -320,8 +327,8 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
         </div>
       </div>
       {/* the text under the anchor */}
-      {prevShot && fadeIn < 1 && layerOf(prevShot) !== layerOf(shot) ? textLayer(prevShot, 1 - fadeIn) : null}
-      {textLayer(shot, end ? 1 - clamp01((t - (sb.badge!.from - 0.4)) / 0.3) : fadeIn)}
+      {changing && !end ? textLayer(ahead, lead) : null}
+      {textLayer(shot, end ? 1 - clamp01((t - (sb.badge!.from - 0.4)) / 0.3) : changing ? 1 - lead : fadeIn)}
       {/* the close: the sources (one line), the badge */}
       {end ? (
         <div style={{ position: "absolute", top: GRID.text.top + 120, left: GRID.colX - GRID.colW / 2, width: GRID.colW, textAlign: "center", opacity: clamp01((t - (sb.badge!.from - 0.3)) / 0.3) * clamp01((sb.total - t) / 0.35) }}>

@@ -71,6 +71,7 @@ export function measureSync(file, sb, probes) {
   const boxOf = new Map();
   for (const p of probes) for (const x of p.words ?? []) if (!boxOf.has(x.w) && x.box[2] > 4) boxOf.set(x.w, x.box);
   const errs = [];
+  const late = [];
   let skipped = 0;
   for (const v of sb.verses) {
     if (v.mode !== "word") continue;
@@ -106,6 +107,12 @@ export function measureSync(file, sb, probes) {
         }
         const b = before.reduce((s, x) => s + x, 0) / before.length;
         const a = after.reduce((s, x) => s + x, 0) / after.length;
+        // a word not yet on screen before it is recited is a layout fault, counted apart
+        if (b > 225) {
+          late.push(id);
+          skipped++;
+          return;
+        }
         if (b - a < 1.0) {
           skipped++;
           return;
@@ -121,12 +128,13 @@ export function measureSync(file, sb, probes) {
         const p0 = series[i - 1];
         const tc = p0.t + ((p0.m - mid) / Math.max(1e-6, p0.m - cross.m)) * (cross.t - p0.t);
         errs.push(Math.round((tc - wd.start) * 1000) / 1000);
+        if (process.env.QA_DEBUG) console.log(`sync ${id}: ${Math.round((tc - wd.start) * 1000)} ms (start ${wd.start}, end ${wd.end}, before ${b.toFixed(1)}, after ${a.toFixed(1)})`);
       });
     });
   }
   const abs = errs.map(Math.abs).sort((x, y) => x - y);
   const q = (p) => (abs.length ? abs[Math.min(abs.length - 1, Math.floor(p * abs.length))] : null);
-  return { measured: errs.length, skipped, medianMs: q(0.5) === null ? null : Math.round(q(0.5) * 1000), p90Ms: q(0.9) === null ? null : Math.round(q(0.9) * 1000), maxMs: abs.length ? Math.round(abs.at(-1) * 1000) : null };
+  return { measured: errs.length, skipped, late: late.length, medianMs: q(0.5) === null ? null : Math.round(q(0.5) * 1000), p90Ms: q(0.9) === null ? null : Math.round(q(0.9) * 1000), maxMs: abs.length ? Math.round(abs.at(-1) * 1000) : null };
 }
 
 /** The texts the page drew: sizes, contrast, safe zones, and the hash of each verse piece against the stored text. */
@@ -234,6 +242,7 @@ export async function runGate({ file, sb, probes, sources, styleFile, sheetFile,
   const sync = measureSync(file, sb, probes);
   if (sync.measured && sync.p90Ms > 100) hard.push(`sync: 90 % of the words within ${sync.p90Ms} ms (over 100)`);
   if (sb.verses.some((v) => v.mode === "word") && !sync.measured) hard.push("sync: no word could be measured");
+  if (sync.late) hard.push(`sync: ${sync.late} verse words appear only after they are recited`);
   // texts
   hard.push(...checkTexts(sb, probes, sources));
   // figures (the library)

@@ -47,7 +47,7 @@ Write THREE clearly different concepts. For each:
 1. one_line: ≤ 14 words, ${m.lang === "fa" ? "Persian" : "English"}, the idea of this video
 2. idea_family: one of families
 3. hook: { type: one of hook_types, choice: index into allowed_hooks }
-4. anchor: { art: an id of library (it must fit the verse's meaning: read the tags), regions: 2–4 region ids of that art in the order the camera visits them (the first is where it opens and closes), key_region: the region the camera pushes into on the key word }
+4. anchor (Siraj's identity is the lamp: the approved style frame is a mihrab with a hanging lamp; prefer an anchor with a lamp, mihrab or mishkat, unless the verse's meaning clearly calls for another, and never the anchor of the last video): { art: an id of library (it must fit the verse's meaning: read the tags), regions: 2–4 region ids of that art in the order the camera visits them (the first is where it opens and closes), key_region: the region the camera pushes into on the key word }
 5. key_word: { verse, index } from key_word_choices (the word that carries the verse; null for a template without a verse)
 6. beats: 4–8 short internal notes, each = one moment + the drawn object that shows it
 7. twist_at_beat: the beat where expectation turns
