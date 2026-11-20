@@ -236,7 +236,14 @@ Return JSON only: {"score": number, "criteria": {"new": n, "anchor": n, "sync": 
 /** The 1 fps contact sheet (8 across), with each second's number in its corner. */
 export function contactSheet(file, seconds, out) {
   const rows = Math.max(1, Math.ceil(seconds / 6));
-  execFileSync("ffmpeg", ["-y", "-v", "error", "-i", file, "-vf", `fps=1,scale=270:-2,drawtext=text='%{eif\\:n\\:d}s':x=6:y=6:fontsize=18:fontcolor=white:box=1:boxcolor=0x0a4535@0.85,tile=6x${rows}:padding=4:color=0x6e6250`, "-frames:v", "1", "-q:v", "3", out]);
+  const label = "drawtext=text='%{eif\\:n\\:d}s':x=6:y=6:fontsize=18:fontcolor=white:box=1:boxcolor=0x0a4535@0.85,";
+  const run = (withLabel) => execFileSync("ffmpeg", ["-y", "-v", "error", "-i", file, "-vf", `fps=1,scale=270:-2,${withLabel ? label : ""}tile=6x${rows}:padding=4:color=0x6e6250`, "-frames:v", "1", "-q:v", "3", out]);
+  // an ffmpeg without drawtext (a static fallback build) makes the sheet without the second numbers
+  try {
+    run(true);
+  } catch {
+    run(false);
+  }
   return out;
 }
 
