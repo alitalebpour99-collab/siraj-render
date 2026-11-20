@@ -36,7 +36,11 @@ jobs:
       SAMPLE_PARTS: "1"
       # a trial is for looking: the gate reports (out/<id>.gate.json) and the run goes on
       SIRAJ_GATE: warn
-      SIRAJ_STYLE: ${{ vars.SIRAJ_STYLE }}
+      # «چراغ» (2026-11-20): the concept writer (Claude, else Gemini) and the QA judge (Gemini on Vertex, via Ahura's proxy)
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GOOGLE_VERTEX_PROXY_URL: ${{ secrets.GOOGLE_VERTEX_PROXY_URL }}
+      GOOGLE_VERTEX_PROXY_KEY: ${{ secrets.GOOGLE_VERTEX_PROXY_KEY }}
+      GOOGLE_VERTEX_PROJECT: ${{ secrets.GOOGLE_VERTEX_PROJECT }}
       SIRAJ_BADGE: ${{ vars.SIRAJ_BADGE }}
     steps:
       - uses: actions/checkout@v4
@@ -86,9 +90,10 @@ jobs:
         if: always()
         run: |
           mkdir -p keep
-          cp out/frames/*.jpg out/*.jpg out/*.json keep/ 2>/dev/null || true
+          cp out/frames/*.jpg out/*.jpg out/*.json out/*.jsonl keep/ 2>/dev/null || true
           # the gate's report and the measured loudness, in the log too
           for g in out/*.gate.json; do [ -e "$g" ] && jq -c '{ok, loudness, failed: [.checks[] | select(.ok | not) | .id]}' "$g"; done
+          for g in out/*.qa*.json; do [ -e "$g" ] && jq -c '{pass, score, hard, still, sync, shots}' "$g"; done
           cp out/*.picture.mp4 keep/ 2>/dev/null || true
           if [ -d out/voice ]; then cp -r out/voice keep/voice; fi
           ls -la keep

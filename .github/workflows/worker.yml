@@ -57,9 +57,13 @@ jobs:
       RENDER_GL: swangle
       RENDER_CONCURRENCY: "4"
       PYTHON: python
-      # the set style of 2026-11-14 (repository variables; unset = on): SIRAJ_STYLE=classic brings
-      # the old look back, SIRAJ_BADGE=off removes the channel badge, SIRAJ_GATE=warn|off loosens the gate
-      SIRAJ_STYLE: ${{ vars.SIRAJ_STYLE }}
+      # ONE style, «چراغ» (2026-11-20; the classic look is gone). SIRAJ_BADGE=off removes the channel
+      # badge, SIRAJ_GATE=warn|off loosens the old formats' gate (the seven templates always pass «چراغ»'s QA or are held)
+      # «چراغ» (2026-11-20): the concept writer (Claude, else Gemini) and the QA judge (Gemini on Vertex, via Ahura's proxy)
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GOOGLE_VERTEX_PROXY_URL: ${{ secrets.GOOGLE_VERTEX_PROXY_URL }}
+      GOOGLE_VERTEX_PROXY_KEY: ${{ secrets.GOOGLE_VERTEX_PROXY_KEY }}
+      GOOGLE_VERTEX_PROJECT: ${{ secrets.GOOGLE_VERTEX_PROJECT }}
       SIRAJ_BADGE: ${{ vars.SIRAJ_BADGE }}
       SIRAJ_GATE: ${{ vars.SIRAJ_GATE }}
       SIRAJ_LAMP_INSIGHTS: ${{ vars.SIRAJ_LAMP_INSIGHTS }}
