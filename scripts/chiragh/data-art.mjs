@@ -65,11 +65,11 @@ export function grid(data, numbers, lang) {
   const lit = Array.isArray(data.lit) ? data.lit : [];
   const focus = Number(data.focus) || null;
   const cols = 19;
-  const cell = 34;
-  const gap = 8;
+  const cell = 38;
+  const gap = 7;
   const w = cols * (cell + gap) - gap;
   const x0 = CX - w / 2;
-  const y0 = 250;
+  const y0 = 230;
   const at = (i) => {
     const c = i % cols;
     const r = Math.floor(i / cols);
@@ -94,7 +94,7 @@ export function grid(data, numbers, lang) {
     regions.push({ id: "focus", x: fx - 140, y: fy - 160, w: 320, h: 320 });
   }
   const big = numbers?.without ?? numbers?.occurrences ?? numbers?.with ?? numbers?.count ?? null;
-  if (big !== null && big !== undefined) labels.push({ x: CX, y: 120, text: num(big, lang), size: 110, group: "cells", font: lang });
+  if (big !== null && big !== undefined) labels.push({ x: CX, y: 110, text: num(big, lang), size: 150, group: "cells", font: lang });
   regions.push({ id: "count", x: CX - 220, y: 20, w: 440, h: 220 });
   return { id: "grid", tags: ["count", "surahs", "mushaf", "only"], figures: false, groups, regions, labels };
 }
