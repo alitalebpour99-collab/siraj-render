@@ -19,3 +19,6 @@ keep/
 *.ogg
 *.flac
 .work/
+
+# the approved «چراغ» style frame the QA judge compares with (owner, 2026-11-20)
+!refs/chiragh-style.jpg

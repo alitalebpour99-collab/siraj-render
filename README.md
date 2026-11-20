@@ -58,7 +58,55 @@ the Story cut). Search forms are locators (a verse and a word span), never typed
 | `src/ornament.tsx`, `src/light.tsx` | the night, the mushaf frame, the cartouche, the seals, the moving light |
 | `public/fonts/` | Amiri Quran, Vazirmatn, EB Garamond, each with its SIL Open Font License |
 
-## The lamp style (2026-11-14)
+## «چراغ», the ONE style (2026-11-20)
+
+Owner, 20 November 2026: one style per project. Siraj's is «چراغ» (style bible v2): warm cream, emerald for the
+Arabic, the ayah numbers and every line, gold only for the flame and the lamp's halo; no music, no figure, no
+hexagram, no generated calligraphy. The old looks (lapis, night, pewter, paper, the classic verse Reel) are gone:
+every format draws in this palette (`src/studio.ts`), and the seven templates of the bible are drawn by one
+composition, `chiragh` (`src/chiragh/Chiragh.tsx`), from a storyboard:
+
+| template | jobs |
+|---|---|
+| آیه‌به‌آیه (verse-by-verse) | `en-verse`, `fa-verse` |
+| یک آیه برای امشب (night-verse) | `en-night-verse`, `fa-night-verse` |
+| چرا این واژه؟ (word-choice) | `fa-word-choice:*` |
+| فاصله‌ها (distances) | `*-one-line:*` |
+| فقط در قرآن / شمارش‌ها (only-counts) | `*-only:*`, `*-myth-fact:*`, `*-counted:*`, `*-meccan-medinan:*`, `*-mushaf-map:*`, `*-middle:*`, `*-revelation-order:*`, `*-opening-letters:*` |
+| راه (path) | `props.kind = "path"`: places with lat/lon and a source each (nothing is placed without one) |
+| از نوشته‌های تو (writing) | `fa-writing` |
+
+Per video (`scripts/chiragh/run.mjs`):
+1. **Alignment** (`align-refine.mjs`): the Quran Foundation word segments, checked against the cut clip's own sound
+   (each word start moves onto a clear dip within 120 ms); the drift is logged.
+2. **Concepts** (`concept.mjs`): Claude (`claude-opus-5-5`, structured output against a JSON schema; else Gemini on Vertex, else three by rule) writes three
+   concepts. A concept only CHOOSES: the anchor and its regions from the line-art library, the key word among the
+   verse's own words, the hook among the template's approved lines, the idea family, hook and ending types.
+   Nothing it writes is shown.
+3. **Pick** (`pick.mjs`): the concept least like the last 30 videos (Jaccard of fingerprints, sent by the service as
+   `props.chiragh.recent`) that keeps the repeat rules (family, hook type, ending, anchor, opening, key word).
+4. **Director** (`director.mjs`) → `out/<id>.storyboard.json`: every sound placed (the narrator never over the qari),
+   the verse in pieces that fit (joined, the stored text exactly), and a shot every 1–2.5 s, each starting on a word of
+   the qari or the narrator (the key word always starts one), with picture (the groups drawn), motion (camera region
+   and scale), text, sound, transition and meaning.
+5. **Render**: the anchor's emerald line art draws group by group (`src/chiragh/art.ts`: mihrab, mishkat, rosette,
+   mushaf, gate, night, olive, oasis, all code, no figure; the counting templates draw their data as line art:
+   `scripts/chiragh/data-art.mjs`), the camera moves between regions, each verse word turns emerald with a soft glow
+   on its first sound, the lamp's halo breathes and rises between ayahs.
+6. **QA gate** (`qa.mjs`): shots 1–2.5 s; frame by frame (10 a second) no 2.5 s without a visible change; the word
+   light measured IN THE PICTURE against the recitation (90 % within 100 ms); text 40 px or more, contrast 4.5:1
+   (Arabic 7:1), inside the safe zones; every verse piece hashed on the page and compared with the stored text; the
+   anchor from the figure-free library; then a vision judge scores the 1 fps contact sheet beside the approved style
+   frame (`refs/chiragh-style.jpg`), with a 5 fps strip of the verse area for the word light, against ten criteria
+   from the references. It looks **twice** and the median counts. Gemini on Vertex judges first; when Vertex refuses
+   (403 «eligible paid billing account», as on the trial credit since 20 Nov), Claude judges the same images. Below 8/10 or any hard check failed:
+   the next concept (at most three tries); a video that never passes is handed in **held** (`manifest.qa.hold`), so
+   the owner decides in the panel; nothing posts by itself.
+
+Secrets (repository): `ANTHROPIC_API_KEY`, `GOOGLE_VERTEX_PROXY_URL`, `GOOGLE_VERTEX_PROXY_KEY`,
+`GOOGLE_VERTEX_PROJECT`. Every Vertex call is logged to `out/vertex-usage.jsonl` with its cost.
+
+## The lamp style (2026-11-14, now inside «چراغ»)
 
 The owner approved the new video style on 13 November and asked for it in each project's own
 look. The verse and the insight Reels are drawn in Siraj's **lamp look**: warm cream, a deep
@@ -99,7 +147,7 @@ shakes or flashes.
   served), `persian` (no «·» or «|» beside Persian), `badge`, `loudness`. A Reel that fails is
   not handed in: the worker reports it failed for good with the reason in plain Persian.
 - **Which Reels**: every verse Reel, and the insight formats whose samples passed the gate: The Only…, The Counts Test, Meccan · Medinan, One Line, Why this word? (`LAMP_INSIGHTS` in `scripts/render.mjs`); the other insight formats and the counts, surah cards and books keep the classic look without the gate until a sample of theirs passes (`SIRAJ_LAMP_INSIGHTS`, a list or `all`, widens it).
-- **Switches** (repository variables, unset = on): `SIRAJ_STYLE=classic` (the old look),
+- **Switches** (repository variables, unset = on):
   `SIRAJ_BADGE=off`, `SIRAJ_GATE=warn` (report only) or `off`. Trials (`try.yml`) run the gate on
   `warn` and keep its report, a 360 px copy of the picture and a sheet of two frames a second.
 

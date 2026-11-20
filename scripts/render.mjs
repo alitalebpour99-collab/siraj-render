@@ -25,6 +25,7 @@ import { TARGET, levelFilter as level, loudness, meets } from "./finish.mjs";
 import { enforce } from "./gate.mjs";
 import { check, jobArg, runMain } from "./lib.mjs";
 import { manifestOf } from "./manifest.mjs";
+import { chiraghJob, isChiragh } from "./chiragh/run.mjs";
 
 /**
  * The set style of 2026-11-14 for this job, from the repository variables (worker.yml):
@@ -32,10 +33,11 @@ import { manifestOf } from "./manifest.mjs";
  * The lamp look is drawn for the verse Reels and the insight formats of LAMP_INSIGHTS; the others keep the classic look.
  */
 export function styleFor(props, env = process.env) {
-  if (env.SIRAJ_STYLE === "classic") return null;
+  // ONE style (owner, 2026-11-20): every format is drawn in the cream, emerald and lamp palette;
+  // the seven templates by «چراغ» (scripts/chiragh/run.mjs), the rest here. SIRAJ_STYLE=classic is gone.
   const insights = (env.SIRAJ_LAMP_INSIGHTS || LAMP_INSIGHTS.join(",")).split(",").map((x) => x.trim());
-  const lamp = props.kind === "verse" || (props.kind === "insight" && (insights.includes("all") || insights.includes(props.format)));
-  return lamp ? { lamp: true, badge: env.SIRAJ_BADGE !== "off" } : null;
+  const gated = props.kind === "verse" || (props.kind === "insight" && (insights.includes("all") || insights.includes(props.format)));
+  return { lamp: true, badge: env.SIRAJ_BADGE !== "off", gate: gated ? "on" : "warn" };
 }
 
 /**
@@ -161,10 +163,14 @@ function moments(props, inputProps, timeline) {
 }
 
 export async function renderJob(job, { stills = false, frames = process.env.FRAMES === "1" } = {}) {
-  const { props, voice, qari, inputProps, timeline, style } = inputsOf(job);
+  const head = readJson(path.join("props", `${job.id}.json`));
+  check(head, `props/${job.id}.json`);
   // an insight or a waiting template is named by its format (fa-nahj-hikma, en-mirror …)
-  const want = props.kind === "insight" || props.kind === "waiting" ? `${props.lang}-${props.format}` : props.kind === "verse" && props.night ? `${props.lang}-night-verse` : `${props.lang}-${props.kind}`;
+  const want = head.kind === "insight" || head.kind === "waiting" ? `${head.lang}-${head.format}` : head.kind === "verse" && head.night ? `${head.lang}-night-verse` : `${head.lang}-${head.kind}`;
   check(job.composition === want, `the job's composition ${job.composition} is ${want}`);
+  // the seven templates of «چراغ»: concept, storyboard, render, QA gate (scripts/chiragh/run.mjs)
+  if (isChiragh(head)) return chiraghJob(job, { stills });
+  const { props, voice, qari, inputProps, timeline, style } = inputsOf(job);
   const out = path.resolve("out");
   const frameDir = path.join(out, "frames");
   fs.mkdirSync(frameDir, { recursive: true });
@@ -301,7 +307,7 @@ export async function renderJob(job, { stills = false, frames = process.env.FRAM
   if (style?.lamp) {
     const plan = gatePlan(props, inputProps, timeline);
     console.log(`${job.id}: gate on ${probes.length} measured frames`);
-    const result = enforce({ probes, plan, file: final, mode: process.env.SIRAJ_GATE ?? "on", log: (l) => console.log(`${job.id}: ${l}`) });
+    const result = enforce({ probes, plan, file: final, mode: style.gate === "warn" ? "warn" : (process.env.SIRAJ_GATE ?? "on"), log: (l) => console.log(`${job.id}: ${l}`) });
     // a trial keeps what the page measured too (numbers and hashes only), to check the gate again on the PC
     if (process.env.SAMPLE_PARTS === "1") fs.writeFileSync(path.join(out, `${job.id}.probes.json`), JSON.stringify({ plan, probes }));
     if (result) fs.writeFileSync(path.join(out, `${job.id}.gate.json`), `${JSON.stringify({ ok: result.ok, checks: result.checks, loudness: loud, frames: probes.length }, null, 1)}

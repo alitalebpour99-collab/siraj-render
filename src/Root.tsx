@@ -7,19 +7,15 @@ import React from "react";
 import { Composition } from "remotion";
 import { CardReel } from "./Card";
 import { CountsReel } from "./Counts";
-import { CardCover, CountsCover, VerseCover } from "./Cover";
+import { CardCover, CountsCover } from "./Cover";
 import { InsightCover, InsightReel, InsightSlide } from "./Insight";
 import "./fonts";
-import type { CardProps, CountsProps, InsightFormat, InsightProps, Lang, MetadataSource, Release, VerseProps } from "./props";
+import type { CardProps, CountsProps, InsightFormat, InsightProps, Lang, MetadataSource, Release } from "./props";
 import { DEFAULT_STUDIO } from "./studio";
 import { FPS, H, W } from "./theme";
-import { cardTimeline, countsTimeline, insightTimeline, verseTimeline } from "./timelines";
-import { VerseReel } from "./Verse";
-import { LampVerse } from "./lamp/LampVerse";
-
-/** The verse in the set style's lamp look when the render asks for it (render.mjs: SIRAJ_STYLE), else the classic look. */
-const VerseAny: React.FC<VerseProps> = (props) => (props.style?.lamp ? <LampVerse {...props} /> : <VerseReel {...props} />);
+import { cardTimeline, countsTimeline, insightTimeline } from "./timelines";
 import { WaitingCompositions } from "./Waiting";
+import { Chiragh, ChiraghCover, type ChiraghProps } from "./chiragh/Chiragh";
 
 const release: Release = {
   releaseKey: "",
@@ -40,22 +36,6 @@ const release: Release = {
 const metadata: MetadataSource = { title: "", url: "https://siraj.ahura.cloud", licenseName: "", licenseUrl: "", sha256: "" };
 const voice = { engine: "none" as const, voice: null, lines: [] };
 const surah = { number: 1, ayahCount: 0, nameArabic: "", revelationPlace: "meccan" as const, revelationOrder: 0, tname: "", ename: "", rukus: 0 };
-
-const emptyVerse = (lang: Lang): VerseProps => ({
-  kind: "verse",
-  id: "",
-  lang,
-  surah,
-  surahTotal: 114,
-  whole: true,
-  from: 1,
-  to: 1,
-  opening: null,
-  ayahs: [],
-  source: { quran: release, translation: { title: "", translatorName: "", language: lang, termsText: null, release }, translationNote: null, surahMetadata: metadata },
-  voice,
-  qari: null,
-});
 
 const emptyCounts = (lang: Lang): CountsProps => ({
   kind: "counts",
@@ -113,17 +93,15 @@ const reel = { width: W, height: H, fps: FPS };
 const grid = { width: 1080, height: 1350, fps: FPS };
 const LANGS = ["en", "fa"] as const;
 
+/** «چراغ» (owner, 2026-11-20): the ONE composition of the seven templates, drawn from storyboard.json. */
+const noBoard: ChiraghProps = { storyboard: null };
+
 export const Root: React.FC = () => (
   <>
+    <Composition id="chiragh" component={Chiragh} {...reel} durationInFrames={300} defaultProps={noBoard} calculateMetadata={({ props }: { props: ChiraghProps }) => ({ durationInFrames: props.storyboard ? Math.ceil(props.storyboard.total * FPS) : 300 })} />
+    <Composition id="chiragh-cover" component={ChiraghCover} {...reel} durationInFrames={1} defaultProps={noBoard} />
     {LANGS.map((lang) => (
       <React.Fragment key={lang}>
-        <Composition id={`${lang}-verse`} component={VerseAny} {...reel} durationInFrames={300} defaultProps={emptyVerse(lang)} calculateMetadata={({ props }) => ({ durationInFrames: verseTimeline(props).total })} />
-        <Composition id={`${lang}-verse-cover`} component={VerseCover} {...reel} durationInFrames={1} defaultProps={emptyVerse(lang)} />
-        <Composition id={`${lang}-verse-grid`} component={VerseCover} {...grid} durationInFrames={1} defaultProps={emptyVerse(lang)} />
-        {/* «یک آیه برای امشب» (2026-11-15): the verse Reel with the night's theme, no narrator */}
-        <Composition id={`${lang}-night-verse`} component={VerseAny} {...reel} durationInFrames={300} defaultProps={emptyVerse(lang)} calculateMetadata={({ props }) => ({ durationInFrames: verseTimeline(props).total })} />
-        <Composition id={`${lang}-night-verse-cover`} component={VerseCover} {...reel} durationInFrames={1} defaultProps={emptyVerse(lang)} />
-        <Composition id={`${lang}-night-verse-grid`} component={VerseCover} {...grid} durationInFrames={1} defaultProps={emptyVerse(lang)} />
         <Composition id={`${lang}-counts`} component={CountsReel} {...reel} durationInFrames={300} defaultProps={emptyCounts(lang)} calculateMetadata={({ props }) => ({ durationInFrames: countsTimeline(props).total })} />
         <Composition id={`${lang}-counts-cover`} component={CountsCover} {...reel} durationInFrames={1} defaultProps={emptyCounts(lang)} />
         <Composition id={`${lang}-counts-grid`} component={CountsCover} {...grid} durationInFrames={1} defaultProps={emptyCounts(lang)} />
