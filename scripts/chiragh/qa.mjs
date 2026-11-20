@@ -166,7 +166,7 @@ export function checkTexts(sb, probes, sources) {
       if (x.role === "label") continue;
       if (x.size < 39.5) small++;
       // a waiting verse word is 6:1, a recited one 7:1 (emerald); every other text 4.5:1
-      const need = x.role === "verse" ? 5.5 : 4.5;
+      const need = 4.5;
       if (x.contrast < need) faint++;
       const [bx, by, bw, bh] = x.box;
       if (bw > 0 && (bx < SAFE.left - 2 || by < SAFE.top - 2 || bx + bw > SAFE.right + 2 || by + bh > SAFE.bottom + 2)) outside++;

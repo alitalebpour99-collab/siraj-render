@@ -118,6 +118,7 @@ function mosqueLamp(x: number, top: number, y: number, s = 1): ArtGroup[] {
     { id: "chain", paths: [line([x, top], [x, y - k(70)]), ...links, line([x, y - k(70)], [x - k(40), y - k(28)]), line([x, y - k(70)], [x + k(40), y - k(28)])] },
     {
       id: "lamp",
+      gold: true,
       paths: [
         `M${x - k(46)} ${y - k(28)}L${x + k(46)} ${y - k(28)}`,
         `M${x - k(40)} ${y - k(28)}C${x - k(64)} ${y + k(6)} ${x - k(40)} ${y + k(44)} ${x - k(14)} ${y + k(52)}L${x + k(14)} ${y + k(52)}C${x + k(40)} ${y + k(44)} ${x + k(64)} ${y + k(6)} ${x + k(40)} ${y - k(28)}`,

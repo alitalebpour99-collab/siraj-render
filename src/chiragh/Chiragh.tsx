@@ -74,7 +74,7 @@ export const WordGlow: React.FC<{ v: Verse; t: number; lang: string }> = ({ v, t
           <span
             key={i}
             data-w={`${v.id}:${ci}:${k}`}
-            style={{ display: "inline-block", padding: "0 1px", borderRadius: 18, backgroundImage: g > 0.01 ? `radial-gradient(closest-side, rgba(236,186,92,${(0.42 * g).toFixed(2)}), rgba(236,186,92,0))` : undefined, color: mix(INK.waiting, INK.emerald, lit(k)), transform: g > 0.01 ? `translateY(${(-6 * g).toFixed(1)}px) scale(${(1 + 0.07 * g).toFixed(3)})` : undefined, textShadow: g > 0.01 ? `0 0 ${Math.round(26 * g)}px rgba(217,164,65,${(0.75 * g).toFixed(2)})` : "none" }}
+            style={{ display: "inline-block", padding: "0 1px", borderRadius: 18, backgroundImage: g > 0.01 ? `radial-gradient(closest-side, rgba(236,186,92,${(0.42 * g).toFixed(2)}), rgba(236,186,92,0))` : undefined, color: mix(INK.waiting, INK.emeraldDeep, lit(k)), transform: g > 0.01 ? `translateY(${(-6 * g).toFixed(1)}px) scale(${(1 + 0.07 * g).toFixed(3)})` : undefined, textShadow: g > 0.01 ? `0 0 ${Math.round(26 * g)}px rgba(217,164,65,${(0.75 * g).toFixed(2)})` : "none" }}
           >
             {p}
           </span>
@@ -257,8 +257,8 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
   const tx = GRID.colX - (GRID.colX - (a.tx + (b.tx - a.tx) * k)) * (z / z0);
   const ty = STAGE_H / 2 - (STAGE_H / 2 - (a.ty + (b.ty - a.ty) * k)) * (z / z0);
   const raw = drawProgress(sb, t);
-  const back = ease((sb.total - t) / 0.9);
-  const progress = Object.fromEntries(Object.entries(raw).map(([g, p]) => [g, t > sb.total - 0.9 ? Math.min(p, back) : p]));
+  const back = ease((sb.total - t) / 1.6);
+  const progress = Object.fromEntries(Object.entries(raw).map(([g, p]) => [g, t > sb.total - 1.6 ? Math.min(p, back) : p]));
   const speaking = sb.sounds.find((s) => t >= s.at && t < s.at + s.seconds);
   const warm = speaking?.who === "qari" ? 1 : speaking ? 0.5 : 0.2;
   const flicker = 0.6 * Math.sin(t * 7.1) + 0.4 * Math.sin(t * 12.7);

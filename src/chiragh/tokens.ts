@@ -15,8 +15,8 @@ export const INK = {
   emerald: "#0e5a45",
   emeraldDeep: "#0a4535",
   emeraldSoft: "#2c6553",
-  /** a waiting (not yet recited) word: a warm brown, 6:1 on the cream (the recited word, emerald, is 7:1) */
-  waiting: "#6b5639",
+  /** a waiting (not yet recited) word: a soft emerald, 4.6:1 on the cream; the recited word turns deep emerald (10:1) */
+  waiting: "#3d7564",
   ink: "#2a2318",
   translation: "#362c1f",
   quiet: "#5a4d3a",

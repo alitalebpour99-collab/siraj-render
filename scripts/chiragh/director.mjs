@@ -266,7 +266,7 @@ export function direct(m, c, { videoId, fps = 30 } = {}) {
     else if (i === 0 && L.verses[0] && m.template !== "word-choice" && m.template !== "distances" && m.template !== "only-counts") text = { layer: "verse", ref: L.verses[0].id, keyword: null };
     else text = { layer: "title", ref: null, keyword: null };
     const draw = [];
-    for (let k = 0; k < perShot && queue.length && i < drawShots + 1; k++) {
+    for (let k = 0; k < (i < 3 ? Math.max(2, perShot) : perShot) && queue.length && i < drawShots + 1; k++) {
       const g = queue.shift();
       draw.push(g);
       // the flame comes with its lamp
