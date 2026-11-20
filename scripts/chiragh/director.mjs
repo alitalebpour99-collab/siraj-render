@@ -116,10 +116,13 @@ export function layout(m) {
     const times = q && mode === "word" ? v.clip.words.map((w) => ({ start: r3(q.from + w.start), end: r3(q.from + w.end) })) : null;
     const max = v.ayah === null ? 99 : 9;
     const raw = chunkVerse(v.text, times, max);
+    // a verse nobody recites word by word (read by the narrator): its pieces share the reading's time evenly
+    const span = (q ?? n).to - startAt;
+    const pieceAt = (k) => startAt + (span * k) / raw.length;
     const chunks = raw.map((c, k) => ({
       text: c.text,
-      words: mode === "word" ? c.words : c.words.map((w) => ({ ...w, start: startAt, end: (q ?? n).to })),
-      from: r3(k === 0 ? from : Math.max(from, c.words[0].start - 0.2)),
+      words: mode === "word" ? c.words : c.words.map((w) => ({ ...w, start: r3(pieceAt(k)), end: r3(pieceAt(k + 1)) })),
+      from: r3(k === 0 ? from : mode === "word" ? Math.max(from, c.words[0].start - 0.2) : pieceAt(k) - 0.2),
       to: 0,
     }));
     chunks.forEach((c, k) => (c.to = r3(k + 1 < chunks.length ? chunks[k + 1].from : nextStart)));

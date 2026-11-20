@@ -124,3 +124,16 @@ test("a picture that does not change for 3 s is found", () => {
   const s = stillness(frames, 10);
   assert.ok(s.longest >= 2.9 && s.longest <= 3.6, String(s.longest));
 });
+
+test("a verse read by the narrator (no recitation) is shown piece by piece across the reading", () => {
+  const m = material({ ayahs: 1, perAyah: 25 });
+  m.verses[0].clip = null;
+  m.verses[0].readBy = "a1";
+  m.order = [{ kind: "narr", line: "a1" }];
+  m.lines[0].seconds = 12;
+  const sb = direct(m, ruleConcepts(m, [])[0], { videoId: "t" });
+  const v = sb.verses[0];
+  assert.equal(v.mode, "verse");
+  assert.ok(v.chunks.length >= 3);
+  for (const c of v.chunks) assert.ok(c.to - c.from > 2, `piece ${c.from}-${c.to}`);
+});
