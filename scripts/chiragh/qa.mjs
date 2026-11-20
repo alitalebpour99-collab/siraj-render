@@ -61,6 +61,8 @@ export function stillness(frames, fps, { step = 0.5, pixel = 10, share = 0.0012 
 
 /** The verse words' light measured in the picture: when each word's box crosses half-way to its lit shade. */
 export function measureSync(file, sb, probes) {
+  // nothing recited word by word (a writing read by the narrator): nothing to measure
+  if (!sb.verses.some((v) => v.mode === "word")) return { measured: 0, skipped: 0, late: 0, medianMs: null, p90Ms: null, maxMs: null };
   const fps = 30;
   const Q = 2;
   const w = 1080 / Q;

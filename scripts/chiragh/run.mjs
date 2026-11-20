@@ -122,8 +122,10 @@ export async function chiraghJob(job, { stills = false } = {}) {
   const out = path.resolve("out");
   fs.mkdirSync(path.join(out, "frames"), { recursive: true });
 
+  // a long video (a whole owner writing) is drawn once: three renders of three minutes each would outlast the run
   const tries = [];
-  for (let n = 1; n <= Math.min(MAX_TRIES, ranked.length); n++) {
+  const longVideo = direct(m, ranked[0].c, { videoId: job.id }).total > 100;
+  for (let n = 1; n <= Math.min(longVideo ? 1 : MAX_TRIES, ranked.length); n++) {
     const pick = ranked[n - 1];
     const sb = direct(m, pick.c, { videoId: job.id });
     const problems = checkStoryboard(sb);
