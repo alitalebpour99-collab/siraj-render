@@ -52,7 +52,7 @@ export const EmeraldLineArt: React.FC<{ art: InlineArt; progress: Record<string,
         const p = drawn(g.id);
         if (p <= 0) return null;
         return (
-          <g key={g.id} opacity={g.fill ? p : 1} style={{ transformBox: "fill-box", transformOrigin: "50% 100%", transform: `scaleY(${(1 + 0.06 * flicker).toFixed(3)})` }}>
+          <g key={g.id} opacity={g.fill ? p : 1} style={g.fill ? { transformBox: "fill-box", transformOrigin: "50% 100%", transform: `scaleY(${(1 + 0.06 * flicker).toFixed(3)})` } : undefined}>
             {g.paths.map((d, i) => (g.fill ? <path key={i} d={d} fill={`url(#flame-${uid})`} /> : <path key={i} d={d} pathLength={1} fill="none" stroke={INK.gold} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" strokeDasharray="1 1" strokeDashoffset={1 - p} />))}
           </g>
         );
