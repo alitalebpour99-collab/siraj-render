@@ -105,37 +105,85 @@ const hangingLamp = (x: number, top: number, bottom: number): ArtGroup[] => [
 
 /* ---------------- the anchors ---------------- */
 
+/** Points at distance `d` inward (towards the arch's centre line) of an arch's points. */
+function offsetArch(cx: number, ys: number, w: number, h: number, inset: number): Pt[] {
+  return archPts(cx, ys, w - 2 * inset, h - inset);
+}
+
+/** A hanging mosque lamp: three chains to a cap, a round glass body, a foot; its flame apart. */
+function mosqueLamp(x: number, top: number, y: number, s = 1): ArtGroup[] {
+  const k = (n: number) => n * s;
+  const links = Array.from({ length: 5 }, (_, i) => circle(x, top + 18 + i * ((y - k(70) - top - 18) / 5), 4));
+  return [
+    { id: "chain", paths: [line([x, top], [x, y - k(70)]), ...links, line([x, y - k(70)], [x - k(40), y - k(28)]), line([x, y - k(70)], [x + k(40), y - k(28)])] },
+    {
+      id: "lamp",
+      paths: [
+        `M${x - k(46)} ${y - k(28)}L${x + k(46)} ${y - k(28)}`,
+        `M${x - k(40)} ${y - k(28)}C${x - k(64)} ${y + k(6)} ${x - k(40)} ${y + k(44)} ${x - k(14)} ${y + k(52)}L${x + k(14)} ${y + k(52)}C${x + k(40)} ${y + k(44)} ${x + k(64)} ${y + k(6)} ${x + k(40)} ${y - k(28)}`,
+        `M${x - k(50)} ${y + k(4)}Q${x} ${y + k(18)} ${x + k(50)} ${y + k(4)}`,
+        `M${x - k(14)} ${y + k(52)}L${x - k(20)} ${y + k(70)}L${x + k(20)} ${y + k(70)}L${x + k(14)} ${y + k(52)}`,
+        line([x, y + k(70)], [x, y + k(86)]),
+        star(x, y + k(96), k(9)),
+      ],
+    },
+    { id: "flame", gold: true, fill: true, weight: 0, paths: [`M${x} ${y + k(20)}C${x - k(10)} ${y + k(8)} ${x - k(7)} ${y - k(10)} ${x} ${y - k(24)}C${x + k(7)} ${y - k(10)} ${x + k(10)} ${y + k(8)} ${x} ${y + k(20)}Z`] },
+  ];
+}
+
 function mihrab(): ArtDef {
-  const base = 572;
-  const ys = 290;
-  const outer = archPts(CX, ys, 470, 268);
-  const band = archPts(CX, ys, 412, 232);
-  const inner = archPts(CX, ys, 352, 198);
-  const niche = archPts(CX, ys + 30, 250, 150);
-  const bandStars = along(band, 44).map(([x, y]) => star(x, y, 15));
+  const base = 574;
+  const ys = 318;
+  const W1 = 420;
+  const H1 = 286;
+  const band = 36;
+  const outer = archPts(CX, ys, W1, H1, 60);
+  const innerBand = offsetArch(CX, ys, W1, H1, band);
+  const mid = offsetArch(CX, ys, W1, H1, band / 2);
+  // the band: a zigzag between its two edges, an 8-pointed star at every third turn (a simple girih)
+  const pts = along(mid, 21);
+  const zig: Pt[] = pts.map((p, i) => {
+    const [x, y] = p;
+    const dx = x - CX;
+    const dy = y - ys;
+    const len = Math.hypot(dx, dy) || 1;
+    const s = (i % 2 ? 1 : -1) * (band / 2 - 4);
+    return [x + (dx / len) * s, y + (dy / len) * s];
+  });
+  const stars = pts.filter((_, i) => i % 3 === 1).map(([x, y]) => star(x, y, band / 2 - 3, 0.45));
+  const frame = [poly([[CX - W1 / 2 - 34, base], [CX - W1 / 2 - 34, ys - H1 - 18], [CX + W1 / 2 + 34, ys - H1 - 18], [CX + W1 / 2 + 34, base]]), poly([[CX - W1 / 2 - 22, base], [CX - W1 / 2 - 22, ys - H1 - 6], [CX + W1 / 2 + 22, ys - H1 - 6], [CX + W1 / 2 + 22, base]])];
+  const spandrels = [star(CX - W1 / 2 + 22, ys - H1 + 36, 22, 0.45), star(CX + W1 / 2 - 22, ys - H1 + 36, 22, 0.45), star(CX - W1 / 2 + 22, ys - H1 + 36, 12, 0.45, 8, -Math.PI / 2 + Math.PI / 8), star(CX + W1 / 2 - 22, ys - H1 + 36, 12, 0.45, 8, -Math.PI / 2 + Math.PI / 8)];
+  const inner = archPts(CX, ys, W1 - 2 * band - 24, H1 - band - 20);
+  const niche = archPts(CX, ys + 40, 236, 176);
+  const hood = [0.78, 0.56, 0.34].map((f) => poly(archPts(CX, ys - 40 + (1 - f) * 70, 236 * f, 120 * f)));
+  const flutes = [-96, -64, -32, 0, 32, 64, 96].map((dx) => line([CX + dx, base], [CX + dx, ys + 40 + 10 - Math.abs(dx) * 0.05]));
   return {
     id: "mihrab",
-    tags: ["prayer", "night", "lamp", "light", "turning to God", "stillness", "worship"],
+    tags: ["prayer", "night", "lamp", "light", "turning to God", "stillness", "worship", "remembrance"],
     figures: false,
     groups: [
-      { id: "ground", paths: [line([110, base], [834, base]), line([150, base + 8], [794, base + 8])] },
-      { id: "piers", paths: [line([CX - 235, base], [CX - 235, ys]), line([CX + 235, base], [CX + 235, ys]), line([CX - 206, base], [CX - 206, ys]), line([CX + 206, base], [CX + 206, ys])] },
-      { id: "outer-arch", paths: [poly(outer)] },
-      { id: "band", paths: [poly(band), ...bandStars] },
-      { id: "inner-arch", paths: [poly(inner), line([CX - 176, base], [CX - 176, ys]), line([CX + 176, base], [CX + 176, ys])] },
-      { id: "niche", paths: [poly(niche), ...[-90, -45, 0, 45, 90].map((dx) => line([CX + dx, base], [CX + dx * 0.9, ys + 70 - Math.abs(dx) * 0.3]))] },
-      ...hangingLamp(CX, ys - 210 + 60, ys + 150),
+      { id: "ground", paths: [line([96, base], [848, base]), line([130, base + 10], [814, base + 10])] },
+      { id: "frame", paths: frame },
+      { id: "piers", paths: [line([CX - W1 / 2, base], [CX - W1 / 2, ys]), line([CX + W1 / 2, base], [CX + W1 / 2, ys]), line([CX - W1 / 2 + band, base], [CX - W1 / 2 + band, ys]), line([CX + W1 / 2 - band, base], [CX + W1 / 2 - band, ys])] },
+      { id: "outer-arch", paths: [poly(outer), poly(innerBand)] },
+      { id: "band", paths: [poly(zig)] },
+      { id: "band-stars", paths: stars },
+      { id: "spandrels", paths: spandrels },
+      { id: "inner-arch", paths: [poly(inner), line([CX - (W1 - 2 * band - 24) / 2, base], [CX - (W1 - 2 * band - 24) / 2, ys]), line([CX + (W1 - 2 * band - 24) / 2, base], [CX + (W1 - 2 * band - 24) / 2, ys])] },
+      { id: "niche", paths: [poly(niche), line([CX - 118, base], [CX - 118, ys + 40]), line([CX + 118, base], [CX + 118, ys + 40])] },
+      { id: "hood", paths: hood },
+      { id: "flutes", paths: flutes },
+      ...mosqueLamp(CX, ys - 150, 330, 1),
     ],
     regions: [
-      { id: "whole", x: 100, y: 0, w: 744, h: 600 },
-      { id: "apex", x: 272, y: 0, w: 400, h: 230 },
-      { id: "lamp", x: 352, y: 180, w: 240, h: 240 },
-      { id: "band", x: 180, y: 40, w: 300, h: 300 },
-      { id: "base", x: 200, y: 380, w: 540, h: 220 },
+      { id: "whole", x: 160, y: 0, w: 624, h: 600 },
+      { id: "apex", x: 302, y: 0, w: 340, h: 250 },
+      { id: "lamp", x: 342, y: 180, w: 260, h: 260 },
+      { id: "band", x: 180, y: 30, w: 320, h: 320 },
+      { id: "base", x: 232, y: 360, w: 480, h: 240 },
     ],
   };
 }
-
 function mishkat(): ArtDef {
   const ys = 300;
   const niche = archPts(CX, ys, 300, 200);

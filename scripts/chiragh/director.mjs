@@ -246,7 +246,7 @@ export function direct(m, c, { videoId, fps = 30 } = {}) {
   const visit = regions.length ? regions : regionIds(art);
   const groups = art.groups.map((g) => g.id);
   const nShots = cs.length;
-  const drawShots = Math.max(1, Math.min(nShots - 1, Math.floor(nShots * 0.55)));
+  const drawShots = Math.max(1, Math.min(nShots - 2, Math.floor(nShots * 0.8)));
   const perShot = Math.max(1, Math.ceil(groups.length / drawShots));
   const queue = [...groups];
   const shots = [];

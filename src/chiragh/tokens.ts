@@ -14,9 +14,9 @@ export const INK = {
   paper: "#e9dcbf",
   emerald: "#0e5a45",
   emeraldDeep: "#0a4535",
-  emeraldSoft: "#3f7d69",
-  /** a waiting (not yet recited) word: a warm brown, 7:1 or more on the cream */
-  waiting: "#5b4528",
+  emeraldSoft: "#2c6553",
+  /** a waiting (not yet recited) word: a warm brown, 6:1 on the cream (the recited word, emerald, is 7:1) */
+  waiting: "#6b5639",
   ink: "#2a2318",
   translation: "#362c1f",
   quiet: "#5a4d3a",
@@ -44,7 +44,7 @@ export const GRID = {
   /** the anchor's stage: the line art lives here and the camera moves inside it */
   stage: { top: 404, bottom: 1004, left: 0, right: 1080 },
   text: { top: 1012, bottom: 1578 },
-  lamp: { x: 472, y: 1716, size: 118 },
+  lamp: { x: 472, y: 1716, size: 150 },
 } as const;
 
 /** A shot lasts 1–2.5 s in Siraj (calm, but never still). */

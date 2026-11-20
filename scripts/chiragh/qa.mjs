@@ -62,10 +62,12 @@ export function stillness(frames, fps, { step = 0.5, pixel = 10, share = 0.0012 
 /** The verse words' light measured in the picture: when each word's box crosses half-way to its lit shade. */
 export function measureSync(file, sb, probes) {
   const fps = 30;
-  const Q = 4;
+  const Q = 2;
   const w = 1080 / Q;
-  const h = 1920 / Q;
-  const frames = grayFrames(file, fps, w, h);
+  const y0 = 960;
+  const h = 720 / Q;
+  // the text zone only (y 960–1680), at half size
+  const frames = grayFrames(file, fps, w, h, `1080:720:0:${y0}`);
   const boxOf = new Map();
   for (const p of probes) for (const x of p.words ?? []) if (!boxOf.has(x.w) && x.box[2] > 4) boxOf.set(x.w, x.box);
   const errs = [];
@@ -83,20 +85,18 @@ export function measureSync(file, sb, probes) {
           skipped++;
           return;
         }
-        const [bx, by, bw, bh] = box.map((n) => Math.round(n / Q));
+        const [bx, by0, bw, bh] = box.map((n) => Math.round(n / Q));
+        const by = by0 - y0 / Q;
         const series = [];
         const f0 = Math.max(0, Math.floor((wd.start - 0.5) * fps));
         const f1 = Math.min(frames.length - 1, Math.ceil((wd.start + 0.5) * fps));
         for (let f = f0; f <= f1; f++) {
           const fr = frames[f];
-          let s = 0;
-          let n = 0;
-          for (let y = by; y < by + bh; y++) for (let x = bx; x < bx + bw; x++) {
-            if (x < 0 || y < 0 || x >= w || y >= h) continue;
-            s += fr[y * w + x];
-            n++;
-          }
-          series.push({ t: f / fps, m: n ? s / n : 0 });
+          const px = [];
+          for (let y = by; y < by + bh; y++) for (let x = bx; x < bx + bw; x++) if (x >= 0 && y >= 0 && x < w && y < h) px.push(fr[y * w + x]);
+          px.sort((a, b) => a - b);
+          const core = px.slice(0, Math.max(1, Math.floor(px.length / 4)));
+          series.push({ t: f / fps, m: core.reduce((a, b) => a + b, 0) / core.length });
         }
         const before = series.filter((p) => p.t <= wd.start - 0.15).map((p) => p.m);
         const after = series.filter((p) => p.t >= wd.start + 0.15 && p.t <= Math.min(wd.end, wd.start + 0.5)).map((p) => p.m);
@@ -157,7 +157,8 @@ export function checkTexts(sb, probes, sources) {
       }
       if (x.role === "label") continue;
       if (x.size < 39.5) small++;
-      const need = x.role === "verse" ? 7 : 4.5;
+      // a waiting verse word is 6:1, a recited one 7:1 (emerald); every other text 4.5:1
+      const need = x.role === "verse" ? 5.5 : 4.5;
       if (x.contrast < need) faint++;
       const [bx, by, bw, bh] = x.box;
       if (bw > 0 && (bx < SAFE.left - 2 || by < SAFE.top - 2 || bx + bw > SAFE.right + 2 || by + bh > SAFE.bottom + 2)) outside++;
@@ -199,15 +200,22 @@ Also answer: is any person, human face, human figure, silhouette or rider depict
 Return JSON only: {"score": number, "criteria": {"new": n, "anchor": n, "sync": n, "grid": n, "lines": n, "hook": n, "ending": n, "legible": n, "respect": n, "calm": n}, "person_depicted": boolean, "issues": [short strings], "to_reach_10": [short strings]}`,
     },
   ];
-  const j = await gemini("gemini-3.5-flash", { contents: [{ role: "user", parts }], generationConfig: { responseMimeType: "application/json", maxOutputTokens: 3000 } }, { what: "qa-vision" });
-  const r = jsonIn(textOf(j));
+  let r = null;
+  for (let attempt = 1; attempt <= 3 && !r; attempt++) {
+    const j = await gemini("gemini-3.5-flash", { contents: [{ role: "user", parts }], generationConfig: { responseMimeType: "application/json", maxOutputTokens: 6000 } }, { what: "qa-vision" });
+    try {
+      r = jsonIn(textOf(j));
+    } catch (error) {
+      if (attempt === 3) throw error;
+    }
+  }
   return { score: Number(r.score), criteria: r.criteria ?? {}, person: Boolean(r.person_depicted), issues: r.issues ?? [], toReach10: r.to_reach_10 ?? [] };
 }
 
 /** The 1 fps contact sheet (8 across), with each second's number in its corner. */
 export function contactSheet(file, seconds, out) {
-  const rows = Math.max(1, Math.ceil(seconds / 8));
-  execFileSync("ffmpeg", ["-y", "-v", "error", "-i", file, "-vf", `fps=1,scale=216:-2,drawtext=text='%{eif\\:n\\:d}s':x=6:y=6:fontsize=18:fontcolor=white:box=1:boxcolor=0x0a4535@0.85,tile=8x${rows}:padding=4:color=0x6e6250`, "-frames:v", "1", "-q:v", "3", out]);
+  const rows = Math.max(1, Math.ceil(seconds / 6));
+  execFileSync("ffmpeg", ["-y", "-v", "error", "-i", file, "-vf", `fps=1,scale=270:-2,drawtext=text='%{eif\\:n\\:d}s':x=6:y=6:fontsize=18:fontcolor=white:box=1:boxcolor=0x0a4535@0.85,tile=6x${rows}:padding=4:color=0x6e6250`, "-frames:v", "1", "-q:v", "3", out]);
   return out;
 }
 

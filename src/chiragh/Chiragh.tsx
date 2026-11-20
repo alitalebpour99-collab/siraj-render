@@ -4,7 +4,7 @@
 // line, the lamp with its breathing halo, the sources and the badge at the close. Every string
 // of the Quran and of a translation is the API's own, exactly as served, cut only at its spaces.
 // No music: only the qari and the narrator are placed.
-import React, { useLayoutEffect, useRef } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 import { AbsoluteFill, Audio, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { quoteHash } from "../lamp/zones";
 import { ART } from "./art";
@@ -29,7 +29,7 @@ export const artOf = (sb: Storyboard): InlineArt => sb.anchor.inline ?? (ART[sb.
 function cameraTransform(art: InlineArt, region: string, scale: number) {
   const r = art.regions.find((x) => x.id === region) ?? art.regions[0]!;
   const fit = Math.min(1080 / r.w, STAGE_H / r.h);
-  const z = Math.max(0.9, Math.min(2.4, Math.min(fit, 1.6) * scale));
+  const z = Math.max(0.96, Math.min(1.4, Math.min(fit, 1.3) * scale));
   const fx = r.x + r.w / 2;
   const fy = r.y + r.h / 2;
   return { z, tx: GRID.colX - fx * z, ty: STAGE_H / 2 - fy * z };
@@ -63,7 +63,7 @@ export const WordGlow: React.FC<{ v: Verse; t: number; lang: string }> = ({ v, t
   // the chunk comes in softly when it follows another of the same ayah
   const enter = ci === 0 ? 1 : ease((t - chunk.from + 0.15) / 0.3);
   return (
-    <div data-q={`${v.id}:${ci}`} data-role="verse" dir="rtl" lang="ar" style={{ fontFamily: FONT.quran, fontSize: size, lineHeight: 1.95, textAlign: "center", color: INK.waiting, opacity: enter, transform: `translateY(${(1 - enter) * 14}px)` }}>
+    <div data-q={`${v.id}:${ci}`} data-role="verse" dir="rtl" lang="ar" style={{ fontFamily: FONT.quran, fontSize: size, lineHeight: 1.8, textAlign: "center", color: INK.waiting, opacity: enter, transform: `translateY(${(1 - enter) * 14}px)` }}>
       {parts.map((p, i) => {
         if (/^\s+$/u.test(p)) return <span key={i}>{p}</span>;
         const k = w++;
@@ -72,7 +72,7 @@ export const WordGlow: React.FC<{ v: Verse; t: number; lang: string }> = ({ v, t
           <span
             key={i}
             data-w={`${v.id}:${ci}:${k}`}
-            style={{ color: mix(INK.waiting, INK.emerald, lit(k)), textShadow: g > 0.01 ? `0 0 ${Math.round(18 * g)}px rgba(217,164,65,${(0.55 * g).toFixed(2)})` : "none" }}
+            style={{ display: "inline-block", padding: "0 6px", borderRadius: 18, backgroundImage: g > 0.01 ? `radial-gradient(closest-side, rgba(236,186,92,${(0.42 * g).toFixed(2)}), rgba(236,186,92,0))` : undefined, color: mix(INK.waiting, INK.emerald, lit(k)), transform: g > 0.01 ? `translateY(${(-6 * g).toFixed(1)}px) scale(${(1 + 0.07 * g).toFixed(3)})` : undefined, textShadow: g > 0.01 ? `0 0 ${Math.round(26 * g)}px rgba(217,164,65,${(0.75 * g).toFixed(2)})` : "none" }}
           >
             {p}
           </span>
@@ -92,11 +92,11 @@ const Translation: React.FC<{ v: Verse; t: number; lang: "en" | "fa" }> = ({ v, 
   const c = v.transChunks[ci]!;
   const fa = lang === "fa";
   const n = c.text.split(/\s+/).length;
-  const size = n <= 14 ? 48 : n <= 24 ? 44 : 40;
+  const size = n <= 14 ? 52 : n <= 24 ? 47 : 42;
   const parts = c.text.split(/(\s+)/u).filter((p) => p.length > 0);
   let k = 0;
   return (
-    <div data-q={`${v.id}:t${ci}`} data-role="translation" dir={fa ? "rtl" : "ltr"} style={{ fontFamily: fa ? FONT.naskh : FONT.en, fontSize: size, lineHeight: 1.55, textAlign: "center", color: INK.translation, fontWeight: fa ? 500 : 500 }}>
+    <div data-q={`${v.id}:t${ci}`} data-role="translation" dir={fa ? "rtl" : "ltr"} style={{ fontFamily: fa ? FONT.naskh : FONT.en, fontSize: size, lineHeight: 1.45, textAlign: "center", color: INK.translation, fontWeight: fa ? 500 : 500 }}>
       {parts.map((p, i) => {
         if (/^\s+$/u.test(p)) return <span key={i}>{p}</span>;
         const w = c.words?.[k++];
@@ -117,13 +117,37 @@ const RefChip: React.FC<{ text: string; lang: "en" | "fa" }> = ({ text, lang }) 
   </div>
 );
 
-const VerseBlock: React.FC<{ v: Verse; t: number; lang: "en" | "fa" }> = ({ v, t, lang }) => (
-  <div style={{ position: "absolute", top: GRID.text.top, left: GRID.colX - GRID.colW / 2, width: GRID.colW, height: GRID.text.bottom - GRID.text.top, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", gap: 14 }}>
-    <WordGlow v={v} t={t} lang={lang} />
-    <Translation v={v} t={t} lang={lang} />
-    {v.refLine ? <RefChip text={v.refLine} lang={lang} /> : null}
-  </div>
-);
+/** A stack that never leaves the text zone: measured, and scaled down (from its top) when it is taller. */
+const FitZone: React.FC<{ children: React.ReactNode; k: string }> = ({ children, k }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const room = GRID.text.bottom - GRID.text.top;
+  useLayoutEffect(() => {
+    if (!ref.current) return;
+    const h = ref.current.scrollHeight;
+    const next = h > room ? Math.max(0.6, room / h) : 1;
+    if (Math.abs(next - scale) > 0.005) setScale(next);
+  }, [k, room, scale]);
+  return (
+    <div ref={ref} style={{ position: "absolute", top: GRID.text.top, left: GRID.colX - GRID.colW / 2, width: GRID.colW, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", gap: 10, transform: scale < 1 ? `scale(${scale.toFixed(3)})` : undefined, transformOrigin: "50% 0" }}>
+      {children}
+    </div>
+  );
+};
+
+const VerseBlock: React.FC<{ v: Verse; t: number; lang: "en" | "fa" }> = ({ v, t, lang }) => {
+  let ci = 0;
+  v.chunks.forEach((c, i) => (c.from <= t + 1e-6 ? (ci = i) : null));
+  let ti = 0;
+  v.transChunks.forEach((c, i) => (c.from <= t + 1e-6 ? (ti = i) : null));
+  return (
+    <FitZone k={`${v.id}:${ci}:${ti}`}>
+      <WordGlow v={v} t={t} lang={lang} />
+      <Translation v={v} t={t} lang={lang} />
+      {v.refLine ? <RefChip text={v.refLine} lang={lang} /> : null}
+    </FitZone>
+  );
+};
 
 const CaptionBlock: React.FC<{ c: Caption; t: number; lang: "en" | "fa" }> = ({ c, t, lang }) => {
   const fa = lang === "fa";
@@ -230,7 +254,9 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
   const z = z0 * (1 + 0.022 * cam.breathe);
   const tx = GRID.colX - (GRID.colX - (a.tx + (b.tx - a.tx) * k)) * (z / z0);
   const ty = STAGE_H / 2 - (STAGE_H / 2 - (a.ty + (b.ty - a.ty) * k)) * (z / z0);
-  const progress = drawProgress(sb, t);
+  const raw = drawProgress(sb, t);
+  const back = ease((sb.total - t) / 0.9);
+  const progress = Object.fromEntries(Object.entries(raw).map(([g, p]) => [g, t > sb.total - 0.9 ? Math.min(p, back) : p]));
   const speaking = sb.sounds.find((s) => t >= s.at && t < s.at + s.seconds);
   const warm = speaking?.who === "qari" ? 1 : speaking ? 0.5 : 0.2;
   const flicker = 0.6 * Math.sin(t * 7.1) + 0.4 * Math.sin(t * 12.7);
@@ -298,7 +324,7 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
       {textLayer(shot, end ? 1 - clamp01((t - (sb.badge!.from - 0.4)) / 0.3) : fadeIn)}
       {/* the close: the sources (one line), the badge */}
       {end ? (
-        <div style={{ position: "absolute", top: GRID.text.top + 120, left: GRID.colX - GRID.colW / 2, width: GRID.colW, textAlign: "center", opacity: clamp01((t - (sb.badge!.from - 0.3)) / 0.3) * clamp01((sb.total / fps - t) / 0.25 + 0.0001) }}>
+        <div style={{ position: "absolute", top: GRID.text.top + 120, left: GRID.colX - GRID.colW / 2, width: GRID.colW, textAlign: "center", opacity: clamp01((t - (sb.badge!.from - 0.3)) / 0.3) * clamp01((sb.total - t) / 0.35) }}>
           <div data-role="credits" dir={fa ? "rtl" : "ltr"} style={{ fontFamily: fa ? FONT.fa : FONT.en, fontSize: 40, lineHeight: 1.5, color: INK.quiet }}>
             {sb.credits}
           </div>
