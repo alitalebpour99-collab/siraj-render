@@ -155,7 +155,6 @@ function mihrab(): ArtDef {
   const spandrels = [star(CX - W1 / 2 + 22, ys - H1 + 36, 22, 0.45), star(CX + W1 / 2 - 22, ys - H1 + 36, 22, 0.45), star(CX - W1 / 2 + 22, ys - H1 + 36, 12, 0.45, 8, -Math.PI / 2 + Math.PI / 8), star(CX + W1 / 2 - 22, ys - H1 + 36, 12, 0.45, 8, -Math.PI / 2 + Math.PI / 8)];
   const inner = archPts(CX, ys, W1 - 2 * band - 24, H1 - band - 20);
   const niche = archPts(CX, ys + 40, 236, 176);
-  const hood = [0.78, 0.56, 0.34].map((f) => poly(archPts(CX, ys - 40 + (1 - f) * 70, 236 * f, 120 * f)));
   const flutes = [-96, -64, -32, 0, 32, 64, 96].map((dx) => line([CX + dx, base], [CX + dx, ys + 40 + 10 - Math.abs(dx) * 0.05]));
   return {
     id: "mihrab",
@@ -172,7 +171,6 @@ function mihrab(): ArtDef {
       { id: "spandrels", paths: spandrels },
       { id: "inner-arch", paths: [poly(inner), line([CX - (W1 - 2 * band - 24) / 2, base], [CX - (W1 - 2 * band - 24) / 2, ys]), line([CX + (W1 - 2 * band - 24) / 2, base], [CX + (W1 - 2 * band - 24) / 2, ys])] },
       { id: "niche", paths: [poly(niche), line([CX - 118, base], [CX - 118, ys + 40]), line([CX + 118, base], [CX + 118, ys + 40])] },
-      { id: "hood", paths: hood },
       { id: "flutes", paths: flutes },
     ],
     regions: [

@@ -72,7 +72,7 @@ export const WordGlow: React.FC<{ v: Verse; t: number; lang: string }> = ({ v, t
           <span
             key={i}
             data-w={`${v.id}:${ci}:${k}`}
-            style={{ display: "inline-block", padding: "0 6px", borderRadius: 18, backgroundImage: g > 0.01 ? `radial-gradient(closest-side, rgba(236,186,92,${(0.42 * g).toFixed(2)}), rgba(236,186,92,0))` : undefined, color: mix(INK.waiting, INK.emerald, lit(k)), transform: g > 0.01 ? `translateY(${(-6 * g).toFixed(1)}px) scale(${(1 + 0.07 * g).toFixed(3)})` : undefined, textShadow: g > 0.01 ? `0 0 ${Math.round(26 * g)}px rgba(217,164,65,${(0.75 * g).toFixed(2)})` : "none" }}
+            style={{ display: "inline-block", padding: "0 1px", borderRadius: 18, backgroundImage: g > 0.01 ? `radial-gradient(closest-side, rgba(236,186,92,${(0.42 * g).toFixed(2)}), rgba(236,186,92,0))` : undefined, color: mix(INK.waiting, INK.emerald, lit(k)), transform: g > 0.01 ? `translateY(${(-6 * g).toFixed(1)}px) scale(${(1 + 0.07 * g).toFixed(3)})` : undefined, textShadow: g > 0.01 ? `0 0 ${Math.round(26 * g)}px rgba(217,164,65,${(0.75 * g).toFixed(2)})` : "none" }}
           >
             {p}
           </span>
