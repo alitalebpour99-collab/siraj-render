@@ -79,7 +79,7 @@ composition, `chiragh` (`src/chiragh/Chiragh.tsx`), from a storyboard:
 Per video (`scripts/chiragh/run.mjs`):
 1. **Alignment** (`align-refine.mjs`): the Quran Foundation word segments, checked against the cut clip's own sound
    (each word start moves onto a clear dip within 120 ms); the drift is logged.
-2. **Concepts** (`concept.mjs`): Claude (`claude-opus-5-5`, else Gemini on Vertex, else three by rule) writes three
+2. **Concepts** (`concept.mjs`): Claude (`claude-opus-5-5`, structured output against a JSON schema; else Gemini on Vertex, else three by rule) writes three
    concepts. A concept only CHOOSES: the anchor and its regions from the line-art library, the key word among the
    verse's own words, the hook among the template's approved lines, the idea family, hook and ending types.
    Nothing it writes is shown.
@@ -96,8 +96,10 @@ Per video (`scripts/chiragh/run.mjs`):
 6. **QA gate** (`qa.mjs`): shots 1–2.5 s; frame by frame (10 a second) no 2.5 s without a visible change; the word
    light measured IN THE PICTURE against the recitation (90 % within 100 ms); text 40 px or more, contrast 4.5:1
    (Arabic 7:1), inside the safe zones; every verse piece hashed on the page and compared with the stored text; the
-   anchor from the figure-free library; then Gemini on Vertex scores the 1 fps contact sheet beside the approved style
-   frame (`refs/chiragh-style.jpg`) against ten criteria from the references. Below 8/10 or any hard check failed:
+   anchor from the figure-free library; then a vision judge scores the 1 fps contact sheet beside the approved style
+   frame (`refs/chiragh-style.jpg`), with a 5 fps strip of the verse area for the word light, against ten criteria
+   from the references. It looks **twice** and the median counts. Gemini on Vertex judges first; when Vertex refuses
+   (403 «eligible paid billing account», as on the trial credit since 20 Nov), Claude judges the same images. Below 8/10 or any hard check failed:
    the next concept (at most three tries); a video that never passes is handed in **held** (`manifest.qa.hold`), so
    the owner decides in the panel; nothing posts by itself.
 
