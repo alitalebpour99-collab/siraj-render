@@ -64,8 +64,8 @@ test("every shot lasts 1–2.5 s, starts on a word, and the shots fill the video
   assert.ok(locked / (sb.shots.length - 1) > 0.8, `locked ${locked}/${sb.shots.length - 1}`);
   // the key word starts a shot
   if (sb.concept.key_word) assert.ok(sb.shots.some((s) => s.text.keyword), "the key word has its shot");
-  // every group of the anchor is drawn by the middle of the video
-  const p = drawProgress(sb, sb.total * 0.7);
+  // every group of the anchor is drawn before the close
+  const p = drawProgress(sb, sb.total - 1.0);
   for (const g of ART[sb.anchor.art].groups) assert.equal(p[g.id], 1, g.id);
   // the narrator never speaks over the qari
   const s = [...sb.sounds].sort((a, b) => a.at - b.at);

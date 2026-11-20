@@ -166,6 +166,7 @@ function mihrab(): ArtDef {
       { id: "frame", paths: frame },
       { id: "piers", paths: [line([CX - W1 / 2, base], [CX - W1 / 2, ys]), line([CX + W1 / 2, base], [CX + W1 / 2, ys]), line([CX - W1 / 2 + band, base], [CX - W1 / 2 + band, ys]), line([CX + W1 / 2 - band, base], [CX + W1 / 2 - band, ys])] },
       { id: "outer-arch", paths: [poly(outer), poly(innerBand)] },
+      ...mosqueLamp(CX, ys - 150, 330, 1),
       { id: "band", paths: [poly(zig)] },
       { id: "band-stars", paths: stars },
       { id: "spandrels", paths: spandrels },
@@ -173,7 +174,6 @@ function mihrab(): ArtDef {
       { id: "niche", paths: [poly(niche), line([CX - 118, base], [CX - 118, ys + 40]), line([CX + 118, base], [CX + 118, ys + 40])] },
       { id: "hood", paths: hood },
       { id: "flutes", paths: flutes },
-      ...mosqueLamp(CX, ys - 150, 330, 1),
     ],
     regions: [
       { id: "whole", x: 160, y: 0, w: 624, h: 600 },
