@@ -98,6 +98,13 @@ jobs:
           done
           grep -cE "^Setting up" /tmp/apt.log || true
           sudo -E apt-get $apt install -y --no-install-recommends libasound2t64 >/dev/null || sudo -E apt-get $apt install -y --no-install-recommends libasound2 >/dev/null
+          # a slow mirror can leave the apt install unfinished (20 Nov: no ffprobe): then a static ffmpeg build
+          if ! command -v ffprobe >/dev/null; then
+            curl -fsSL --retry 3 -o /tmp/ff.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+            mkdir -p /tmp/ff && tar -xJf /tmp/ff.tar.xz -C /tmp/ff --strip-components=1
+            sudo install -m 755 /tmp/ff/ffmpeg /tmp/ff/ffprobe /usr/local/bin/
+          fi
+          ffprobe -version | head -1
           for t in ffmpeg ffprobe espeak-ng; do command -v "$t" > /dev/null || { echo "$t is missing"; exit 1; }; done
           ffmpeg -version | head -1
       - if: steps.look.outputs.waiting != '0'
