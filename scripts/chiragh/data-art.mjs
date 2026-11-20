@@ -33,29 +33,23 @@ export function strip(data, numbers, lang) {
   const xOf = (k) => (lang === "fa" ? right - ((k - 1) * (right - left)) / Math.max(1, n - 1) : left + ((k - 1) * (right - left)) / Math.max(1, n - 1));
   const ticks = [];
   for (let k = 1; k <= n; k++) ticks.push(`M${r1(xOf(k))} ${y - (k % 10 === 0 ? 16 : 8)}L${r1(xOf(k))} ${y + (k % 10 === 0 ? 16 : 8)}`);
-  const gaps = { one: [], two: [], more: [] };
-  for (let i = 1; i < places.length; i++) {
-    const a = places[i - 1];
-    const b = places[i];
-    const g = b - a - 1;
-    const x0 = xOf(a);
-    const x1 = xOf(b);
-    const h = 24 + Math.min(150, Math.abs(x1 - x0) * 1.2);
-    const d = `M${r1(x0)} ${y - 12}Q${r1((x0 + x1) / 2)} ${r1(y - 12 - h)} ${r1(x1)} ${y - 12}`;
-    (g <= 1 ? gaps.one : g === 2 ? gaps.two : gaps.more).push(d);
+  // one group per repeat (its ring and the arc from the one before it), so the strip builds repeat by repeat
+  const steps = [];
+  for (let i = 0; i < places.length; i++) {
+    const paths = [circle(xOf(places[i]), y, 9)];
+    if (i > 0) {
+      const x0 = xOf(places[i - 1]);
+      const x1 = xOf(places[i]);
+      const h = 24 + Math.min(150, Math.abs(x1 - x0) * 1.2);
+      paths.push(`M${r1(x0)} ${y - 12}Q${r1((x0 + x1) / 2)} ${r1(y - 12 - h)} ${r1(x1)} ${y - 12}`);
+    }
+    steps.push({ id: `repeat${i + 1}`, paths });
   }
-  const groups = [
-    { id: "axis", paths: [`M${left - 20} ${y}L${right + 20} ${y}`] },
-    { id: "ticks", paths: ticks },
-    { id: "repeats", paths: places.map((p) => circle(xOf(p), y, 9)) },
-    { id: "gap-one", paths: gaps.one },
-    { id: "gap-two", paths: gaps.two.length ? gaps.two : [] },
-    { id: "gap-more", paths: gaps.more.length ? gaps.more : [] },
-  ].filter((g) => g.paths.length);
+  const groups = [{ id: "axis", paths: [`M${left - 20} ${y}L${right + 20} ${y}`] }, { id: "ticks", paths: ticks }, ...steps];
   const labels = [
     { x: xOf(1), y: y + 52, text: num(1, lang), size: 40, group: "ticks", font: lang },
     { x: xOf(n), y: y + 52, text: num(n, lang), size: 40, group: "ticks", font: lang },
-    ...(numbers?.times ? [{ x: CX, y: 110, text: `${num(numbers.times, lang)} ×`, size: 96, group: "repeats", font: lang }] : []),
+    ...(numbers?.times ? [{ x: CX, y: 120, text: `${num(numbers.times, lang)} ×`, size: 120, group: "repeat1", font: lang }] : []),
   ];
   return { id: "strip", tags: ["distance", "count", "repeat"], figures: false, groups, regions: [{ id: "whole", x: 60, y: 40, w: 840, h: 500 }, { id: "first", x: lang === "fa" ? 560 : 60, y: 200, w: 340, h: 300 }, { id: "last", x: lang === "fa" ? 60 : 560, y: 200, w: 340, h: 300 }, { id: "count", x: 272, y: 20, w: 400, h: 200 }], labels };
 }

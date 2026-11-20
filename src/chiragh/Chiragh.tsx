@@ -6,6 +6,7 @@
 // No music: only the qari and the narrator are placed.
 import React, { useLayoutEffect, useRef, useState } from "react";
 import { AbsoluteFill, Audio, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { fontsReady } from "../fonts";
 import { quoteHash } from "../lamp/zones";
 import { ART } from "./art";
 import { EmeraldLineArt } from "./LineArt";
@@ -125,13 +126,22 @@ const RefChip: React.FC<{ text: string; lang: "en" | "fa" }> = ({ text, lang }) 
 const FitZone: React.FC<{ children: React.ReactNode; k: string }> = ({ children, k }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
-  const room = GRID.text.bottom - GRID.text.top;
+  // measured again once the faces are in (a first layout in a fallback face is shorter)
+  const [fonts, setFonts] = useState(0);
+  useLayoutEffect(() => {
+    let live = true;
+    void fontsReady().then(() => live && setFonts(1));
+    return () => {
+      live = false;
+    };
+  }, []);
+  const room = GRID.text.bottom - GRID.text.top - 12;
   useLayoutEffect(() => {
     if (!ref.current) return;
     const h = ref.current.scrollHeight;
     const next = h > room ? Math.max(0.6, room / h) : 1;
     if (Math.abs(next - scale) > 0.005) setScale(next);
-  }, [k, room, scale]);
+  }, [k, room, scale, fonts]);
   return (
     <div ref={ref} style={{ position: "absolute", top: GRID.text.top, left: GRID.colX - GRID.colW / 2, width: GRID.colW, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", gap: 10, transform: scale < 1 ? `scale(${scale.toFixed(3)})` : undefined, transformOrigin: "50% 0" }}>
       {children}
