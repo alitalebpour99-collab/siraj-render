@@ -193,9 +193,9 @@ export const CRITERIA = [
 ];
 
 /** The vision judge, twice (it is not steady from one look to the next): the median of the two looks, and both kept. */
-export async function visionScore(sheetFile, styleFile) {
+export async function visionScore(sheetFile, styleFile, extra = {}) {
   const looks = [];
-  for (let k = 0; k < 2; k++) looks.push(await visionOnce(sheetFile, styleFile));
+  for (let k = 0; k < 2; k++) looks.push(await visionOnce(sheetFile, styleFile, extra));
   const scores = looks.map((l) => l.score).filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
   // the median of two is their mean; a look that failed does not count
   const score = scores.length ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : null;
@@ -203,13 +203,14 @@ export async function visionScore(sheetFile, styleFile) {
   return { ...pick, score, looks: looks.map((l) => l.score), person: looks.some((l) => l.person) };
 }
 
-async function visionOnce(sheetFile, styleFile) {
+async function visionOnce(sheetFile, styleFile, { strip = null, template = "", anchorKind = "" } = {}) {
   if (!vertexReady()) return { score: null, why: "the Vertex proxy is not configured" };
   const parts = [
     { text: "Image 1: the APPROVED style frame of Siraj's video style «Chiragh» (the verse area is left empty on purpose)." },
     ...(fs.existsSync(styleFile) ? [{ inlineData: { mimeType: "image/jpeg", data: fs.readFileSync(styleFile).toString("base64") } }] : []),
-    { text: "Image 2: a contact sheet of a NEW video, one frame per second, read left to right, top to bottom." },
+    { text: `Image 2: a contact sheet of a NEW video, one frame per second, read left to right, top to bottom. Its template is «${template}»; its anchor drawing is ${anchorKind}. The approved frame shows ONE possible anchor (a mihrab): other anchors and data drawings (a strip of verses, a map of the surahs, a root of letters) are allowed in the same style; judge the style, not whether it is an arch.` },
     { inlineData: { mimeType: "image/jpeg", data: fs.readFileSync(sheetFile).toString("base64") } },
+    ...(strip && fs.existsSync(strip) ? [{ text: "Image 3: the verse area of the NEW video at 5 frames per second during the recitation (read left to right, top to bottom): the word light is judged here, not on the small 1 fps sheet." }, { inlineData: { mimeType: "image/jpeg", data: fs.readFileSync(strip).toString("base64") } }] : []),
     {
       text: `You are a strict short-video art director. Score the NEW video 0–10 (one decimal) against these criteria, as a viewer of top explainer Reels would. Calibration: 10 = the level of the @ensan.besham line-art explainer and the Zoomit "World Ahead 2027" explainer (one anchor drawing built line by line, something new every 1–2 s); 2.5 = Siraj's old video where one verse card stood still for 12 s with only a small lamp icon. Be honest; do not round up.
 Criteria:
@@ -260,10 +261,18 @@ export async function runGate({ file, sb, probes, sources, styleFile, sheetFile,
   if (!art || art.figures !== false) hard.push("figures: the anchor is not from the figure-free library");
   // vision
   contactSheet(file, sb.total, sheetFile);
+  // the verse area at 5 fps over 3 s of recitation (the judge sees the word light there)
+  let strip = null;
+  const first = sb.verses.find((v) => v.mode === "word" && v.ayah !== null && v.chunks[0]?.words.length > 2);
+  if (first) {
+    strip = sheetFile.replace(/\.jpg$/, "-words.jpg");
+    const at = Math.max(0, first.chunks[0].words[0].start - 0.2);
+    execFileSync("ffmpeg", ["-y", "-v", "error", "-ss", at.toFixed(2), "-t", "3", "-i", file, "-vf", "fps=5,crop=1080:300:0:1060,scale=540:-2,tile=3x5:padding=4:color=0x6e6250", "-frames:v", "1", "-q:v", "3", strip]);
+  }
   let judge = { score: null, why: "skipped" };
   if (vision) {
     try {
-      judge = await visionScore(sheetFile, styleFile);
+      judge = await visionScore(sheetFile, styleFile, { strip, template: sb.template, anchorKind: sb.anchor.inline ? `a data drawing («${sb.anchor.art}»)` : `the «${sb.anchor.art}» line drawing` });
     } catch (error) {
       judge = { score: null, why: String(error.message).slice(0, 160) };
     }

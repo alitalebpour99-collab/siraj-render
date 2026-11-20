@@ -29,7 +29,7 @@ export const artOf = (sb: Storyboard): InlineArt => sb.anchor.inline ?? (ART[sb.
 function cameraTransform(art: InlineArt, region: string, scale: number) {
   const r = art.regions.find((x) => x.id === region) ?? art.regions[0]!;
   const fit = Math.min(1080 / r.w, STAGE_H / r.h);
-  const z = Math.max(0.96, Math.min(1.95, Math.min(fit, 1.6) * scale));
+  const z = Math.max(0.96, Math.min(1.45, Math.min(fit, 1.3) * scale));
   // the camera leans towards a region but keeps the anchor near the column (one centred grid)
   const all = art.regions[0]!;
   const fx = 0.75 * (r.x + r.w / 2) + 0.25 * (all.x + all.w / 2);
@@ -94,7 +94,7 @@ const Translation: React.FC<{ v: Verse; t: number; lang: "en" | "fa" }> = ({ v, 
   const c = v.transChunks[ci]!;
   const fa = lang === "fa";
   const n = c.text.split(/\s+/).length;
-  const size = n <= 14 ? 52 : n <= 24 ? 47 : 42;
+  const size = n <= 14 ? 56 : n <= 24 ? 50 : 46;
   const parts = c.text.split(/(\s+)/u).filter((p) => p.length > 0);
   let k = 0;
   return (

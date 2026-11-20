@@ -42,8 +42,8 @@ export const GRID = {
   colW: 792,
   title: { top: 236, h: 140 },
   /** the anchor's stage: the line art lives here and the camera moves inside it */
-  stage: { top: 380, bottom: 1072, left: 0, right: 1080 },
-  text: { top: 1078, bottom: 1580 },
+  stage: { top: 380, bottom: 1040, left: 0, right: 1080 },
+  text: { top: 1046, bottom: 1580 },
   lamp: { x: 472, y: 1716, size: 150 },
 } as const;
 
