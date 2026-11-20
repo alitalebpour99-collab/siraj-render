@@ -125,7 +125,8 @@ export function layout(m) {
     chunks.forEach((c, k) => (c.to = r3(k + 1 < chunks.length ? chunks[k + 1].from : nextStart)));
     // the translation: whole sentences, in time across the narrator's reading (or the verse's time)
     const tc = chunkTranslation(v.translation, 30);
-    const tSpan = n ? [n.from, n.to] : [from, nextStart];
+    // the translation's sentences in time with its reading, or with the recitation (a verse with no narrator line)
+    const tSpan = n ? [n.from, n.to] : q ? [q.from, q.to] : [from, nextStart];
     const narr = m.lines.find((l) => l.verse === v.id);
     const transChunks = tc.map((text, k) => {
       const a = tSpan[0] + ((tSpan[1] - tSpan[0]) * k) / tc.length;

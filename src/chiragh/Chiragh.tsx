@@ -314,7 +314,7 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
   const fa = sb.lang === "fa";
   const end = sb.badge ? t >= sb.badge.from - 0.4 : false;
   const badgeOp = sb.badge ? Math.min(clamp01((t - sb.badge.from) / 0.3), clamp01((sb.badge.to - t) / 0.3)) : 0;
-  const probe = still === null && (f % 15 === 0 || f === sb.total - 1 || sb.verses.some((v) => v.chunks.some((c) => Math.round(c.from * fps) + 2 === f)));
+  const probe = still === null && (f % 15 === 0 || f === sb.total - 1 || sb.verses.some((v) => v.chunks.some((c) => Math.round(c.from * fps) + 2 === f) || v.transChunks.some((c) => Math.round(c.from * fps) + 9 === f)));
   const titleSize = sb.title.main.length > 34 ? 46 : sb.title.main.length > 24 ? 54 : sb.title.main.length > 18 ? 70 : 84;
   return (
     <AbsoluteFill ref={root} style={{ background: `linear-gradient(180deg, ${INK.cream} 0%, ${INK.cream} 55%, ${INK.cream2} 100%)` }}>
