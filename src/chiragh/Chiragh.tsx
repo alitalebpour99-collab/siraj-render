@@ -5,7 +5,7 @@
 // of the Quran and of a translation is the API's own, exactly as served, cut only at its spaces.
 // No music: only the qari and the narrator are placed.
 import React, { useLayoutEffect, useRef, useState } from "react";
-import { AbsoluteFill, Audio, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Audio, Sequence, continueRender, delayRender, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { fontsReady } from "../fonts";
 import { quoteHash } from "../lamp/zones";
 import { ART } from "./art";
@@ -233,6 +233,28 @@ const ratio = (a: number[], b: number[]) => {
 const Probe: React.FC<{ root: React.RefObject<HTMLDivElement | null>; f: number; probe: boolean }> = ({ root, f, probe }) => {
   useLayoutEffect(() => {
     if (!probe || !root.current) return;
+    // measured on the next animation frame: after the text zone has fitted itself (FitZone's second render)
+    const hold = delayRender("probe");
+    let done = false;
+    const finish = () => {
+      if (!done) {
+        done = true;
+        continueRender(hold);
+      }
+    };
+    const raf = requestAnimationFrame(() => {
+      try {
+        measure();
+      } finally {
+        finish();
+      }
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      finish();
+    };
+    function measure() {
+    if (!root.current) return;
     const texts = [...root.current.querySelectorAll<HTMLElement>("[data-q],[data-role=ref],[data-role=title],[data-role=sub],[data-role=credits],[data-role=label]")].map((el) => {
       const b = el.getBoundingClientRect();
       const cs = getComputedStyle(el);
@@ -244,6 +266,7 @@ const Probe: React.FC<{ root: React.RefObject<HTMLDivElement | null>; f: number;
       return { w: el.dataset.w, box: [Math.round(b.x), Math.round(b.y), Math.round(b.width), Math.round(b.height)] };
     });
     console.log(`CHIRAGH_PROBE ${JSON.stringify({ f, texts, words })}`);
+    }
   }, [f, probe, root]);
   return null;
 };
