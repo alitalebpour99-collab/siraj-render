@@ -206,7 +206,6 @@ export async function visionScore(sheetFile, styleFile, extra = {}) {
 }
 
 async function visionOnce(sheetFile, styleFile, { strip = null, template = "", anchorKind = "" } = {}) {
-  if (!vertexReady()) return { score: null, why: "the Vertex proxy is not configured" };
   const parts = [
     { text: "Image 1: the APPROVED style frame of Siraj's video style «Chiragh» (the verse area is left empty on purpose)." },
     ...(fs.existsSync(styleFile) ? [{ inlineData: { mimeType: "image/jpeg", data: fs.readFileSync(styleFile).toString("base64") } }] : []),
@@ -222,22 +221,61 @@ Return JSON only: {"score": number, "criteria": {"new": n, "anchor": n, "sync": 
     },
   ];
   let r = null;
-  for (let attempt = 1; attempt <= 3 && !r; attempt++) {
-    const j = await gemini("gemini-3.5-flash", { contents: [{ role: "user", parts }], generationConfig: { responseMimeType: "application/json", maxOutputTokens: 6000 } }, { what: "qa-vision" });
+  let by = "gemini-3.5-flash";
+  // Gemini on Vertex first; when Vertex refuses (20 Nov: 403 «eligible paid billing account» on every
+  // Gemini model of the trial credit), Claude looks at the same images with the same criteria
+  if (vertexReady()) {
     try {
-      r = jsonIn(textOf(j));
+      for (let attempt = 1; attempt <= 3 && !r; attempt++) {
+        const j = await gemini("gemini-3.5-flash", { contents: [{ role: "user", parts }], generationConfig: { responseMimeType: "application/json", maxOutputTokens: 6000 } }, { what: "qa-vision", tries: 4 });
+        try {
+          r = jsonIn(textOf(j));
+        } catch (error) {
+          if (attempt === 3) throw error;
+        }
+      }
     } catch (error) {
-      if (attempt === 3) throw error;
+      console.log(`qa: Gemini could not judge (${String(error.message).slice(0, 80)}); Claude judges`);
     }
   }
-  return { score: Number(r.score), criteria: r.criteria ?? {}, person: Boolean(r.person_depicted), issues: r.issues ?? [], toReach10: r.to_reach_10 ?? [] };
+  if (!r && process.env.ANTHROPIC_API_KEY) {
+    by = "claude-opus-5-5";
+    r = await claudeJudge(parts);
+  }
+  if (!r) return { score: null, why: "no vision judge answered" };
+  return { score: Number(r.score), criteria: r.criteria ?? {}, person: Boolean(r.person_depicted), issues: r.issues ?? [], toReach10: r.to_reach_10 ?? [], by };
+}
+
+const n = { type: "number" };
+const JUDGE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["score", "criteria", "person_depicted", "issues", "to_reach_10"],
+  properties: {
+    score: n,
+    criteria: { type: "object", additionalProperties: false, required: ["new", "anchor", "sync", "grid", "lines", "hook", "ending", "legible", "respect", "calm"], properties: Object.fromEntries(["new", "anchor", "sync", "grid", "lines", "hook", "ending", "legible", "respect", "calm"].map((k) => [k, n])) },
+    person_depicted: { type: "boolean" },
+    issues: { type: "array", items: { type: "string" } },
+    to_reach_10: { type: "array", items: { type: "string" } },
+  },
+};
+
+/** The same look by Claude (vision, structured output): the Gemini parts turned into Claude content blocks. */
+async function claudeJudge(parts) {
+  const { default: Anthropic } = await import("@anthropic-ai/sdk");
+  const client = new Anthropic();
+  const content = parts.map((p) => (p.inlineData ? { type: "image", source: { type: "base64", media_type: p.inlineData.mimeType, data: p.inlineData.data } } : { type: "text", text: p.text }));
+  const res = await client.messages.create({ model: "claude-opus-5-5", max_tokens: 4000, output_config: { effort: "low", format: { type: "json_schema", schema: JUDGE_SCHEMA } }, messages: [{ role: "user", content }] });
+  if (res.stop_reason === "refusal") throw new Error("claude judge: refused");
+  console.log(`qa: Claude judged, ${res.usage?.input_tokens ?? 0} in, ${res.usage?.output_tokens ?? 0} out`);
+  return jsonIn(res.content.filter((b) => b.type === "text").map((b) => b.text).join(""));
 }
 
 /** The 1 fps contact sheet (8 across), with each second's number in its corner. */
 export function contactSheet(file, seconds, out) {
   const rows = Math.max(1, Math.ceil(seconds / 6));
   const label = "drawtext=text='%{eif\\:n\\:d}s':x=6:y=6:fontsize=18:fontcolor=white:box=1:boxcolor=0x0a4535@0.85,";
-  const run = (withLabel) => execFileSync("ffmpeg", ["-y", "-v", "error", "-i", file, "-vf", `fps=1,scale=270:-2,${withLabel ? label : ""}tile=6x${rows}:padding=4:color=0x6e6250`, "-frames:v", "1", "-q:v", "3", out]);
+  const run = (withLabel) => execFileSync("ffmpeg", ["-y", "-v", "error", "-i", file, "-vf", `fps=1,scale=${rows > 12 ? Math.max(90, Math.floor(2400 / rows)) : 270}:-2,${withLabel ? label : ""}tile=6x${rows}:padding=4:color=0x6e6250`, "-frames:v", "1", "-q:v", "3", out]);
   // an ffmpeg without drawtext (a static fallback build) makes the sheet without the second numbers
   try {
     run(true);
