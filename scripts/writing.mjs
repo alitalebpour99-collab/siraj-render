@@ -40,7 +40,19 @@ export function nahjRef(url, pageTitle) {
   const t = String(pageTitle).replace(/[۰-۹]/g, (d) => String(FA_DIGITS.indexOf(d))).trim();
   const m = t.match(/^(حکمت|خطبه|نامه)\s*(\d{1,4})(?!\d)/);
   if (!m || m[1] !== kind || !(Number(m[2]) >= 1 && Number(m[2]) <= 500)) return null;
-  return `نهج‌البلاغه، ${kind} ${faNum(Number(m[2]))}`;
+  const section = t.split("|")[1]?.trim();
+  return `نهج‌البلاغه، ${kind} ${faNum(Number(m[2]))}${section && /^بخش/.test(section) ? `، ${section}` : ""}`;
+}
+/**
+ * The title of a publisher's page from its HTML. A saying in parts has its own page per part,
+ * titled only «بخش اوّل»: the page's data names its parent («PatTitle:"حکمت 150"»), so the title
+ * becomes «حکمت 150 | بخش اوّل» (wisdom/1114 is حکمت ۱۵۰، بخش اوّل; checked 27 Nov).
+ */
+export function titleOfPage(html) {
+  const title = String(html).match(/<title>([^<]{1,300})<\/title>/i)?.[1]?.trim() ?? null;
+  if (!title || !/^بخش/.test(title)) return title;
+  const m = String(html).match(/Title:"(بخش[^"]{1,40})",PatTitle:"((?:حکمت|خطبه|نامه) \d{1,3})"/);
+  return m && title.startsWith(m[1]) ? `${m[2]} | ${m[1]}` : title;
 }
 /** The publisher's page title (only the Nahj al-balagha site Siraj serves); null when it cannot be read. */
 export async function pageTitle(url) {
@@ -48,7 +60,7 @@ export async function pageTitle(url) {
   try {
     const res = await fetch(url, { headers: { "user-agent": "siraj-render (Ahura)" }, signal: AbortSignal.timeout(20_000) });
     if (!res.ok) return null;
-    return (await res.text()).match(/<title>([^<]{1,300})<\/title>/i)?.[1]?.trim() ?? null;
+    return titleOfPage(await res.text());
   } catch {
     return null;
   }
