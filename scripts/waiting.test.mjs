@@ -73,7 +73,7 @@ const WRITING_BODY = (over = {}) => ({
     title: `${LET(3)} ۷`,
     sections: [
       { lead: `${LET(5)}: ${LET(2)}`, passage: { kind: "quran", id: "q:2:3-4", surahNumber: 2, surahName: "ن۱", fromAyah: 3, toAyah: 4, ayahs: [{ ayahNumber: 3, text: AR(6), translation: FA(9) }, { ayahNumber: 4, text: AR(5), translation: FA(8) }], translatorName: "م۱", textCredit: "c1 · c2" } },
-      { lead: LET(6), passage: { kind: "hadith", id: "h:r1", recordKey: "r1", matn: AR(7), translation: FA(10), attributedTo: "ک۱", locator: "ج۱", sourceTitle: "ک۲", textCredit: "c3", assessments: [{ assessorName: "ن۲", gradeLabel: "د۱" }] } },
+      { lead: LET(6), passage: { kind: "hadith", id: "h:r1", recordKey: "r1", matn: AR(7), translation: FA(10), attributedTo: "ک۱", locator: "https://nahj.makarem.ir/wisdom/1095", sourceTitle: "ک۲", textCredit: "c3", assessments: [{ assessorName: "ن۲", gradeLabel: "د۱" }] } },
     ],
     publishedAt: "2026-11-18T06:00:00.000Z",
     ...over,
@@ -92,7 +92,7 @@ const W_HASHES = (b = WRITING_BODY()) => {
 };
 const REVIEW = { id: "review", show: "فقط مالک سایت بازبینی کرده است", say: "این نوشته را فقط مالکِ سایت بازبینی کرده است." };
 
-const io = (pages = {}, record = RECORD(), writing = WRITING_BODY()) => ({ page: async (path) => pages[path] ?? (() => { throw new Error(`${path}: HTTP 404`); })(), exegesis: async () => record, verses: async (...a) => VERSES(...a), writing: async () => writing });
+const io = (pages = {}, record = RECORD(), writing = WRITING_BODY()) => ({ page: async (path) => pages[path] ?? (() => { throw new Error(`${path}: HTTP 404`); })(), exegesis: async () => record, verses: async (...a) => VERSES(...a), writing: async () => writing, title: async (url) => (url.endsWith("/wisdom/1095") ? "حکمت 135 | Nahj al-Balagha" : null) });
 
 const SRC_LINE = { id: "src", show: `${LET(3)} · ${LET(2)}`, say: `${LET(3)}، ${LET(2)}` };
 const REST_LINE = { id: "rest", show: LET(4), say: LET(4) };
@@ -180,6 +180,14 @@ test("an owner writing: read from Siraj, every string hash-checked, the narrator
   assert.deepEqual(p.scenes.map((s) => s.id), ["hook", "s1", "s1b1", "s1b2", "s2", "s2b1", "sources", "end"]);
   // a source's «·» is never shown beside Persian
   assert.ok(!p.writing.sources.join("\n").includes("·"));
+  // the narration named by book, part and number (checked on the publisher's page), never its record title and a raw address
+  assert.equal(p.writing.sections[1].ref, "نهج‌البلاغه، حکمت ۱۳۵");
+  assert.ok(p.writing.sources.some((l) => l.startsWith("۲. نهج‌البلاغه، حکمت ۱۳۵. ")));
+  assert.ok(!p.writing.sources.join("\n").includes("wisdom/1095"));
+  // a source that cannot be checked stops the job (the QC gate)
+  const unchecked = WRITING_BODY();
+  unchecked.writing.sections[1].passage.locator = "https://nahj.makarem.ir/wisdom/1114";
+  await assert.rejects(waitingProps(FIXTURES.writing(), io({}, RECORD(), unchecked)), CheckError);
   // a changed string, a broken trust block, another writing: refused
   const changed = WRITING_BODY();
   changed.writing.sections[1].lead = LET(4);

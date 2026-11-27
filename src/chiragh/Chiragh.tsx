@@ -117,7 +117,8 @@ const Translation: React.FC<{ v: Verse; t: number; lang: "en" | "fa" }> = ({ v, 
 };
 
 const RefChip: React.FC<{ text: string; lang: "en" | "fa" }> = ({ text, lang }) => (
-  <div data-role="ref" dir={lang === "fa" ? "rtl" : "ltr"} style={{ display: "inline-block", padding: "6px 26px", borderRadius: 999, background: INK.emeraldDeep, color: INK.cream, fontFamily: lang === "fa" ? FONT.fa : FONT.en, fontSize: 40, lineHeight: 1.35, fontWeight: lang === "fa" ? 600 : 500 }}>
+  // never wider than the text zone (27 Nov: a long source ran off the pill); wrapped, balanced, isolated
+  <div data-role="ref" dir={lang === "fa" ? "rtl" : "ltr"} style={{ display: "inline-block", maxWidth: 900, textWrap: "balance", unicodeBidi: "isolate", padding: "6px 26px", borderRadius: 999, background: INK.emeraldDeep, color: INK.cream, fontFamily: lang === "fa" ? FONT.fa : FONT.en, fontSize: 40, lineHeight: 1.35, fontWeight: lang === "fa" ? 600 : 500 }}>
     {text}
   </div>
 );

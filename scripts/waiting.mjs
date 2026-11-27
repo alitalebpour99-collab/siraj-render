@@ -56,7 +56,7 @@ import { API, DataChanged, UA, check, checkTrust, releaseOf, same, sha256, siraj
 import { FIT, MAFATIH, NAHJ, WEEKDAYS, dayIndex, duaLineUrl, duaPassage, duaPath, nahjFits, nahjPath, quranPath, readDuaPage, readHadithPage, slideText, storyLine, tafsirSlides, trParts, wordsOf } from "./books.mjs";
 import { readingProblems } from "./spoken.mjs";
 import { FIXED_LINES, MIRROR_LINES, TAFSIR_SLIDES, TR_LINES, WAITING_LANGS, WAITING_LOOK, scenesOf } from "../src/waitingPlan.ts";
-import { WRITING_SLUG, readWriting, servedTexts, sourceLines, writingNarration } from "./writing.mjs";
+import { WRITING_SLUG, pageTitle, readWriting, servedTexts, sourceLines, withPlaces, writingNarration } from "./writing.mjs";
 
 export { WEEKDAYS };
 
@@ -97,7 +97,7 @@ async function exegesis(id) {
   return body;
 }
 
-export const IO = { page, exegesis, verses: (job, surah, ayahs) => versesOf(job, surah, ayahs), writing: (slug) => siraj(`/api/writings/${slug}`) };
+export const IO = { page, exegesis, verses: (job, surah, ayahs) => versesOf(job, surah, ayahs), writing: (slug) => siraj(`/api/writings/${slug}`), title: pageTitle };
 
 /* ---------- the shape of a job (no network) ---------- */
 
@@ -397,7 +397,7 @@ export async function waitingProps(job, io = IO) {
   } else if (f === "writing") {
     const slug = need.writing.slug;
     if (e.textRelease !== `writing:${slug}`) throw new DataChanged("the writing the job names");
-    const w = readWriting(await io.writing(slug), slug);
+    const w = await withPlaces(readWriting(await io.writing(slug), slug), io.title ?? pageTitle);
     props.texts = servedTexts(w);
     checkHashes(job, props.texts);
     props.writing = {
