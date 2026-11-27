@@ -44,13 +44,44 @@ function cameraTransform(art: InlineArt, region: string, scale: number) {
   return { z, tx: GRID.colX - fx * z, ty: STAGE_H / 2 - fy * z };
 }
 
+/* ---------------- one drawing, built across the whole video ---------------- */
+
+/**
+ * The anchor is ONE drawing that keeps growing (vision review, 27 Nov: «it finishes by 10 s, then
+ * only re-zooms»): its groups in the director's order, the first third already standing at frame 0
+ * (the hook shows the drawing), the rest spread evenly until 85 % of the video, each drawing in over
+ * 1.2 s (the director's order and groups; only the times are spread).
+ */
+const buildCache = new WeakMap<object, Array<{ g: string; at: number }>>();
+export function buildPlan(sb: Pick<Storyboard, "shots" | "total">): Array<{ g: string; at: number }> {
+  const hit = buildCache.get(sb as object);
+  if (hit) return hit;
+  const first = new Map<string, number>();
+  for (const s of sb.shots) s.picture.draw.forEach((g) => (first.has(g) ? null : first.set(g, s.start)));
+  const order = [...first.entries()].sort((a, b) => a[1] - b[1]).map(([g]) => g);
+  const n = order.length;
+  const k0 = Math.max(1, Math.ceil(n * 0.34));
+  const end = Math.max(4, sb.total * 0.85);
+  const start = 1.2;
+  const plan = order.map((g, i) => ({ g, at: i < k0 ? -1.4 + (i * 1.0) / k0 : start + ((i - k0 + 1) / Math.max(1, n - k0)) * (end - start) }));
+  buildCache.set(sb as object, plan);
+  return plan;
+}
+function buildProgress(sb: Storyboard, raw: Record<string, number>, t: number): Record<string, number> {
+  const out: Record<string, number> = { ...raw };
+  // the loop: in the last second the groups added after the hook draw back, so the last frame is the first
+  const back = t > sb.total - 1.0 ? ease((sb.total - t) / 1.0) : 1;
+  for (const { g, at } of buildPlan(sb)) out[g] = clamp01((t - at) / 1.2) * (at < 0 ? 1 : back);
+  return out;
+}
+
 /* ---------------- the stage per verse ---------------- */
 
-/** The stage's treatments, by verse (in turn): whole · close on the crown · wide with an echo. */
+/** The stage's treatments, by verse (in turn): whole · close on the crown · wide (the echo layer was judged clutter: off). */
 const TREATMENTS = [
   { zoom: 1, dx: 0, dy: 0, echo: 0 },
-  { zoom: 1.3, dx: 0, dy: 95, echo: 0.07 },
-  { zoom: 0.84, dx: 0, dy: -8, echo: 0.13 },
+  { zoom: 1.16, dx: 0, dy: 55, echo: 0 },
+  { zoom: 0.9, dx: 0, dy: -6, echo: 0 },
 ] as const;
 type Treatment = { zoom: number; dx: number; dy: number; echo: number };
 const lerpT = (a: Treatment, b: Treatment, k: number): Treatment => ({ zoom: a.zoom + (b.zoom - a.zoom) * k, dx: a.dx + (b.dx - a.dx) * k, dy: a.dy + (b.dy - a.dy) * k, echo: a.echo + (b.echo - a.echo) * k });
@@ -131,7 +162,7 @@ const Translation: React.FC<{ v: Verse; t: number; lang: "en" | "fa" }> = ({ v, 
   const fa = lang === "fa";
   const n = c.text.split(/\s+/).length;
   // larger and readable (27 Nov: the lower third stood empty): the translation is the second voice of the verse
-  const size = fa ? (n <= 14 ? 64 : n <= 24 ? 56 : 50) : n <= 14 ? 60 : n <= 24 ? 54 : 48;
+  const size = fa ? (n <= 14 ? 72 : n <= 24 ? 62 : 54) : n <= 14 ? 66 : n <= 24 ? 58 : 52;
   const parts = c.text.split(/(\s+)/u).filter((p) => p.length > 0);
   let k = 0;
   return (
@@ -152,7 +183,7 @@ const Translation: React.FC<{ v: Verse; t: number; lang: "en" | "fa" }> = ({ v, 
 
 const RefChip: React.FC<{ text: string; lang: "en" | "fa" }> = ({ text, lang }) => (
   // never wider than the text zone (27 Nov: a long source ran off the pill); wrapped, balanced, isolated
-  <div data-role="ref" dir={lang === "fa" ? "rtl" : "ltr"} style={{ display: "inline-block", maxWidth: 900, textWrap: "balance", unicodeBidi: "isolate", padding: "6px 26px", borderRadius: 999, background: INK.emeraldDeep, color: INK.cream, fontFamily: lang === "fa" ? FONT.fa : FONT.en, fontSize: 40, lineHeight: 1.35, fontWeight: lang === "fa" ? 600 : 500 }}>
+  <div data-role="ref" dir={lang === "fa" ? "rtl" : "ltr"} style={{ display: "inline-block", maxWidth: 900, textWrap: "balance", unicodeBidi: "isolate", padding: "6px 26px", borderRadius: 999, background: INK.emeraldDeep, color: INK.cream, fontFamily: lang === "fa" ? FONT.fa : FONT.en, fontSize: 46, lineHeight: 1.35, fontWeight: lang === "fa" ? 600 : 500 }}>
     {text}
   </div>
 );
@@ -341,9 +372,10 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
   const tr = stageTreatment(sb, t);
   const drift = { x: 10 * Math.sin(t / 4.7), y: 6 * Math.sin(t / 6.3 + 1) };
   const raw = drawProgress(sb, t);
-  const progress = raw;
-  // the loop: in the last second the drawing fades out as one (nothing flies apart) and the first text comes back, so the last frame is the first
-  const artOp = t > sb.total - 1.0 ? ease((sb.total - t) / 1.0) : 1;
+  const progress = buildProgress(sb, raw, t);
+  // the loop: the first text comes back in the last 0.6 s (the drawing draws back to the hook: buildProgress)
+  // the drawing no longer fades out at the end: buildProgress draws back to the hook's first third
+  const artOp = 1;
   const loopIn = ease((t - (sb.total - 0.6)) / 0.6);
   const speaking = sb.sounds.find((s) => t >= s.at && t < s.at + s.seconds);
   const warm = speaking?.who === "qari" ? 1 : speaking ? 0.5 : 0.2;
@@ -417,7 +449,7 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
         <div data-role="title" style={{ fontFamily: fa ? FONT.fa : FONT.en, fontWeight: fa ? 800 : 600, fontSize: titleSize, lineHeight: 1.22, color: INK.emeraldDeep, textWrap: "balance" }}>
           {sb.title.main}
         </div>
-        <div data-role="sub" style={{ fontFamily: fa ? FONT.fa : FONT.en, fontWeight: fa ? 600 : 500, fontSize: 44, lineHeight: 1.35, color: INK.emeraldSoft }}>
+        <div data-role="sub" style={{ fontFamily: fa ? FONT.fa : FONT.en, fontWeight: fa ? 600 : 500, fontSize: 52, lineHeight: 1.35, color: INK.emeraldSoft }}>
           {sb.title.sub}
         </div>
       </div>
@@ -428,7 +460,7 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
       {/* the close: the sources (one line), the badge */}
       {end ? (
         <div style={{ position: "absolute", top: GRID.text.top + 120, left: GRID.colX - GRID.colW / 2, width: GRID.colW, textAlign: "center", opacity: clamp01((t - (sb.badge!.from - 0.3)) / 0.3) * clamp01((sb.total - 0.6 - t) / 0.3) }}>
-          <div data-role="credits" dir={fa ? "rtl" : "ltr"} style={{ fontFamily: fa ? FONT.fa : FONT.en, fontSize: 40, lineHeight: 1.5, color: INK.quiet }}>
+          <div data-role="credits" dir={fa ? "rtl" : "ltr"} style={{ fontFamily: fa ? FONT.fa : FONT.en, fontSize: 48, lineHeight: 1.5, color: INK.quiet }}>
             {sb.credits}
           </div>
         </div>
