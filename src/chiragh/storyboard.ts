@@ -129,7 +129,8 @@ export function cameraAt(sb: Pick<Storyboard, "shots">, t: number): { region: st
   for (let k = 0; k < shots.length; k++) if (shots[k]!.start <= t + 1e-6) i = k;
   const s = shots[i]!;
   const prev = i > 0 ? shots[i - 1]!.motion.to : { region: s.motion.to.region, scale: s.motion.to.scale * 0.94 };
-  const move = Math.min(0.8, s.dur * 0.6);
+  // slow and calm (27 Nov): the camera glides over most of the shot instead of jumping in 0.8 s
+  const move = Math.max(0.6, Math.min(1.8, s.dur * 0.9));
   const k = ease((t - s.start) / move);
   const breathe = clamp01((t - s.start) / Math.max(0.1, s.dur));
   return { region: s.motion.to.region, scale: s.motion.to.scale, prev, k, breathe };

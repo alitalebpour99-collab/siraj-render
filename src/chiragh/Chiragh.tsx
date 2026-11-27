@@ -23,6 +23,10 @@ const mix = (a: string, b: string, k: number) => {
   return `rgb(${A.map((x, i) => Math.round(x + (B[i]! - x) * clamp01(k))).join(",")})`;
 };
 const STAGE_H = GRID.stage.bottom - GRID.stage.top;
+/** The source pill's row: low in the text zone, inside the safe area (the lower third carries the source). */
+const PILL_TOP = GRID.safe.bottom - 96;
+/** The text stack starts a little into the stage's soft lower edge (its mask fades there). */
+const TEXT_TOP = GRID.text.top - 50;
 
 export const artOf = (sb: Storyboard): InlineArt => sb.anchor.inline ?? (ART[sb.anchor.art] as InlineArt);
 
@@ -38,6 +42,35 @@ function cameraTransform(art: InlineArt, region: string, scale: number) {
   const fx = lean * (r.x + r.w / 2) + (1 - lean) * (all.x + all.w / 2);
   const fy = lean * (r.y + r.h / 2) + (1 - lean) * (all.y + all.h / 2);
   return { z, tx: GRID.colX - fx * z, ty: STAGE_H / 2 - fy * z };
+}
+
+/* ---------------- the stage per verse ---------------- */
+
+/** The stage's treatments, by verse (in turn): whole · close on the crown · wide with an echo. */
+const TREATMENTS = [
+  { zoom: 1, dx: 0, dy: 0, echo: 0 },
+  { zoom: 1.3, dx: 0, dy: 95, echo: 0.07 },
+  { zoom: 0.84, dx: 0, dy: -8, echo: 0.13 },
+] as const;
+type Treatment = { zoom: number; dx: number; dy: number; echo: number };
+const lerpT = (a: Treatment, b: Treatment, k: number): Treatment => ({ zoom: a.zoom + (b.zoom - a.zoom) * k, dx: a.dx + (b.dx - a.dx) * k, dy: a.dy + (b.dy - a.dy) * k, echo: a.echo + (b.echo - a.echo) * k });
+
+/** The verse (its order) whose text is on screen at t, and when it came: the treatment follows the verse, not the shot. */
+export function stageTreatment(sb: Pick<Storyboard, "shots" | "verses">, t: number): Treatment {
+  let cur = -1;
+  let since = 0;
+  let prev = -1;
+  for (const s of sb.shots) {
+    if (s.start > t + 1e-6) break;
+    if (s.text.layer !== "verse") continue;
+    const vi = sb.verses.findIndex((v) => v.id === s.text.ref);
+    if (vi < 0 || vi === cur) continue;
+    prev = cur;
+    cur = vi;
+    since = s.start;
+  }
+  const at = (i: number): Treatment => (i < 0 ? TREATMENTS[0] : TREATMENTS[i % TREATMENTS.length]!);
+  return lerpT(at(prev), at(cur), ease((t - since) / 1.4));
 }
 
 /* ---------------- the verse with its word light ---------------- */
@@ -97,7 +130,8 @@ const Translation: React.FC<{ v: Verse; t: number; lang: "en" | "fa" }> = ({ v, 
   const c = v.transChunks[ci]!;
   const fa = lang === "fa";
   const n = c.text.split(/\s+/).length;
-  const size = n <= 14 ? 56 : n <= 24 ? 50 : 46;
+  // larger and readable (27 Nov: the lower third stood empty): the translation is the second voice of the verse
+  const size = fa ? (n <= 14 ? 64 : n <= 24 ? 56 : 50) : n <= 14 ? 60 : n <= 24 ? 54 : 48;
   const parts = c.text.split(/(\s+)/u).filter((p) => p.length > 0);
   let k = 0;
   return (
@@ -136,7 +170,7 @@ const FitZone: React.FC<{ children: React.ReactNode; k: string }> = ({ children,
       live = false;
     };
   }, []);
-  const room = GRID.text.bottom - GRID.text.top - 12;
+  const room = PILL_TOP - TEXT_TOP - 16;
   useLayoutEffect(() => {
     if (!ref.current) return;
     const h = ref.current.scrollHeight;
@@ -144,8 +178,11 @@ const FitZone: React.FC<{ children: React.ReactNode; k: string }> = ({ children,
     if (Math.abs(next - scale) > 0.005) setScale(next);
   }, [k, room, scale, fonts]);
   return (
-    <div ref={ref} style={{ position: "absolute", top: GRID.text.top, left: GRID.colX - GRID.colW / 2, width: GRID.colW, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", gap: 10, transform: scale < 1 ? `scale(${scale.toFixed(3)})` : undefined, transformOrigin: "50% 0" }}>
-      {children}
+    // the zone runs from under the drawing down to the pill row; the stack sits in its middle (no empty lower third)
+    <div style={{ position: "absolute", top: TEXT_TOP, left: GRID.colX - GRID.colW / 2, width: GRID.colW, height: room, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div ref={ref} style={{ width: GRID.colW, display: "flex", flexDirection: "column", alignItems: "center", gap: 18, transform: scale < 1 ? `scale(${scale.toFixed(3)})` : undefined, transformOrigin: "50% 50%" }}>
+        {children}
+      </div>
     </div>
   );
 };
@@ -156,11 +193,17 @@ const VerseBlock: React.FC<{ v: Verse; t: number; lang: "en" | "fa" }> = ({ v, t
   let ti = 0;
   v.transChunks.forEach((c, i) => (c.from <= t + 1e-6 ? (ti = i) : null));
   return (
+    <>
     <FitZone k={`${v.id}:${ci}:${ti}`}>
       <WordGlow v={v} t={t} lang={lang} />
       <Translation v={v} t={t} lang={lang} />
-      {v.refLine ? <RefChip text={v.refLine} lang={lang} /> : null}
     </FitZone>
+    {v.refLine ? (
+      <div style={{ position: "absolute", top: PILL_TOP, left: GRID.colX - GRID.colW / 2, width: GRID.colW, display: "flex", justifyContent: "center" }}>
+        <RefChip text={v.refLine} lang={lang} />
+      </div>
+    ) : null}
+    </>
   );
 };
 
@@ -289,9 +332,14 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
   const k = cam.k;
   // the move to the shot's region, then a slow push around the stage's centre (never still)
   const z0 = a.z + (b.z - a.z) * k;
-  const z = z0 * (1 + 0.04 * cam.breathe);
+  const z = z0 * (1 + 0.025 * cam.breathe);
   const tx = GRID.colX - (GRID.colX - (a.tx + (b.tx - a.tx) * k)) * (z / z0);
   const ty = STAGE_H / 2 - (STAGE_H / 2 - (a.ty + (b.ty - a.ty) * k)) * (z / z0);
+  // the stage changes per verse (27 Nov: «not the same arch every time»): the whole anchor, a close
+  // view of its crown, a wide view with a large faint echo behind for depth; each verse eases into
+  // its own over 1.4 s, and a slow drift runs under all of it
+  const tr = stageTreatment(sb, t);
+  const drift = { x: 10 * Math.sin(t / 4.7), y: 6 * Math.sin(t / 6.3 + 1) };
   const raw = drawProgress(sb, t);
   const progress = raw;
   // the loop: in the last second the drawing fades out as one (nothing flies apart) and the first text comes back, so the last frame is the first
@@ -351,8 +399,17 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
       <Lamp warm={warm} flicker={flicker} rise={rise} />
       {/* the anchor on its stage, with the camera */}
       <div style={{ position: "absolute", left: 0, top: GRID.stage.top, width: 1080, height: STAGE_H, overflow: "hidden", opacity: artOp, WebkitMaskImage: "linear-gradient(180deg, transparent 0%, #000 7%, #000 93%, transparent 100%)", maskImage: "linear-gradient(180deg, transparent 0%, #000 7%, #000 93%, transparent 100%)" }}>
-        <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: STAGE_H, transformOrigin: "0 0", transform: `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) scale(${z.toFixed(4)})` }}>
-          <EmeraldLineArt art={art} progress={progress} height={STAGE_H} uid={sb.video_id.replace(/[^a-z0-9]/gi, "")} flicker={flicker} />
+        {tr.echo > 0.005 ? (
+          <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: STAGE_H, opacity: tr.echo, transformOrigin: `${GRID.colX}px ${STAGE_H / 2}px`, transform: `translate(${(-drift.x * 1.6).toFixed(2)}px, ${(-drift.y * 1.6).toFixed(2)}px) scale(${(2.05 + 0.03 * Math.sin(t / 5)).toFixed(4)})` }}>
+            <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: STAGE_H, transformOrigin: "0 0", transform: `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) scale(${z.toFixed(4)})` }}>
+              <EmeraldLineArt art={art} progress={progress} height={STAGE_H} uid={`${sb.video_id.replace(/[^a-z0-9]/gi, "")}e`} flicker={0} />
+            </div>
+          </div>
+        ) : null}
+        <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: STAGE_H, transformOrigin: `${GRID.colX}px ${STAGE_H / 2}px`, transform: `translate(${(tr.dx + drift.x).toFixed(2)}px, ${(tr.dy + drift.y).toFixed(2)}px) scale(${tr.zoom.toFixed(4)})` }}>
+          <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: STAGE_H, transformOrigin: "0 0", transform: `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) scale(${z.toFixed(4)})` }}>
+            <EmeraldLineArt art={art} progress={progress} height={STAGE_H} uid={sb.video_id.replace(/[^a-z0-9]/gi, "")} flicker={flicker} />
+          </div>
         </div>
       </div>
       {/* the title, from the first frame to the last */}

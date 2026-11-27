@@ -9,6 +9,8 @@ import { splitLeadingBasmala } from "../../src/basmala.ts";
 import { NIGHT_SERIES } from "../../src/night.ts";
 import { hookHead } from "../../src/lamp/zones.ts";
 import { dataArt } from "./data-art.mjs";
+// a surah's Persian name, the same rule as the source lines (owner 27 Nov: «سورهٔ ناس», not «سورهٔ الناس»)
+import { faSurahName } from "../writing.mjs";
 
 const FA_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 const AR_DIGITS = "٠١٢٣٤٥٦٧٨٩";
@@ -95,13 +97,13 @@ export function materialOf(props, voice, qari) {
     const s = props.surah;
     const tr = props.source.translation.translatorName;
     const refLine = props.night
-      ? (k) => (fa ? `سورهٔ ${s.nameArabic}، آیهٔ ${faNum(k)}؛ ترجمهٔ ${tr}` : `${s.number}:${k} · ${tr}`)
+      ? (k) => (fa ? `سورهٔ ${faSurahName(s.nameArabic)}، آیهٔ ${faNum(k)}؛ ترجمهٔ ${tr}` : `${s.number}:${k} · ${tr}`)
       : (k) => (fa ? `آیهٔ ${faNum(k)} از ${faNum(props.ayahs.length)}؛ ترجمهٔ ${tr}` : `${s.number}:${k} · ${tr}`);
     m.verses = versesOf(props, qari, { ...props, basmala: true }, refLine);
     if (props.night) {
       m.title = { main: props.night.title[lang], sub: NIGHT_SERIES[lang] };
     } else {
-      m.title = fa ? { main: `سورهٔ ${s.nameArabic}`, sub: props.whole ? "آیه به آیه، با معنا" : `آیه‌های ${faNum(props.from)} تا ${faNum(props.to)}، با معنا` } : { main: `Surah ${s.tname}`, sub: props.whole ? "Verse by verse, with meaning" : `Verses ${props.from}–${props.to}, with meaning` };
+      m.title = fa ? { main: `سورهٔ ${faSurahName(s.nameArabic)}`, sub: props.whole ? "آیه به آیه، با معنا" : `آیه‌های ${faNum(props.from)} تا ${faNum(props.to)}، با معنا` } : { main: `Surah ${s.tname}`, sub: props.whole ? "Verse by verse, with meaning" : `Verses ${props.from}–${props.to}, with meaning` };
     }
     m.hooks = [m.title.main];
     for (const v of m.verses) {
@@ -127,7 +129,7 @@ export function materialOf(props, voice, qari) {
     const tr = props.recite?.translation?.translatorName ?? null;
     if (props.recite) {
       const r = props.recite;
-      m.verses = versesOf(props, qari, r, (k) => (fa ? `سورهٔ ${r.surah.nameArabic}، آیهٔ ${faNum(k)}${tr ? `؛ ترجمهٔ ${tr}` : ""}` : `${r.surah.number}:${k}${tr ? ` · ${tr}` : ""}`));
+      m.verses = versesOf(props, qari, r, (k) => (fa ? `سورهٔ ${faSurahName(r.surah.nameArabic)}، آیهٔ ${faNum(k)}${tr ? `؛ ترجمهٔ ${tr}` : ""}` : `${r.surah.number}:${k}${tr ? ` · ${tr}` : ""}`));
     }
     for (const sc of props.scenes) {
       if (sc.id === "recite" || (!sc.lines.length && sc.id.startsWith("recite"))) {
