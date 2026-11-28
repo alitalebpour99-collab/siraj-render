@@ -6,7 +6,8 @@
 // 1080 × 600, the stage sits at y 404–1004 of the frame; the text column's centre is x 472.
 // This file imports nothing so that the scripts (node) can list the library for the concept writer.
 
-export type ArtGroup = { id: string; paths: string[]; weight?: number; gold?: boolean; fill?: boolean };
+/** `cue`: the words (Arabic, English, Persian; a regex source, case-free) of the verse on which this stage draws: the drawing says what that verse says */
+export type ArtGroup = { id: string; paths: string[]; weight?: number; gold?: boolean; fill?: boolean; cue?: string };
 export type Region = { id: string; x: number; y: number; w: number; h: number };
 export type ArtDef = {
   id: string;
@@ -19,6 +20,17 @@ export type ArtDef = {
 };
 
 export const STAGE = { w: 1080, h: 600 } as const;
+
+/** Arabic and Persian text without its marks (harakat, tatweel), one alef and one yeh: for matching a cue to a verse. */
+export const bare = (s: string) =>
+  String(s ?? "")
+    .normalize("NFC")
+    .replace(/[ً-ٰٟۖ-ۭـ]/g, "")
+    .replace(/[آأإٱ]/g, "ا")
+    .replace(/[ىی]/g, "ي")
+    .replace(/ک/g, "ك");
+/** Does the cue (a regex source over bare text, case-free) name something in this text? */
+export const cueIn = (cue: string, text: string) => new RegExp(bare(cue), "iu").test(bare(text));
 const CX = 472;
 const r1 = (n: number) => Math.round(n * 10) / 10;
 type Pt = [number, number];
@@ -57,7 +69,8 @@ export function archPts(cx: number, ys: number, w: number, h: number, n = 40): P
   const r = w / 2 + d;
   const top = Math.acos(-d / r);
   const left = arc(cx + d, ys, r, Math.PI, Math.PI + (Math.PI - top), n);
-  const right = arc(cx - d, ys, r, -top, 0, n);
+  // the right curve starts AT the apex (its centre is cx - d: the apex is at angle -(π - top)); -top drew a stray chord across the crown (v3 frames, 28 Nov)
+  const right = arc(cx - d, ys, r, -(Math.PI - top), 0, n);
   return [...left, ...right.slice(1)];
 }
 const arch = (cx: number, ys: number, w: number, h: number) => poly(archPts(cx, ys, w, h));
@@ -407,7 +420,206 @@ function oasis(): ArtDef {
   };
 }
 
-export const ART: Record<string, ArtDef> = Object.fromEntries([mihrab(), mishkat(), rosette(), mushaf(), gate(), nightSky(), oliveTree(), oasis()].map((a) => [a.id, a]));
+
+/* ---------------- meaning motifs (owner, 28 Nov: «Siraj's videos and animations should have meaning») ----------------
+ * Each motif shows the key image of a text, built in the order the text says it: its groups are
+ * STAGES (the first stands at the hook, the rest arrive verse by verse: Chiragh.buildPlan). Nature,
+ * sky, architecture and abstract marks only: no person, face, prophet, imam, animal or figure for God.
+ * scripts/chiragh/meaning.mjs picks one per text and says why. */
+
+/** light / nur: a point of light, then rings and rays spreading over the dark land */
+function lightSpread(): ArtDef {
+  const o: Pt = [CX, 300];
+  const rays = (r0: number, r1x: number, n: number, off = 0) => Array.from({ length: n }, (_, i) => {
+    const a = off + (i * 2 * Math.PI) / n;
+    return line([o[0] + r0 * Math.cos(a), o[1] + r0 * Math.sin(a)], [o[0] + r1x * Math.cos(a), o[1] + r1x * Math.sin(a)]);
+  });
+  return {
+    id: "light",
+    tags: ["light", "nur", "guidance", "dawn", "truth", "knowledge", "lamp", "shine"],
+    figures: false,
+    groups: [
+      { id: "land", paths: [poly(arc(CX, 1180, 900, -Math.PI * 0.62, -Math.PI * 0.38, 60)), line([60, 560], [884, 560])] },
+      { id: "source", gold: true, fill: true, weight: 0, paths: [circle(o[0], o[1], 16)] },
+      { id: "ring-1", gold: true, paths: [circle(o[0], o[1], 48)], cue: "نور|النور|\\blight\\b" },
+      { id: "rays-1", paths: rays(64, 130, 8) },
+      { id: "ring-2", paths: [circle(o[0], o[1], 150)] },
+      { id: "rays-2", paths: rays(160, 250, 16, Math.PI / 16), cue: "اهدنا|هدى|يهدي|\\bguid|هدایت" },
+      { id: "ring-3", paths: [circle(o[0], o[1], 270)] },
+      { id: "glints", paths: [[180, 520], [300, 500], [640, 500], [770, 520], [470, 540]].map(([x, y]) => star(x!, y!, 9, 0.45)) },
+    ],
+    regions: [
+      { id: "whole", x: 60, y: 10, w: 824, h: 580 },
+      { id: "source", x: 342, y: 170, w: 260, h: 260 },
+      { id: "land", x: 100, y: 420, w: 744, h: 170 },
+    ],
+  };
+}
+
+/** water / rain: dry cracked ground, a cloud, rain, and the ground revived with shoots */
+function rainRevive(): ArtDef {
+  const cracks = [poly([[200, 520], [240, 540], [230, 570]]), poly([[360, 515], [330, 545], [350, 575]]), poly([[560, 520], [600, 548], [580, 578]]), poly([[720, 515], [690, 545], [715, 572]])];
+  const cloud = "M300 150Q300 100 350 100Q370 60 430 66Q470 30 530 56Q590 50 610 100Q660 104 656 150Z";
+  const drops = (y0: number, k: number) => Array.from({ length: 11 }, (_, i) => { const x = 320 + i * 30 + (k % 2) * 14; const y = y0 + ((i * 37) % 60); return line([x, y], [x - 8, y + 34]); });
+  const shoot = (x: number, h: number) => [line([x, 512], [x, 512 - h]), leaf(x, 512 - h * 0.55, 30, -2.3, 0.3), leaf(x, 512 - h * 0.75, 30, -0.8, 0.3)];
+  return {
+    id: "rain",
+    tags: ["rain", "water", "revive", "dead earth", "mercy", "life", "resurrection", "sky", "sustenance"],
+    figures: false,
+    groups: [
+      { id: "ground", paths: [line([120, 512], [824, 512]), ...cracks] },
+      { id: "cloud", paths: [cloud] },
+      { id: "rain-a", paths: drops(180, 0), cue: "ماء|الماء|غيث|\\brain\\b|\\bwater\\b|باران|آب" },
+      { id: "rain-b", paths: drops(250, 1) },
+      { id: "soak", paths: [line([160, 526], [784, 526]), line([200, 540], [744, 540])] },
+      { id: "shoots-a", paths: [...shoot(250, 70), ...shoot(470, 96)], cue: "احيا|فاحيا|\\brevive|\\bgave life|زنده" },
+      { id: "shoots-b", paths: [...shoot(360, 60), ...shoot(600, 84), ...shoot(700, 58)] },
+      { id: "bloom", gold: true, paths: [[470, 408], [600, 420]].map(([x, y]) => circle(x!, y!, 9)) },
+    ],
+    regions: [
+      { id: "whole", x: 100, y: 20, w: 744, h: 570 },
+      { id: "sky", x: 260, y: 30, w: 440, h: 300 },
+      { id: "ground", x: 160, y: 380, w: 624, h: 210 },
+    ],
+  };
+}
+
+/** patience / growth: a seed in the soil, roots, a stem, leaves, and at last the fruit */
+function seedGrow(): ArtDef {
+  const soil = 430;
+  return {
+    id: "seed",
+    tags: ["patience", "seed", "growth", "reward", "good deed", "charity", "multiply", "time", "faith"],
+    figures: false,
+    groups: [
+      { id: "soil", paths: [line([140, soil], [804, soil]), line([180, soil + 14], [764, soil + 14])] },
+      { id: "seed", paths: [`M${CX - 16} ${soil + 70}Q${CX} ${soil + 46} ${CX + 16} ${soil + 70}Q${CX} ${soil + 94} ${CX - 16} ${soil + 70}Z`] },
+      { id: "roots", paths: [`M${CX} ${soil + 88}Q${CX - 30} ${soil + 120} ${CX - 80} ${soil + 140}`, `M${CX} ${soil + 88}Q${CX + 26} ${soil + 124} ${CX + 70} ${soil + 146}`, `M${CX} ${soil + 90}L${CX} ${soil + 160}`] },
+      { id: "stem", paths: [`M${CX} ${soil + 54}C${CX - 10} ${soil - 60} ${CX + 12} ${soil - 160} ${CX} ${soil - 260}`] },
+      { id: "leaves-a", paths: [leaf(CX, soil - 40, 60, -2.6, 0.3), leaf(CX, soil - 80, 60, -0.5, 0.3)] },
+      { id: "leaves-b", paths: [leaf(CX + 2, soil - 150, 64, -2.5, 0.3), leaf(CX + 2, soil - 190, 64, -0.6, 0.3), leaf(CX, soil - 240, 40, -1.6, 0.3)] },
+      { id: "ears", paths: [-0.9, -2.2].map((a) => leaf(CX, soil - 250, 80, a, 0.16)), cue: "سنابل|سنبلة|\\bears\\b|خوشه" },
+      { id: "fruit", gold: true, paths: [[CX - 42, soil - 300], [CX + 46, soil - 296], [CX, soil - 330]].map(([x, y]) => circle(x!, y!, 8)), cue: "الصابرين|اجر|\\breward|\\bmultipl|پاداش|چند برابر" },
+    ],
+    regions: [
+      { id: "whole", x: 140, y: 40, w: 664, h: 560 },
+      { id: "soil", x: 292, y: 400, w: 360, h: 200 },
+      { id: "crown", x: 292, y: 60, w: 360, h: 300 },
+    ],
+  };
+}
+
+/** night and day: the sky turning, the sun's arc down, the moon up, the stars */
+function skyTurn(): ArtDef {
+  const h = 470;
+  return {
+    id: "sky",
+    tags: ["night", "day", "time", "sun", "moon", "signs", "dawn", "dusk", "turn", "creation"],
+    figures: false,
+    groups: [
+      { id: "horizon", paths: [line([60, h], [884, h]), "M60 520Q300 490 470 510T884 500"] },
+      { id: "sun", gold: true, paths: [circle(250, 200, 40)], cue: "الشمس|الضحى|النهار|\\bsun\\b|\\bday\\b|\\bmorning|خورشید|روز|چاشت" },
+      { id: "sun-arc", paths: [poly(arc(CX, h, 330, Math.PI, Math.PI * 1.5, 40))] },
+      { id: "dusk", cue: "الليل|\\bnight\\b|شب", paths: [poly(arc(CX, h, 400, Math.PI * 1.02, Math.PI * 1.98, 60)), poly(arc(CX, h, 440, Math.PI * 1.04, Math.PI * 1.96, 60))] },
+      { id: "moon", paths: [`M700 120A56 56 0 1 0 744 210A44 44 0 1 1 700 120Z`], cue: "القمر|\\bmoon\\b|ماه" },
+      { id: "moon-arc", paths: [poly(arc(CX, h, 330, Math.PI * 1.5, Math.PI * 2, 40))] },
+      { id: "stars", cue: "الفجر|\\bdawn\\b|سپیده|فجر", paths: [[160, 90], [380, 60], [560, 110], [860, 80], [300, 160], [620, 200], [820, 260]].map(([x, y], i) => star(x!, y!, i % 2 ? 8 : 12, 0.42)) },
+    ],
+    regions: [
+      { id: "whole", x: 40, y: 20, w: 864, h: 560 },
+      { id: "sun", x: 140, y: 100, w: 300, h: 260 },
+      { id: "moon", x: 560, y: 40, w: 300, h: 260 },
+    ],
+  };
+}
+
+/** the scale / justice: the stand, the beam, the pans, then the beam level */
+function balance(): ArtDef {
+  const top = 150;
+  const pan = (x: number, y: number) => [line([x, y], [x - 70, y + 120]), line([x, y], [x + 70, y + 120]), `M${x - 90} ${y + 120}Q${x} ${y + 170} ${x + 90} ${y + 120}Z`];
+  return {
+    id: "balance",
+    tags: ["justice", "scale", "balance", "measure", "judgment", "deeds", "weigh", "fairness", "reckoning"],
+    figures: false,
+    groups: [
+      { id: "base", paths: [line([CX - 120, 560], [CX + 120, 560]), `M${CX - 70} 560Q${CX} 520 ${CX + 70} 560`] },
+      { id: "pillar", paths: [line([CX, 540], [CX, top]), circle(CX, top - 16, 14)] },
+      { id: "beam", paths: [line([CX - 260, top + 10], [CX + 260, top + 10])] },
+      { id: "pan-left", paths: pan(CX - 260, top + 10), cue: "موازين|الميزان|مثقال|\\bscales?\\b|\\bweigh|ترازو|سنگینی|وزن" },
+      { id: "pan-right", paths: pan(CX + 260, top + 10) },
+      { id: "level", gold: true, paths: [star(CX, top - 16, 9, 0.45)], cue: "بالقسط|القسط|\\bjustice|\\bjust\\b|عدل|عدالت|داد" },
+    ],
+    regions: [
+      { id: "whole", x: 120, y: 60, w: 704, h: 530 },
+      { id: "beam", x: 172, y: 80, w: 600, h: 260 },
+      { id: "base", x: 292, y: 380, w: 360, h: 210 },
+    ],
+  };
+}
+
+/** refuge: a sheltered flame in a niche, its light, and the dark whispers curling away from it */
+function refuge(): ArtDef {
+  const ys = 330;
+  const wisp = (x: number, y: number, dir: number) => `M${x} ${y}c${dir * 30} -24 ${dir * 60} 10 ${dir * 44} 34s${dir * -40} 10 ${dir * -24} -10`;
+  return {
+    id: "refuge",
+    tags: ["refuge", "protection", "shelter", "evil", "whisper", "trust", "safety", "seek refuge", "guard"],
+    figures: false,
+    groups: [
+      { id: "shelter", paths: [arch(CX, ys, 300, 230), line([CX - 150, ys], [CX - 150, 560]), line([CX + 150, ys], [CX + 150, 560]), line([CX - 190, 560], [CX + 190, 560])] },
+      { id: "glass", paths: [circle(CX, 460, 54), line([CX - 34, 508], [CX - 44, 556]), line([CX + 34, 508], [CX + 44, 556])] },
+      { id: "flame", gold: true, fill: true, weight: 0, paths: [`M${CX} 490C${CX - 12} 476 ${CX - 8} 452 ${CX} 432C${CX + 8} 452 ${CX + 12} 476 ${CX} 490Z`] },
+      // the shelter made whole: eight-fold stars along its arch (refuge in the Lord: shelter, never an image for Him)
+      { id: "tiles", paths: along(archPts(CX, 330, 300, 230), 46).map(([x, y]) => star(x, y - 18, 8, 0.45)) },
+      { id: "light-1", gold: true, paths: [circle(CX, 460, 110)], cue: "الفلق|\\bdaybreak|\\bdawn|سپیده" },
+      { id: "wisps-near", cue: "الوسواس|غاسق|\\bwhisper|\\bdarkness|وسوسه|تاریکی", paths: [wisp(250, 300, 1), wisp(700, 320, -1), wisp(230, 480, 1), wisp(720, 470, -1)] },
+      { id: "light-2", paths: [poly(arc(CX, 460, 200, Math.PI * 1.06, Math.PI * 1.94, 48))], cue: "الجنة|حاسد|\\bjinn|\\benvi|جنّ|جن |حسود" },
+      { id: "wisps-away", cue: "الخناس|النفاثات|\\bwithdraw|\\bslink|\\bsneak|\\bretreat|پنهانکار|دمندگان", paths: [wisp(110, 140, -1), wisp(840, 150, 1), wisp(90, 400, -1), wisp(860, 420, 1)] },
+    ],
+    regions: [
+      { id: "whole", x: 60, y: 40, w: 824, h: 550 },
+      { id: "flame", x: 342, y: 330, w: 260, h: 260 },
+      { id: "edges", x: 60, y: 100, w: 824, h: 400 },
+    ],
+  };
+}
+
+/** the stones from the sky: the House on its plain, flight trails filling the sky, stones falling, a field of straw eaten down (105) */
+function stones(): ArtDef {
+  const g = 540;
+  const stalks = (bent: boolean) => Array.from({ length: 12 }, (_, i) => {
+    const x = 160 + i * 56;
+    return bent ? `M${x} ${g}Q${x + 4} ${g - 30} ${x + 30} ${g - 24}` : line([x, g], [x - 4 + (i % 3) * 4, g - 70 - (i % 4) * 8]);
+  });
+  const trails = [[180, 150, 1], [330, 110, 1], [620, 120, -1], [780, 160, -1], [470, 70, 1]].map(([x, y, d]) => `M${x} ${y}q${d! * 40} -26 ${d! * 80} 0`);
+  const falling = [[260, 220], [360, 260], [480, 200], [590, 270], [690, 230], [420, 330], [540, 360]].flatMap(([x, y]) => [circle(x!, y!, 6), line([x! - 14, y! - 40], [x! - 3, y! - 8])]);
+  return {
+    id: "stones",
+    tags: ["elephant", "army", "stones", "birds", "plot", "defeat", "protection of the House", "kaaba", "punishment"],
+    figures: false,
+    groups: [
+      { id: "plain", paths: [line([60, g], [884, g])] },
+      { id: "house", paths: [poly([[CX - 50, g], [CX - 50, g - 100], [CX + 50, g - 100], [CX + 50, g]]), line([CX - 50, g - 76], [CX + 50, g - 76])] },
+      // the road the army took towards the House (verse 1: «the owners of the elephant»), no figure on it
+      { id: "road", paths: ["M60 560Q220 548 360 546T402 542", "M60 578Q240 566 380 562T412 556"] },
+      { id: "dust", cue: "كيدهم|\\bstratagem|\\bplot|نقشه|نیرنگ|مکر", paths: ["M60 520Q120 490 180 515T300 510", "M70 500Q130 470 190 495"] },
+      { id: "trails", paths: trails, cue: "طيرا|ابابيل|\\bbirds?\\b|\\bflying|\\bflocks?\\b|پرندگان|دسته دسته" },
+      { id: "falling", paths: falling, cue: "بحجارة|سجيل|\\bstones?\\b|\\bclay\\b|سنگ" },
+      { id: "stalks", paths: stalks(false), cue: "كعصف|\\bstraw|\\bcrops|\\bleaves|کاه|برگ" },
+      { id: "straw", paths: stalks(true), cue: "ماكول|\\bdevoured|\\beaten|خورده" },
+    ],
+    regions: [
+      { id: "whole", x: 60, y: 30, w: 824, h: 560 },
+      { id: "sky", x: 160, y: 40, w: 620, h: 340 },
+      { id: "plain", x: 100, y: 380, w: 744, h: 210 },
+    ],
+  };
+}
+
+export const ART: Record<string, ArtDef> = Object.fromEntries([mihrab(), mishkat(), rosette(), mushaf(), gate(), nightSky(), oliveTree(), oasis(), lightSpread(), rainRevive(), seedGrow(), skyTurn(), balance(), refuge(), stones()].map((a) => [a.id, a]));
+
+/** The meaning motifs (their groups are stages, drawn in step with the text). */
+export const MOTIFS = ["light", "rain", "seed", "sky", "balance", "refuge", "stones"] as const;
 
 /** The library as the concept writer sees it: ids, meanings, groups, regions (no geometry). */
 export const artIndex = () => Object.values(ART).map((a) => ({ id: a.id, tags: a.tags, groups: a.groups.map((g) => g.id), regions: a.regions.map((r) => r.id) }));

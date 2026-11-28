@@ -334,7 +334,7 @@ export function direct(m, c, { videoId, fps = 30 } = {}) {
     idea_family: c.idea_family,
     concept: { one_line: c.one_line, hook: { type: c.hook.type, text: c.hook.text }, key_word: c.key_word ?? null, twist_at_beat: c.twist_at_beat ?? 0, ending: { type: c.ending?.type ?? "loop", links_to: "hook" }, new_because: c.new_because ?? [], by: c.by ?? "code" },
     fingerprint: fingerprintOf(m, c, shots),
-    anchor: { art: art.id, inline: m.data ?? null, regions: visit },
+    anchor: { art: art.id, inline: m.data ?? null, regions: visit, meaning: m.meaning ? { art: m.meaning.art, why: m.meaning.why, by: m.meaning.by } : null },
     title: m.title,
     fps,
     total: L.total,

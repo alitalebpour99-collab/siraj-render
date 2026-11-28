@@ -5,10 +5,10 @@
 // of the Quran and of a translation is the API's own, exactly as served, cut only at its spaces.
 // No music: only the qari and the narrator are placed.
 import React, { useLayoutEffect, useRef, useState } from "react";
-import { AbsoluteFill, Audio, Sequence, continueRender, delayRender, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Audio, Img, Sequence, continueRender, delayRender, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { fontsReady } from "../fonts";
 import { quoteHash } from "../lamp/zones";
-import { ART } from "./art";
+import { ART, cueIn } from "./art";
 import { EmeraldLineArt } from "./LineArt";
 import { cameraAt, drawProgress, ease, glowAmount, litAmount, shotAt, type Caption, type InlineArt, type Storyboard, type Verse } from "./storyboard";
 import { FONT, GRID, INK } from "./tokens";
@@ -23,6 +23,10 @@ const mix = (a: string, b: string, k: number) => {
   return `rgb(${A.map((x, i) => Math.round(x + (B[i]! - x) * clamp01(k))).join(",")})`;
 };
 const STAGE_H = GRID.stage.bottom - GRID.stage.top;
+/** The source pill's row: low in the text zone, inside the safe area (the lower third carries the source). */
+const PILL_TOP = GRID.safe.bottom - 96;
+/** The text stack starts a little into the stage's soft lower edge (its mask fades there). */
+const TEXT_TOP = GRID.text.top - 50;
 
 export const artOf = (sb: Storyboard): InlineArt => sb.anchor.inline ?? (ART[sb.anchor.art] as InlineArt);
 
@@ -40,9 +44,119 @@ function cameraTransform(art: InlineArt, region: string, scale: number) {
   return { z, tx: GRID.colX - fx * z, ty: STAGE_H / 2 - fy * z };
 }
 
+/* ---------------- one drawing, built across the whole video ---------------- */
+
+/**
+ * The anchor is ONE drawing that keeps growing (vision review, 27 Nov: «it finishes by 10 s, then
+ * only re-zooms»): its groups in the director's order, the first third already WHOLE at frame 0
+ * (the hook shows the drawing), the rest spread evenly until 85 % of the video, each drawing in over
+ * 1.2 s (the director's order and groups; only the times are spread).
+ */
+const buildCache = new WeakMap<object, Array<{ g: string; at: number }>>();
+export function buildPlan(sb: Pick<Storyboard, "shots" | "total"> & Partial<Pick<Storyboard, "verses">>): Array<{ g: string; at: number }> {
+  const hit = buildCache.get(sb as object);
+  if (hit) return hit;
+  const first = new Map<string, number>();
+  for (const s of sb.shots) s.picture.draw.forEach((g) => (first.has(g) ? null : first.set(g, s.start)));
+  const order = [...first.entries()].sort((a, b) => a[1] - b[1]).map(([g]) => g);
+  // a stage with a cue draws on the (first) verse whose words or translation name it (art.ts: cue)
+  const art = "anchor" in sb ? artOf(sb as Storyboard) : null;
+  const cueAt = new Map<string, number>();
+  if (art && sb.verses) {
+    const firstShot = new Map<string, number>();
+    for (const s of sb.shots) if (s.text.layer === "verse" && s.text.ref && !firstShot.has(s.text.ref)) firstShot.set(s.text.ref, s.start);
+    for (const g of art.groups) {
+      if (!g.cue) continue;
+      const v = sb.verses.find((x) => x.ayah !== null && firstShot.has(x.id) && cueIn(g.cue!, `${x.chunks.map((c) => c.text).join(" ")} ${x.translation ?? ""}`));
+      if (v) cueAt.set(g.id, firstShot.get(v.id)!);
+    }
+  }
+  const n = order.length;
+  // the hook: the first third, never a stage that waits for its verse
+  const k0 = Math.max(1, Math.min(order.findIndex((g) => cueAt.has(g)) < 0 ? n : order.findIndex((g) => cueAt.has(g)), Math.ceil(n * 0.34)));
+  const end = Math.max(4, sb.total * 0.85);
+  const start = 1.2;
+  // in step with the text (owner, 28 Nov: «meaning»): the stages after the hook are shared out over the verses in
+  // order, each arriving as its verse comes on screen (and spread inside it); without verses, evenly in time
+  const seen = new Set<string>();
+  const uniq: number[] = [];
+  for (const s of sb.shots) {
+    if (s.text.layer !== "verse" || !s.text.ref || seen.has(s.text.ref) || s.start >= end) continue;
+    const v = (sb.verses ?? []).find((x) => x.id === s.text.ref);
+    if (!v || v.ayah === null) continue;
+    seen.add(s.text.ref);
+    if (s.start >= start - 0.5) uniq.push(s.start);
+  }
+  uniq.sort((p, q) => p - q);
+  const rest = n - k0;
+  // stages cued on the same verse follow each other 1.2 s apart
+  const cuedOn = new Map<number, number>();
+  const plan = order.map((g, i) => {
+    if (i < k0) return { g, at: -2.6 + (i * 1.0) / k0 };
+    if (cueAt.has(g)) {
+      const t0 = cueAt.get(g)!;
+      const k = cuedOn.get(t0) ?? 0;
+      cuedOn.set(t0, k + 1);
+      return { g, at: Math.max(start, Math.min(end, t0 + 0.4 + 1.2 * k)) };
+    }
+    const r = i - k0;
+    if (uniq.length >= 2) {
+      // stage r of rest goes to verse floor(r · V / rest); several stages in one verse follow each other 1.4 s apart
+      const vi = Math.min(uniq.length - 1, Math.floor((r * uniq.length) / Math.max(1, rest)));
+      const f0 = Math.ceil((vi * rest) / uniq.length); // the first stage that falls in this verse
+      const inVerse = Math.max(1, Math.ceil(((vi + 1) * rest) / uniq.length) - f0);
+      const nextAt = vi + 1 < uniq.length ? uniq[vi + 1]! : end;
+      const slot = Math.min(1.4, Math.max(0.6, (nextAt - uniq[vi]! - 0.3) / (inVerse + 0.5)));
+      return { g, at: Math.max(start, uniq[vi]! + 0.3 + (r - f0) * slot) };
+    }
+    return { g, at: start + ((r + 1) / Math.max(1, rest)) * (end - start) };
+  });
+  buildCache.set(sb as object, plan);
+  return plan;
+}
+function buildProgress(sb: Storyboard, raw: Record<string, number>, t: number): Record<string, number> {
+  const out: Record<string, number> = { ...raw };
+  // the loop: in the last second the groups added after the hook draw back, so the last frame is the first
+  // (28 Nov: the last frame showed dots, the round caps of strokes at 1–3 %: the draw-back now ends 3 frames early and a
+  // stroke under 4 % is not drawn at all, so the last frame is exactly the hook's drawing)
+  const back = t > sb.total - 1.0 ? ease((sb.total - 0.1 - t) / 0.9) : 1;
+  for (const { g, at } of buildPlan(sb)) out[g] = clamp01((t - at) / 1.2) * (at < 0 ? 1 : back);
+  for (const g of Object.keys(out)) if (out[g]! < 0.04) out[g] = 0;
+  return out;
+}
+
+/* ---------------- the stage per verse ---------------- */
+
+/** The stage's treatments, by verse (in turn): whole · close on the crown · wide (the echo layer was judged clutter: off). */
+const TREATMENTS = [
+  { zoom: 1, dx: 0, dy: 0, echo: 0 },
+  { zoom: 1.16, dx: 0, dy: 55, echo: 0 },
+  { zoom: 0.9, dx: 0, dy: -6, echo: 0 },
+] as const;
+type Treatment = { zoom: number; dx: number; dy: number; echo: number };
+const lerpT = (a: Treatment, b: Treatment, k: number): Treatment => ({ zoom: a.zoom + (b.zoom - a.zoom) * k, dx: a.dx + (b.dx - a.dx) * k, dy: a.dy + (b.dy - a.dy) * k, echo: a.echo + (b.echo - a.echo) * k });
+
+/** The verse (its order) whose text is on screen at t, and when it came: the treatment follows the verse, not the shot. */
+export function stageTreatment(sb: Pick<Storyboard, "shots" | "verses">, t: number): Treatment {
+  let cur = -1;
+  let since = 0;
+  let prev = -1;
+  for (const s of sb.shots) {
+    if (s.start > t + 1e-6) break;
+    if (s.text.layer !== "verse") continue;
+    const vi = sb.verses.findIndex((v) => v.id === s.text.ref);
+    if (vi < 0 || vi === cur) continue;
+    prev = cur;
+    cur = vi;
+    since = s.start;
+  }
+  const at = (i: number): Treatment => (i < 0 ? TREATMENTS[0] : TREATMENTS[i % TREATMENTS.length]!);
+  return lerpT(at(prev), at(cur), ease((t - since) / 1.4));
+}
+
 /* ---------------- the verse with its word light ---------------- */
 
-const fitSize = (words: number) => (words <= 4 ? 92 : words <= 7 ? 80 : words <= 10 ? 70 : words <= 14 ? 62 : 56);
+const fitSize = (words: number) => (words <= 4 ? 100 : words <= 7 ? 88 : words <= 10 ? 78 : words <= 14 ? 68 : 60);
 
 const Seal: React.FC<{ label: string; size: number }> = ({ label, size }) => (
   <span style={{ display: "inline-flex", position: "relative", width: size * 0.9, height: size * 0.9, verticalAlign: "middle", margin: "0 10px" }}>
@@ -97,7 +211,8 @@ const Translation: React.FC<{ v: Verse; t: number; lang: "en" | "fa" }> = ({ v, 
   const c = v.transChunks[ci]!;
   const fa = lang === "fa";
   const n = c.text.split(/\s+/).length;
-  const size = n <= 14 ? 56 : n <= 24 ? 50 : 46;
+  // larger and readable (27 Nov: the lower third stood empty): the translation is the second voice of the verse
+  const size = fa ? (n <= 14 ? 76 : n <= 24 ? 66 : 58) : n <= 14 ? 72 : n <= 24 ? 62 : 56;
   const parts = c.text.split(/(\s+)/u).filter((p) => p.length > 0);
   let k = 0;
   return (
@@ -118,7 +233,7 @@ const Translation: React.FC<{ v: Verse; t: number; lang: "en" | "fa" }> = ({ v, 
 
 const RefChip: React.FC<{ text: string; lang: "en" | "fa" }> = ({ text, lang }) => (
   // never wider than the text zone (27 Nov: a long source ran off the pill); wrapped, balanced, isolated
-  <div data-role="ref" dir={lang === "fa" ? "rtl" : "ltr"} style={{ display: "inline-block", maxWidth: 900, textWrap: "balance", unicodeBidi: "isolate", padding: "6px 26px", borderRadius: 999, background: INK.emeraldDeep, color: INK.cream, fontFamily: lang === "fa" ? FONT.fa : FONT.en, fontSize: 40, lineHeight: 1.35, fontWeight: lang === "fa" ? 600 : 500 }}>
+  <div data-role="ref" dir={lang === "fa" ? "rtl" : "ltr"} style={{ display: "inline-block", maxWidth: 900, textWrap: "balance", unicodeBidi: "isolate", padding: "6px 26px", borderRadius: 999, background: INK.emeraldDeep, color: INK.cream, fontFamily: lang === "fa" ? FONT.fa : FONT.en, fontSize: 46, lineHeight: 1.35, fontWeight: lang === "fa" ? 600 : 500 }}>
     {text}
   </div>
 );
@@ -136,7 +251,7 @@ const FitZone: React.FC<{ children: React.ReactNode; k: string }> = ({ children,
       live = false;
     };
   }, []);
-  const room = GRID.text.bottom - GRID.text.top - 12;
+  const room = PILL_TOP - TEXT_TOP - 16;
   useLayoutEffect(() => {
     if (!ref.current) return;
     const h = ref.current.scrollHeight;
@@ -144,8 +259,11 @@ const FitZone: React.FC<{ children: React.ReactNode; k: string }> = ({ children,
     if (Math.abs(next - scale) > 0.005) setScale(next);
   }, [k, room, scale, fonts]);
   return (
-    <div ref={ref} style={{ position: "absolute", top: GRID.text.top, left: GRID.colX - GRID.colW / 2, width: GRID.colW, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", gap: 10, transform: scale < 1 ? `scale(${scale.toFixed(3)})` : undefined, transformOrigin: "50% 0" }}>
-      {children}
+    // the zone runs from under the drawing down to the pill row; the stack sits in its middle (no empty lower third)
+    <div style={{ position: "absolute", top: TEXT_TOP, left: GRID.colX - GRID.colW / 2, width: GRID.colW, height: room, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div ref={ref} style={{ width: GRID.colW, display: "flex", flexDirection: "column", alignItems: "center", gap: 18, transform: scale < 1 ? `scale(${scale.toFixed(3)})` : undefined, transformOrigin: "50% 50%" }}>
+        {children}
+      </div>
     </div>
   );
 };
@@ -156,11 +274,17 @@ const VerseBlock: React.FC<{ v: Verse; t: number; lang: "en" | "fa" }> = ({ v, t
   let ti = 0;
   v.transChunks.forEach((c, i) => (c.from <= t + 1e-6 ? (ti = i) : null));
   return (
+    <>
     <FitZone k={`${v.id}:${ci}:${ti}`}>
       <WordGlow v={v} t={t} lang={lang} />
       <Translation v={v} t={t} lang={lang} />
-      {v.refLine ? <RefChip text={v.refLine} lang={lang} /> : null}
     </FitZone>
+    {v.refLine ? (
+      <div style={{ position: "absolute", top: PILL_TOP, left: GRID.colX - GRID.colW / 2, width: GRID.colW, display: "flex", justifyContent: "center" }}>
+        <RefChip text={v.refLine} lang={lang} />
+      </div>
+    ) : null}
+    </>
   );
 };
 
@@ -215,6 +339,50 @@ const Lamp: React.FC<{ warm: number; flicker: number; rise: number }> = ({ warm,
     </>
   );
 };
+
+/* ---------------- round 5: the scene stage (a still per verse group, Ken Burns, cross-fades) ---------------- */
+
+/** Where the picture ends and the cream text panel begins (the picture fades into it). */
+const SCENE_FADE = { from: 880, to: 1030 };
+
+const SceneStage: React.FC<{ sb: Storyboard; t: number }> = ({ sb, t }) => {
+  const scenes = sb.scenes ?? [];
+  const FADE = 0.9;
+  const layer = (s: (typeof scenes)[number], i: number, op: number, key: string) => {
+    // slow Ken Burns: a push in across the scene's time, the drift alternating left/right (never still)
+    const span = Math.max(1, s.to - s.from + FADE);
+    const k = clamp01((t - s.from) / span);
+    const z = 1.04 + 0.1 * k;
+    const dx = (i % 2 ? -1 : 1) * (18 - 36 * k);
+    const dy = -10 * k;
+    return (
+      <div key={key} style={{ position: "absolute", left: 0, top: 0, width: 1080, height: 1920, opacity: op, overflow: "hidden" }}>
+        <Img src={staticFile(s.file)} style={{ position: "absolute", left: 0, top: 0, width: 1080, height: 1920, objectFit: "cover", transformOrigin: "50% 34%", transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scale(${z.toFixed(4)})` }} />
+      </div>
+    );
+  };
+  const shown = scenes.map((s, i) => ({ s, i })).filter(({ s }) => t >= s.from - 1e-6 && t < s.to + FADE);
+  // the loop: the first scene comes back over the last 0.8 s, so the last frame is the first
+  const back = ease((t - (sb.total - 0.8)) / 0.8);
+  return (
+    <>
+      {shown.map(({ s, i }) => layer(s, i, i === 0 ? 1 : ease((t - s.from) / FADE), s.id))}
+      {back > 0 && scenes[0] ? layer({ ...scenes[0], from: 0, to: scenes[0].to }, 0, back, "loop") : null}
+      {/* the picture fades into the cream panel that carries the text */}
+      <div style={{ position: "absolute", left: 0, top: SCENE_FADE.from, width: 1080, height: 1920 - SCENE_FADE.from, background: `linear-gradient(180deg, rgba(246,239,223,0) 0px, ${INK.cream} ${SCENE_FADE.to - SCENE_FADE.from}px, ${INK.cream} 100%)` }} />
+      {/* a soft shade under the title */}
+      <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: 420, background: "linear-gradient(180deg, rgba(10,20,16,0.55) 0%, rgba(10,20,16,0) 100%)" }} />
+    </>
+  );
+};
+
+/** The brand, small, in the corner (the lamp is no longer the picture). */
+const CornerMark: React.FC<{ fa: boolean }> = ({ fa }) => (
+  <div style={{ position: "absolute", right: 40, top: 236, display: "flex", alignItems: "center", gap: 10, opacity: 0.92 }} dir={fa ? "rtl" : "ltr"}>
+    <svg width={64} height={52} viewBox="0 0 120 98"><g fill="none" stroke={INK.cream} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round"><path d="M24 60C24 47 43 41.5 62 42.5C77 43.3 91 47.5 103 51.5C95 56 82 62.5 66 65.5C47 69 26 70 24 60Z" /><path d="M48 67.5L44 79H74L70 66.2" /><path d="M38 83H80" /></g><path d="M104 50C97.5 43.5 98.5 33 105.5 21C111.5 32.5 112.5 43.5 106.5 50Z" fill={INK.flame} /></svg>
+    <span style={{ fontFamily: fa ? FONT.fa : FONT.en, fontSize: 40, fontWeight: 700, color: INK.cream, textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>{fa ? "سراج" : "Siraj"}</span>
+  </div>
+);
 
 /* ---------------- the measurements for the gate (numbers and hashes, never a text) ---------------- */
 
@@ -283,19 +451,40 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
   const t = f / fps;
   const art = artOf(sb);
   const shot = shotAt(sb, t);
-  const cam = cameraAt(sb, t);
-  const a = cameraTransform(art, cam.prev.region, cam.prev.scale);
-  const b = cameraTransform(art, cam.region, cam.scale);
-  const k = cam.k;
-  // the move to the shot's region, then a slow push around the stage's centre (never still)
-  const z0 = a.z + (b.z - a.z) * k;
-  const z = z0 * (1 + 0.04 * cam.breathe);
-  const tx = GRID.colX - (GRID.colX - (a.tx + (b.tx - a.tx) * k)) * (z / z0);
-  const ty = STAGE_H / 2 - (STAGE_H / 2 - (a.ty + (b.ty - a.ty) * k)) * (z / z0);
+  // the camera, the stage's treatment and its drift at a time; in the last second they ease back to frame 0's,
+  // so the last frame is the first (28 Nov: the loop jumped in framing as well as in drawing)
+  const stageAt = (tt: number) => {
+    const cam = cameraAt(sb, tt);
+    const a = cameraTransform(art, cam.prev.region, cam.prev.scale);
+    const b = cameraTransform(art, cam.region, cam.scale);
+    const k = cam.k;
+    // the move to the shot's region, then a slow push around the stage's centre (never still)
+    const z0 = a.z + (b.z - a.z) * k;
+    const z = z0 * (1 + 0.025 * cam.breathe);
+    const tx = GRID.colX - (GRID.colX - (a.tx + (b.tx - a.tx) * k)) * (z / z0);
+    const ty = STAGE_H / 2 - (STAGE_H / 2 - (a.ty + (b.ty - a.ty) * k)) * (z / z0);
+    const tr = stageTreatment(sb, tt);
+    // a slow drift and push under all of it (28 Nov: «the drawing stays motionless»: a little wider, still calm)
+    const drift = { x: 16 * Math.sin(tt / 4.7), y: 10 * Math.sin(tt / 6.3 + 1), z: 1 + 0.02 * Math.sin(tt / 3.3) };
+    return { z, tx, ty, tr, drift };
+  };
+  const now0 = stageAt(t);
+  const first = stageAt(0);
+  const home = ease((t - (sb.total - 1.0)) / 0.9);
+  const lerpN = (p: number, q: number) => p + (q - p) * home;
+  const z = lerpN(now0.z, first.z);
+  const tx = lerpN(now0.tx, first.tx);
+  const ty = lerpN(now0.ty, first.ty);
+  // the stage changes per verse (27 Nov: «not the same arch every time»): the whole anchor, a close
+  // view of its crown, a wide view with a large faint echo behind for depth; each verse eases into
+  // its own over 1.4 s, and a slow drift runs under all of it
+  const tr = lerpT(now0.tr, first.tr, home);
+  const drift = { x: lerpN(now0.drift.x, first.drift.x), y: lerpN(now0.drift.y, first.drift.y), z: lerpN(now0.drift.z, first.drift.z) };
   const raw = drawProgress(sb, t);
-  const progress = raw;
-  // the loop: in the last second the drawing fades out as one (nothing flies apart) and the first text comes back, so the last frame is the first
-  const artOp = t > sb.total - 1.0 ? ease((sb.total - t) / 1.0) : 1;
+  const progress = buildProgress(sb, raw, t);
+  // the loop: the first text comes back in the last 0.6 s (the drawing draws back to the hook: buildProgress)
+  // the drawing no longer fades out at the end: buildProgress draws back to the hook's first third
+  const artOp = 1;
   const loopIn = ease((t - (sb.total - 0.6)) / 0.6);
   const speaking = sb.sounds.find((s) => t >= s.at && t < s.at + s.seconds);
   const warm = speaking?.who === "qari" ? 1 : speaking ? 0.5 : 0.2;
@@ -312,7 +501,11 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
   const LEAD = 0.45;
   const ahead = shotAt(sb, t + LEAD);
   const changing = ahead !== shot && layerOf(ahead) !== layerOf(shot);
-  const lead = changing ? ease((t - (ahead.start - LEAD)) / 0.3) : 0;
+  const lead = changing ? clamp01((t - (ahead.start - LEAD)) / 0.4) : 0;
+  // 28 Nov («messy cross-dissolve, double exposure»): the old text fades out over the first half, the new one in over the second
+  // (v4: an even split left a near-blank text card for ~0.2 s: the old text now leaves in the first 40 %, the new one starts at 35 %)
+  const leadOut = ease(lead / 0.4);
+  const leadIn = ease((lead - 0.35) / 0.65);
   const fadeIn = 1;
   const textLayer = (s: typeof shot, op: number, tt: number = t) => {
     if (op <= 0.01) return null;
@@ -348,30 +541,40 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
         </Sequence>
       ))}
       <AbsoluteFill style={{ pointerEvents: "none", background: "radial-gradient(120% 80% at 46% 40%, rgba(120,90,40,0) 60%, rgba(120,90,40,0.10) 100%)" }} />
-      <Lamp warm={warm} flicker={flicker} rise={rise} />
+      {sb.scenes?.length ? <SceneStage sb={sb} t={t} /> : <Lamp warm={warm} flicker={flicker} rise={rise} />}
       {/* the anchor on its stage, with the camera */}
-      <div style={{ position: "absolute", left: 0, top: GRID.stage.top, width: 1080, height: STAGE_H, overflow: "hidden", opacity: artOp, WebkitMaskImage: "linear-gradient(180deg, transparent 0%, #000 7%, #000 93%, transparent 100%)", maskImage: "linear-gradient(180deg, transparent 0%, #000 7%, #000 93%, transparent 100%)" }}>
-        <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: STAGE_H, transformOrigin: "0 0", transform: `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) scale(${z.toFixed(4)})` }}>
-          <EmeraldLineArt art={art} progress={progress} height={STAGE_H} uid={sb.video_id.replace(/[^a-z0-9]/gi, "")} flicker={flicker} />
+      {sb.scenes?.length ? null : <div style={{ position: "absolute", left: 0, top: GRID.stage.top, width: 1080, height: STAGE_H, overflow: "hidden", opacity: artOp, WebkitMaskImage: "linear-gradient(180deg, transparent 0%, #000 7%, #000 93%, transparent 100%)", maskImage: "linear-gradient(180deg, transparent 0%, #000 7%, #000 93%, transparent 100%)" }}>
+        {tr.echo > 0.005 ? (
+          <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: STAGE_H, opacity: tr.echo, transformOrigin: `${GRID.colX}px ${STAGE_H / 2}px`, transform: `translate(${(-drift.x * 1.6).toFixed(2)}px, ${(-drift.y * 1.6).toFixed(2)}px) scale(${(2.05 + 0.03 * Math.sin(t / 5)).toFixed(4)})` }}>
+            <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: STAGE_H, transformOrigin: "0 0", transform: `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) scale(${z.toFixed(4)})` }}>
+              <EmeraldLineArt art={art} progress={progress} height={STAGE_H} uid={`${sb.video_id.replace(/[^a-z0-9]/gi, "")}e`} flicker={0} />
+            </div>
+          </div>
+        ) : null}
+        <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: STAGE_H, transformOrigin: `${GRID.colX}px ${STAGE_H / 2}px`, transform: `translate(${(tr.dx + drift.x).toFixed(2)}px, ${(tr.dy + drift.y).toFixed(2)}px) scale(${(tr.zoom * drift.z).toFixed(4)})` }}>
+          <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: STAGE_H, transformOrigin: "0 0", transform: `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) scale(${z.toFixed(4)})` }}>
+            <EmeraldLineArt art={art} progress={progress} height={STAGE_H} uid={sb.video_id.replace(/[^a-z0-9]/gi, "")} flicker={flicker} />
+          </div>
         </div>
-      </div>
+      </div>}
       {/* the title, from the first frame to the last */}
+      {sb.scenes?.length ? <CornerMark fa={fa} /> : null}
       <div style={{ position: "absolute", top: GRID.title.top, left: GRID.colX - GRID.colW / 2, width: GRID.colW, textAlign: "center" }} dir={fa ? "rtl" : "ltr"}>
-        <div data-role="title" style={{ fontFamily: fa ? FONT.fa : FONT.en, fontWeight: fa ? 800 : 600, fontSize: titleSize, lineHeight: 1.22, color: INK.emeraldDeep, textWrap: "balance" }}>
+        <div data-role="title" style={{ fontFamily: fa ? FONT.fa : FONT.en, fontWeight: fa ? 800 : 600, fontSize: titleSize, lineHeight: 1.22, color: sb.scenes?.length ? INK.cream : INK.emeraldDeep, textShadow: sb.scenes?.length ? "0 2px 14px rgba(0,0,0,0.55)" : undefined, textWrap: "balance" }}>
           {sb.title.main}
         </div>
-        <div data-role="sub" style={{ fontFamily: fa ? FONT.fa : FONT.en, fontWeight: fa ? 600 : 500, fontSize: 44, lineHeight: 1.35, color: INK.emeraldSoft }}>
+        {sb.scenes?.length ? null : <div data-role="sub" style={{ fontFamily: fa ? FONT.fa : FONT.en, fontWeight: fa ? 600 : 500, fontSize: 52, lineHeight: 1.35, color: INK.emeraldSoft }}>
           {sb.title.sub}
-        </div>
+        </div>}
       </div>
       {/* the text under the anchor */}
-      {changing && !end ? textLayer(ahead, lead) : null}
-      {textLayer(shot, end ? 1 - clamp01((t - (sb.badge!.from - 0.4)) / 0.3) : changing ? 1 - lead : fadeIn)}
+      {changing && !end ? textLayer(ahead, leadIn) : null}
+      {textLayer(shot, end ? 1 - clamp01((t - (sb.badge!.from - 0.4)) / 0.3) : changing ? 1 - leadOut : fadeIn)}
       {loopIn > 0 ? textLayer(sb.shots[0]!, loopIn, 0) : null}
       {/* the close: the sources (one line), the badge */}
       {end ? (
         <div style={{ position: "absolute", top: GRID.text.top + 120, left: GRID.colX - GRID.colW / 2, width: GRID.colW, textAlign: "center", opacity: clamp01((t - (sb.badge!.from - 0.3)) / 0.3) * clamp01((sb.total - 0.6 - t) / 0.3) }}>
-          <div data-role="credits" dir={fa ? "rtl" : "ltr"} style={{ fontFamily: fa ? FONT.fa : FONT.en, fontSize: 40, lineHeight: 1.5, color: INK.quiet }}>
+          <div data-role="credits" dir={fa ? "rtl" : "ltr"} style={{ fontFamily: fa ? FONT.fa : FONT.en, fontSize: 48, lineHeight: 1.5, color: INK.quiet }}>
             {sb.credits}
           </div>
         </div>

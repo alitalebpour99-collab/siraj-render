@@ -17,7 +17,9 @@ import { TARGET, levelFilter, loudness, meets } from "../finish.mjs";
 import { check } from "../lib.mjs";
 import { manifestOf } from "../manifest.mjs";
 import { refineQari } from "./align-refine.mjs";
-import { writeConcepts } from "./concept.mjs";
+import { motifOf, writeConcepts } from "./concept.mjs";
+import { makeScenes, placeScenes, scenePlan, withoutBasmala } from "./scenes.mjs";
+import { vertexReady } from "./vertex.mjs";
 import { checkStoryboard, direct } from "./director.mjs";
 import { materialOf, templateOf } from "./material.mjs";
 import { rank } from "./pick.mjs";
@@ -114,7 +116,17 @@ export async function chiraghJob(job, { stills = false } = {}) {
   const voice = props.silent ? { engine: "none", voice: null, lines: [] } : (readJson(path.join("public", "voice", job.id, "manifest.json")) ?? { engine: "none", voice: null, lines: [] });
   const qari = readJson(path.join("public", "qari", job.id, "manifest.json"));
   const align = refineQari(qari);
-  const m = materialOf(props, voice, qari);
+  const m0 = materialOf(props, voice, qari);
+  // round 5 (owner, 28 Nov): a rich scene per verse instead of the line art, made before the bundle; the video then
+  // opens on the hook verse (no basmala line). No stills (no Vertex, or the cap): the line art as before.
+  let scenes = null;
+  if (process.env.SIRAJ_SCENES !== "off" && vertexReady()) {
+    const plan = scenePlan(m0, motifOf(m0).art);
+    const made = plan ? await makeScenes(plan, job.id) : [];
+    if (plan && made.length >= Math.min(2, plan.length)) scenes = made;
+  }
+  const m = scenes ? withoutBasmala(m0) : m0;
+  if (scenes) m.meaning = m0.meaning;
   const recent = Array.isArray(job.props?.chiragh?.recent) ? job.props.chiragh.recent : [];
   const concepts = (await writeConcepts(m, recent)).map((c) => (m.forcedKey ? { ...c, key_word: m.forcedKey } : c));
   const ranked = rank(m, concepts, recent);
@@ -125,9 +137,11 @@ export async function chiraghJob(job, { stills = false } = {}) {
   // a long video (a whole owner writing) is drawn once: three renders of three minutes each would outlast the run
   const tries = [];
   const longVideo = direct(m, ranked[0].c, { videoId: job.id }).total > 100;
-  for (let n = 1; n <= Math.min(longVideo ? 1 : MAX_TRIES, ranked.length); n++) {
+  // a scene video is drawn once: its pictures are the same for every concept
+  for (let n = 1; n <= Math.min(longVideo || scenes ? 1 : MAX_TRIES, ranked.length); n++) {
     const pick = ranked[n - 1];
     const sb = direct(m, pick.c, { videoId: job.id });
+    if (scenes) sb.scenes = placeScenes(sb, scenes);
     const problems = checkStoryboard(sb);
     const suffix = n > 1 ? `-try${n}` : "";
     fs.writeFileSync(path.join(out, `${job.id}.storyboard${suffix}.json`), `${JSON.stringify(sb, null, 1)}\n`);

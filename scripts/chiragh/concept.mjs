@@ -6,6 +6,7 @@
 // first; the verse is only the stored text). When Claude cannot be had, Gemini on Vertex writes
 // them; when neither can, the code makes three by rule, so a video is never blocked on a model.
 import { artIndex, ART } from "../../src/chiragh/art.ts";
+import { chooseMotif } from "./meaning.mjs";
 import { FAMILIES, HOOK_TYPES, keyWordChoices } from "./material.mjs";
 import { gemini, jsonIn, textOf, vertexReady } from "./vertex.mjs";
 
@@ -45,8 +46,13 @@ export const CONCEPTS_SCHEMA = {
 };
 
 /** What the concept writer is shown: the material without its sound files, the library, the recent fingerprints. */
+/** The text's motif, chosen once per material (meaning.mjs). */
+export const motifOf = (m) => (m.meaning ??= chooseMotif(m));
+
 export function brief(m, recent) {
+  const meaning = motifOf(m);
   return {
+    meaning: { art: meaning.art, why: meaning.why, sure: meaning.sure },
     template: m.template,
     language: m.lang,
     title: m.title,
@@ -76,7 +82,7 @@ Write THREE clearly different concepts. For each:
 1. one_line: ≤ 14 words, ${m.lang === "fa" ? "Persian" : "English"}, the idea of this video
 2. idea_family: one of families
 3. hook: { type: one of hook_types, choice: index into allowed_hooks }
-4. anchor (Siraj's identity is the lamp: the approved style frame is a mihrab with a hanging lamp; prefer an anchor with a lamp, mihrab or mishkat, unless the verse's meaning clearly calls for another, and never the anchor of the last video): { art: an id of library (it must fit the verse's meaning: read the tags), regions: 2–4 region ids of that art in the order the camera visits them (the first is where it opens and closes), key_region: the region the camera pushes into on the key word }
+4. anchor (owner, 28 Nov: «the videos and animations must have MEANING»: the drawing shows the key image of THIS text and builds in step with it, never a generic lamp or arch. Take meaning.art; when meaning.sure is false you may take another library art only if it shows an image the text itself names more exactly (read the translation and its usual tafsir sense; never an image the text does not say). The lamp, mihrab or mishkat only when nothing in the library shows the text. Nature, sky, architecture or abstract only: no prophet, imam, person, face or animal, never an image for God): { art: an id of library, regions: 2–4 region ids of that art in the order the camera visits them (the first is where it opens and closes), key_region: the region the camera pushes into on the key word }
 5. key_word: { verse, index } from key_word_choices (the word that carries the verse; null for a template without a verse)
 6. beats: 4–8 short internal notes, each = one moment + the drawn object that shows it
 7. twist_at_beat: the beat where expectation turns
@@ -110,6 +116,9 @@ export function validConcept(c, m) {
     else c.key_word = { verse: c.key_word.verse, index: Number(c.key_word.index) };
   }
   if (!ENDINGS.includes(c.ending?.type)) c.ending = { type: "loop" };
+  // a checked passage or a clear key image: the drawing must be that motif (the meaning is not the model's choice)
+  const meaning = m.data ? null : motifOf(m);
+  if (meaning?.sure && c.anchor?.art !== meaning.art) why.push(`anchor ${c.anchor?.art} does not show the text (${meaning.art}: ${meaning.why})`);
   return { ok: why.length === 0, why };
 }
 
@@ -120,6 +129,16 @@ export function ruleConcepts(m, recent) {
   const arts = m.data ? [m.data] : Object.values(ART).sort((a, b) => used.filter((u) => u === a.id).length - used.filter((u) => u === b.id).length);
   const pref = { "night-verse": ["night", "mishkat", "mihrab"], "verse-by-verse": ["mihrab", "rosette", "mushaf", "mishkat"], writing: ["olive", "mushaf", "mihrab"], path: ["oasis"] }[m.template] ?? [];
   arts.sort((a, b) => (pref.indexOf(b.id) >= 0 ? 10 - pref.indexOf(b.id) : 0) - (pref.indexOf(a.id) >= 0 ? 10 - pref.indexOf(a.id) : 0));
+  // the text's own motif first (and only it when it is sure)
+  if (!m.data) {
+    const meaning = motifOf(m);
+    const mine = arts.find((a) => a.id === meaning.art);
+    if (mine) {
+      arts.splice(arts.indexOf(mine), 1);
+      arts.unshift(mine);
+      if (meaning.sure) arts.length = 1;
+    }
+  }
   return [0, 1, 2].map((i) => {
     const art = arts[i % arts.length];
     const regions = art.regions.map((r) => r.id);

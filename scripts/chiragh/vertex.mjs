@@ -10,7 +10,7 @@ const env = process.env;
 export const vertexReady = () => Boolean(env.GOOGLE_VERTEX_PROXY_URL && env.GOOGLE_VERTEX_PROXY_KEY && env.GOOGLE_VERTEX_PROJECT);
 
 /** USD per million tokens (input, output), for the cost log only. */
-const PRICE = { "gemini-3.5-flash": [0.3, 2.5], "gemini-3.1-pro-preview": [2, 12], "gemini-3-pro-image": [2, 120], "gemini-3.1-flash-image": [0.5, 60] };
+const PRICE = { "gemini-3.5-flash": [0.3, 2.5], "gemini-3.1-pro-preview": [2, 12], "gemini-3-pro-image": [2, 120], "gemini-3.1-flash-image": [0.5, 60], "gemini-2.5-flash-image": [0.3, 30] };
 
 function logUsage(model, usage, what) {
   try {
@@ -26,10 +26,12 @@ function logUsage(model, usage, what) {
 }
 
 /** generateContent on a Gemini model (location global), with retries on 403/429/5xx. */
-export async function gemini(model, body, { what = "", tries = 8 } = {}) {
+export async function gemini(model, body, { what = "", tries = 8, location = null } = {}) {
   if (!vertexReady()) throw new Error("vertex: the proxy is not configured");
   const base = env.GOOGLE_VERTEX_PROXY_URL.replace(/\/+$/, "");
-  const url = `${base}/v1/projects/${env.GOOGLE_VERTEX_PROJECT}/locations/global/publishers/google/models/${model}:generateContent`;
+  // most models answer on «global»; 2.5 Flash Image only in a region (memory: reference_vertex_proxy)
+  const loc = location ?? (model === "gemini-2.5-flash-image" ? "us-central1" : "global");
+  const url = `${base}/v1/projects/${env.GOOGLE_VERTEX_PROJECT}/locations/${loc}/publishers/google/models/${model}:generateContent`;
   let wait = 2000;
   for (let attempt = 1; ; attempt++) {
     let res;
