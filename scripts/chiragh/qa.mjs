@@ -195,6 +195,21 @@ export const CRITERIA = [
   "meaning: the drawing and its animation SAY WHAT THE TEXT SAYS (owner, 28 Nov): its key image (given below with the translation) appears and moves in step with the verse that names it, accurately to the text's sense; a generic decorative lamp or arch that could sit under any verse scores low here",
 ];
 
+/** Round 5: a scene video (a still per verse group, Ken Burns): the same keys, judged as a viewer on a phone would. */
+export const SCENE_CRITERIA = [
+  "new: the picture moves gently all the time (slow push/drift) and changes on the verse that names it; never a frozen card",
+  "anchor: each picture is rich and beautiful and its SUBJECT reads at a glance on a phone",
+  "sync: the verse's words light up one by one with the recitation, clearly readable",
+  "grid: picture on top, the verse and its translation large on the cream panel below, the source pill, a small corner logo only",
+  "lines: image quality: clean, natural, no artefacts, no garbled shapes, no text or letters inside the picture",
+  "hook: the first frame already shows the first verse and a striking picture (no long basmala intro)",
+  "ending: short close that returns to the first picture (loop) with the sources",
+  "legible: the Arabic and the translation are large and clear on a phone",
+  "respect: no person, face, figure, silhouette, prophet, imam or holy figure; nothing that stands for God; no animal",
+  "calm: calm and reverent, but never static",
+  "meaning: a viewer who knows the surah sees at once WHY each picture goes with its verse (given below with the translation); a pretty picture that does not show the verse's image scores low",
+];
+
 /** The text and its image, for the judge's meaning criterion: each verse's translation and the stages its words call (ids only). */
 export function meaningBrief(sb) {
   const art = sb.anchor.inline ?? ART[sb.anchor.art];
@@ -217,21 +232,31 @@ export async function visionScore(sheetFile, styleFile, extra = {}) {
   return { ...pick, score, looks: looks.map((l) => l.score), person: looks.some((l) => l.person) };
 }
 
-async function visionOnce(sheetFile, styleFile, { strip = null, template = "", anchorKind = "", meaning = "" } = {}) {
-  const parts = [
+async function visionOnce(sheetFile, styleFile, { strip = null, template = "", anchorKind = "", meaning = "", scenes = null } = {}) {
+  const criteria = scenes ? SCENE_CRITERIA : CRITERIA;
+  const parts = scenes
+    ? [
+        { text: `A contact sheet of a NEW Siraj Quran video, one frame per second, read left to right, top to bottom. Its pictures are scenes made for the verses (${scenes}). ${meaning ? `The text and the picture chosen for each verse: ${meaning}` : ""}` },
+        { inlineData: { mimeType: "image/jpeg", data: fs.readFileSync(sheetFile).toString("base64") } },
+        ...(strip && fs.existsSync(strip) ? [{ text: "The verse area at 5 frames per second during the recitation: the word light is judged here." }, { inlineData: { mimeType: "image/jpeg", data: fs.readFileSync(strip).toString("base64") } }] : []),
+      ]
+    : [
     { text: "Image 1: the APPROVED style frame of Siraj's video style «Chiragh» (the verse area is left empty on purpose)." },
     ...(fs.existsSync(styleFile) ? [{ inlineData: { mimeType: "image/jpeg", data: fs.readFileSync(styleFile).toString("base64") } }] : []),
     { text: `Image 2: a contact sheet of a NEW video, one frame per second, read left to right, top to bottom. Its template is «${template}»; its anchor drawing is ${anchorKind}. The approved frame shows ONE possible anchor (a mihrab): other anchors and data drawings (a strip of verses, a map of the surahs, a root of letters) are allowed in the same style; judge the style, not whether it is an arch.${meaning ? ` For the meaning criterion, the text and its chosen image: ${meaning}` : ""}` },
     { inlineData: { mimeType: "image/jpeg", data: fs.readFileSync(sheetFile).toString("base64") } },
     ...(strip && fs.existsSync(strip) ? [{ text: "Image 3: the verse area of the NEW video at 5 frames per second during the recitation (read left to right, top to bottom): the word light is judged here, not on the small 1 fps sheet." }, { inlineData: { mimeType: "image/jpeg", data: fs.readFileSync(strip).toString("base64") } }] : []),
-    {
-      text: `You are a strict short-video art director. Score the NEW video 0–10 (one decimal) against these criteria, as a viewer of top explainer Reels would. Calibration: 10 = the level of the @ensan.besham line-art explainer and the Zoomit "World Ahead 2027" explainer (one anchor drawing built line by line, something new every 1–2 s); 2.5 = Siraj's old video where one verse card stood still for 12 s with only a small lamp icon. Be honest; do not round up.
+      ];
+  const calibration = scenes
+    ? `Calibration: 10 = a top Quran Reel where every picture is beautiful, instantly shows what the verse says, and the verse text is big and clear; 2.5 = a still card with small text and a decorative picture unrelated to the verse.`
+    : `Calibration: 10 = the level of the @ensan.besham line-art explainer and the Zoomit "World Ahead 2027" explainer (one anchor drawing built line by line, something new every 1–2 s); 2.5 = Siraj's old video where one verse card stood still for 12 s with only a small lamp icon.`;
+  parts.push({
+      text: `You are a strict short-video art director. Score the NEW video 0–10 (one decimal) against these criteria, as a viewer of top Reels on a phone would. ${calibration} Be honest; do not round up.
 Criteria:
-${CRITERIA.map((c, i) => `${i + 1}. ${c}`).join("\n")}
+${criteria.map((c, i) => `${i + 1}. ${c}`).join("\n")}
 Also answer: is any person, human face, human figure, silhouette or rider depicted anywhere (true/false)?
 Return JSON only: {"score": number, "criteria": {"new": n, "anchor": n, "sync": n, "grid": n, "lines": n, "hook": n, "ending": n, "legible": n, "respect": n, "calm": n, "meaning": n}, "person_depicted": boolean, "issues": [short strings], "to_reach_10": [short strings]}`,
-    },
-  ];
+  });
   let r = null;
   let by = "gemini-3.5-flash";
   // Gemini on Vertex first; when Vertex refuses (20 Nov: 403 «eligible paid billing account» on every
@@ -331,7 +356,7 @@ export async function runGate({ file, sb, probes, sources, styleFile, sheetFile,
   let judge = { score: null, why: "skipped" };
   if (vision) {
     try {
-      judge = await visionScore(sheetFile, styleFile, { strip, template: sb.template, anchorKind: sb.anchor.inline ? `a data drawing («${sb.anchor.art}»)` : `the «${sb.anchor.art}» line drawing`, meaning: meaningBrief(sb) });
+      judge = await visionScore(sheetFile, styleFile, { strip, template: sb.template, anchorKind: sb.anchor.inline ? `a data drawing («${sb.anchor.art}»)` : `the «${sb.anchor.art}» line drawing`, meaning: meaningBrief(sb), scenes: sb.scenes?.length ? sb.scenes.map((x) => `${x.id} for ${x.verses.join("+")}: ${x.why}`).join("; ") : null });
     } catch (error) {
       judge = { score: null, why: String(error.message).slice(0, 160) };
     }

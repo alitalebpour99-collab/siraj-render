@@ -76,6 +76,8 @@ export type Storyboard = {
   };
   fingerprint: Fingerprint;
   anchor: { art: string; inline: InlineArt | null; regions: string[]; meaning?: { art: string; why: string; by: string } | null };
+  /** round 5: a still per verse group (public/scenes/<job>/…), shown from `from` to `to` with slow motion; null: the line art */
+  scenes?: Array<{ id: string; file: string; from: number; to: number; why: string; verses: string[] }> | null;
   title: { main: string; sub: string };
   fps: number;
   total: number;

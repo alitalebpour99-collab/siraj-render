@@ -173,3 +173,25 @@ test("meaning: each text gets the motif of its own key image, a checked passage 
   assert.ok(cs.every((c) => c.anchor.art === "stones"));
   assert.ok(!validConcept({ ...cs[0], anchor: { art: "mihrab", regions: ["whole"], key_region: null } }, m).ok);
 });
+
+test("scenes: a checked passage gets one scene per verse group, placed on its verse; the basmala line goes", async () => {
+  const { scenePlan, placeScenes, withoutBasmala, PASSAGE_SCENES } = await import("./scenes.mjs");
+  const m = material({ ayahs: 6 });
+  m.verses.forEach((v, i) => Object.assign(v, { surah: 114, key: `114:${i + 1}` }));
+  const plan = scenePlan(m, "refuge");
+  assert.deepEqual(plan.map((s) => s.verses), [["a1"], ["a2", "a3"], ["a4", "a5"], ["a6"]]);
+  // every prompt forbids people, faces, animals and text
+  for (const list of Object.values(PASSAGE_SCENES)) for (const s of list) assert.ok(s.prompt.length > 40);
+  for (const s of plan) assert.match(s.prompt, /no people, no faces.*no animals/);
+  const sb = direct(m, ruleConcepts(m, [])[0], { videoId: "t" });
+  const placed = placeScenes(sb, plan.map((s) => ({ ...s, file: `scenes/t/${s.id}.jpg` })));
+  assert.equal(placed[0].from, 0);
+  for (let i = 1; i < placed.length; i++) assert.ok(placed[i].from > placed[i - 1].from && placed[i - 1].to === placed[i].from);
+  assert.equal(placed.at(-1).to, sb.total);
+  const b = { ...m, verses: [{ id: "b", ayah: null }, ...m.verses], order: [{ kind: "qari", verse: "b" }, ...m.order] };
+  const w = withoutBasmala(b);
+  assert.ok(!w.verses.some((v) => v.id === "b") && !w.order.some((o) => o.verse === "b"));
+  // a text no passage or motif covers: no scenes (the line art stays)
+  const none = material({ ayahs: 2 });
+  assert.equal(scenePlan(none, "mishkat"), null);
+});

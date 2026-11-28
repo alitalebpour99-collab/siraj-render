@@ -5,7 +5,7 @@
 // of the Quran and of a translation is the API's own, exactly as served, cut only at its spaces.
 // No music: only the qari and the narrator are placed.
 import React, { useLayoutEffect, useRef, useState } from "react";
-import { AbsoluteFill, Audio, Sequence, continueRender, delayRender, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Audio, Img, Sequence, continueRender, delayRender, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { fontsReady } from "../fonts";
 import { quoteHash } from "../lamp/zones";
 import { ART, cueIn } from "./art";
@@ -340,6 +340,50 @@ const Lamp: React.FC<{ warm: number; flicker: number; rise: number }> = ({ warm,
   );
 };
 
+/* ---------------- round 5: the scene stage (a still per verse group, Ken Burns, cross-fades) ---------------- */
+
+/** Where the picture ends and the cream text panel begins (the picture fades into it). */
+const SCENE_FADE = { from: 880, to: 1030 };
+
+const SceneStage: React.FC<{ sb: Storyboard; t: number }> = ({ sb, t }) => {
+  const scenes = sb.scenes ?? [];
+  const FADE = 0.9;
+  const layer = (s: (typeof scenes)[number], i: number, op: number, key: string) => {
+    // slow Ken Burns: a push in across the scene's time, the drift alternating left/right (never still)
+    const span = Math.max(1, s.to - s.from + FADE);
+    const k = clamp01((t - s.from) / span);
+    const z = 1.04 + 0.1 * k;
+    const dx = (i % 2 ? -1 : 1) * (18 - 36 * k);
+    const dy = -10 * k;
+    return (
+      <div key={key} style={{ position: "absolute", left: 0, top: 0, width: 1080, height: 1920, opacity: op, overflow: "hidden" }}>
+        <Img src={staticFile(s.file)} style={{ position: "absolute", left: 0, top: 0, width: 1080, height: 1920, objectFit: "cover", transformOrigin: "50% 34%", transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scale(${z.toFixed(4)})` }} />
+      </div>
+    );
+  };
+  const shown = scenes.map((s, i) => ({ s, i })).filter(({ s }) => t >= s.from - 1e-6 && t < s.to + FADE);
+  // the loop: the first scene comes back over the last 0.8 s, so the last frame is the first
+  const back = ease((t - (sb.total - 0.8)) / 0.8);
+  return (
+    <>
+      {shown.map(({ s, i }) => layer(s, i, i === 0 ? 1 : ease((t - s.from) / FADE), s.id))}
+      {back > 0 && scenes[0] ? layer({ ...scenes[0], from: 0, to: scenes[0].to }, 0, back, "loop") : null}
+      {/* the picture fades into the cream panel that carries the text */}
+      <div style={{ position: "absolute", left: 0, top: SCENE_FADE.from, width: 1080, height: 1920 - SCENE_FADE.from, background: `linear-gradient(180deg, rgba(246,239,223,0) 0px, ${INK.cream} ${SCENE_FADE.to - SCENE_FADE.from}px, ${INK.cream} 100%)` }} />
+      {/* a soft shade under the title */}
+      <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: 420, background: "linear-gradient(180deg, rgba(10,20,16,0.55) 0%, rgba(10,20,16,0) 100%)" }} />
+    </>
+  );
+};
+
+/** The brand, small, in the corner (the lamp is no longer the picture). */
+const CornerMark: React.FC<{ fa: boolean }> = ({ fa }) => (
+  <div style={{ position: "absolute", right: 40, top: 236, display: "flex", alignItems: "center", gap: 10, opacity: 0.92 }} dir={fa ? "rtl" : "ltr"}>
+    <svg width={64} height={52} viewBox="0 0 120 98"><g fill="none" stroke={INK.cream} strokeWidth={6} strokeLinecap="round" strokeLinejoin="round"><path d="M24 60C24 47 43 41.5 62 42.5C77 43.3 91 47.5 103 51.5C95 56 82 62.5 66 65.5C47 69 26 70 24 60Z" /><path d="M48 67.5L44 79H74L70 66.2" /><path d="M38 83H80" /></g><path d="M104 50C97.5 43.5 98.5 33 105.5 21C111.5 32.5 112.5 43.5 106.5 50Z" fill={INK.flame} /></svg>
+    <span style={{ fontFamily: fa ? FONT.fa : FONT.en, fontSize: 40, fontWeight: 700, color: INK.cream, textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>{fa ? "سراج" : "Siraj"}</span>
+  </div>
+);
+
 /* ---------------- the measurements for the gate (numbers and hashes, never a text) ---------------- */
 
 function luminance([r, g, b]: number[]) {
@@ -497,9 +541,9 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
         </Sequence>
       ))}
       <AbsoluteFill style={{ pointerEvents: "none", background: "radial-gradient(120% 80% at 46% 40%, rgba(120,90,40,0) 60%, rgba(120,90,40,0.10) 100%)" }} />
-      <Lamp warm={warm} flicker={flicker} rise={rise} />
+      {sb.scenes?.length ? <SceneStage sb={sb} t={t} /> : <Lamp warm={warm} flicker={flicker} rise={rise} />}
       {/* the anchor on its stage, with the camera */}
-      <div style={{ position: "absolute", left: 0, top: GRID.stage.top, width: 1080, height: STAGE_H, overflow: "hidden", opacity: artOp, WebkitMaskImage: "linear-gradient(180deg, transparent 0%, #000 7%, #000 93%, transparent 100%)", maskImage: "linear-gradient(180deg, transparent 0%, #000 7%, #000 93%, transparent 100%)" }}>
+      {sb.scenes?.length ? null : <div style={{ position: "absolute", left: 0, top: GRID.stage.top, width: 1080, height: STAGE_H, overflow: "hidden", opacity: artOp, WebkitMaskImage: "linear-gradient(180deg, transparent 0%, #000 7%, #000 93%, transparent 100%)", maskImage: "linear-gradient(180deg, transparent 0%, #000 7%, #000 93%, transparent 100%)" }}>
         {tr.echo > 0.005 ? (
           <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: STAGE_H, opacity: tr.echo, transformOrigin: `${GRID.colX}px ${STAGE_H / 2}px`, transform: `translate(${(-drift.x * 1.6).toFixed(2)}px, ${(-drift.y * 1.6).toFixed(2)}px) scale(${(2.05 + 0.03 * Math.sin(t / 5)).toFixed(4)})` }}>
             <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: STAGE_H, transformOrigin: "0 0", transform: `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) scale(${z.toFixed(4)})` }}>
@@ -512,15 +556,16 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
             <EmeraldLineArt art={art} progress={progress} height={STAGE_H} uid={sb.video_id.replace(/[^a-z0-9]/gi, "")} flicker={flicker} />
           </div>
         </div>
-      </div>
+      </div>}
       {/* the title, from the first frame to the last */}
+      {sb.scenes?.length ? <CornerMark fa={fa} /> : null}
       <div style={{ position: "absolute", top: GRID.title.top, left: GRID.colX - GRID.colW / 2, width: GRID.colW, textAlign: "center" }} dir={fa ? "rtl" : "ltr"}>
-        <div data-role="title" style={{ fontFamily: fa ? FONT.fa : FONT.en, fontWeight: fa ? 800 : 600, fontSize: titleSize, lineHeight: 1.22, color: INK.emeraldDeep, textWrap: "balance" }}>
+        <div data-role="title" style={{ fontFamily: fa ? FONT.fa : FONT.en, fontWeight: fa ? 800 : 600, fontSize: titleSize, lineHeight: 1.22, color: sb.scenes?.length ? INK.cream : INK.emeraldDeep, textShadow: sb.scenes?.length ? "0 2px 14px rgba(0,0,0,0.55)" : undefined, textWrap: "balance" }}>
           {sb.title.main}
         </div>
-        <div data-role="sub" style={{ fontFamily: fa ? FONT.fa : FONT.en, fontWeight: fa ? 600 : 500, fontSize: 52, lineHeight: 1.35, color: INK.emeraldSoft }}>
+        {sb.scenes?.length ? null : <div data-role="sub" style={{ fontFamily: fa ? FONT.fa : FONT.en, fontWeight: fa ? 600 : 500, fontSize: 52, lineHeight: 1.35, color: INK.emeraldSoft }}>
           {sb.title.sub}
-        </div>
+        </div>}
       </div>
       {/* the text under the anchor */}
       {changing && !end ? textLayer(ahead, leadIn) : null}
