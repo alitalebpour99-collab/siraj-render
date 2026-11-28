@@ -48,7 +48,7 @@ function cameraTransform(art: InlineArt, region: string, scale: number) {
 
 /**
  * The anchor is ONE drawing that keeps growing (vision review, 27 Nov: «it finishes by 10 s, then
- * only re-zooms»): its groups in the director's order, the first third already standing at frame 0
+ * only re-zooms»): its groups in the director's order, the first third already WHOLE at frame 0
  * (the hook shows the drawing), the rest spread evenly until 85 % of the video, each drawing in over
  * 1.2 s (the director's order and groups; only the times are spread).
  */
@@ -63,15 +63,18 @@ export function buildPlan(sb: Pick<Storyboard, "shots" | "total">): Array<{ g: s
   const k0 = Math.max(1, Math.ceil(n * 0.34));
   const end = Math.max(4, sb.total * 0.85);
   const start = 1.2;
-  const plan = order.map((g, i) => ({ g, at: i < k0 ? -1.4 + (i * 1.0) / k0 : start + ((i - k0 + 1) / Math.max(1, n - k0)) * (end - start) }));
+  const plan = order.map((g, i) => ({ g, at: i < k0 ? -2.6 + (i * 1.0) / k0 : start + ((i - k0 + 1) / Math.max(1, n - k0)) * (end - start) }));
   buildCache.set(sb as object, plan);
   return plan;
 }
 function buildProgress(sb: Storyboard, raw: Record<string, number>, t: number): Record<string, number> {
   const out: Record<string, number> = { ...raw };
   // the loop: in the last second the groups added after the hook draw back, so the last frame is the first
-  const back = t > sb.total - 1.0 ? ease((sb.total - t) / 1.0) : 1;
+  // (28 Nov: the last frame showed dots, the round caps of strokes at 1–3 %: the draw-back now ends 3 frames early and a
+  // stroke under 4 % is not drawn at all, so the last frame is exactly the hook's drawing)
+  const back = t > sb.total - 1.0 ? ease((sb.total - 0.1 - t) / 0.9) : 1;
   for (const { g, at } of buildPlan(sb)) out[g] = clamp01((t - at) / 1.2) * (at < 0 ? 1 : back);
+  for (const g of Object.keys(out)) if (out[g]! < 0.04) out[g] = 0;
   return out;
 }
 
@@ -106,7 +109,7 @@ export function stageTreatment(sb: Pick<Storyboard, "shots" | "verses">, t: numb
 
 /* ---------------- the verse with its word light ---------------- */
 
-const fitSize = (words: number) => (words <= 4 ? 92 : words <= 7 ? 80 : words <= 10 ? 70 : words <= 14 ? 62 : 56);
+const fitSize = (words: number) => (words <= 4 ? 100 : words <= 7 ? 88 : words <= 10 ? 78 : words <= 14 ? 68 : 60);
 
 const Seal: React.FC<{ label: string; size: number }> = ({ label, size }) => (
   <span style={{ display: "inline-flex", position: "relative", width: size * 0.9, height: size * 0.9, verticalAlign: "middle", margin: "0 10px" }}>
@@ -162,7 +165,7 @@ const Translation: React.FC<{ v: Verse; t: number; lang: "en" | "fa" }> = ({ v, 
   const fa = lang === "fa";
   const n = c.text.split(/\s+/).length;
   // larger and readable (27 Nov: the lower third stood empty): the translation is the second voice of the verse
-  const size = fa ? (n <= 14 ? 72 : n <= 24 ? 62 : 54) : n <= 14 ? 66 : n <= 24 ? 58 : 52;
+  const size = fa ? (n <= 14 ? 76 : n <= 24 ? 66 : 58) : n <= 14 ? 72 : n <= 24 ? 62 : 56;
   const parts = c.text.split(/(\s+)/u).filter((p) => p.length > 0);
   let k = 0;
   return (
@@ -357,20 +360,35 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
   const t = f / fps;
   const art = artOf(sb);
   const shot = shotAt(sb, t);
-  const cam = cameraAt(sb, t);
-  const a = cameraTransform(art, cam.prev.region, cam.prev.scale);
-  const b = cameraTransform(art, cam.region, cam.scale);
-  const k = cam.k;
-  // the move to the shot's region, then a slow push around the stage's centre (never still)
-  const z0 = a.z + (b.z - a.z) * k;
-  const z = z0 * (1 + 0.025 * cam.breathe);
-  const tx = GRID.colX - (GRID.colX - (a.tx + (b.tx - a.tx) * k)) * (z / z0);
-  const ty = STAGE_H / 2 - (STAGE_H / 2 - (a.ty + (b.ty - a.ty) * k)) * (z / z0);
+  // the camera, the stage's treatment and its drift at a time; in the last second they ease back to frame 0's,
+  // so the last frame is the first (28 Nov: the loop jumped in framing as well as in drawing)
+  const stageAt = (tt: number) => {
+    const cam = cameraAt(sb, tt);
+    const a = cameraTransform(art, cam.prev.region, cam.prev.scale);
+    const b = cameraTransform(art, cam.region, cam.scale);
+    const k = cam.k;
+    // the move to the shot's region, then a slow push around the stage's centre (never still)
+    const z0 = a.z + (b.z - a.z) * k;
+    const z = z0 * (1 + 0.025 * cam.breathe);
+    const tx = GRID.colX - (GRID.colX - (a.tx + (b.tx - a.tx) * k)) * (z / z0);
+    const ty = STAGE_H / 2 - (STAGE_H / 2 - (a.ty + (b.ty - a.ty) * k)) * (z / z0);
+    const tr = stageTreatment(sb, tt);
+    // a slow drift and push under all of it (28 Nov: «the drawing stays motionless»: a little wider, still calm)
+    const drift = { x: 16 * Math.sin(tt / 4.7), y: 10 * Math.sin(tt / 6.3 + 1), z: 1 + 0.02 * Math.sin(tt / 3.3) };
+    return { z, tx, ty, tr, drift };
+  };
+  const now0 = stageAt(t);
+  const first = stageAt(0);
+  const home = ease((t - (sb.total - 1.0)) / 0.9);
+  const lerpN = (p: number, q: number) => p + (q - p) * home;
+  const z = lerpN(now0.z, first.z);
+  const tx = lerpN(now0.tx, first.tx);
+  const ty = lerpN(now0.ty, first.ty);
   // the stage changes per verse (27 Nov: «not the same arch every time»): the whole anchor, a close
   // view of its crown, a wide view with a large faint echo behind for depth; each verse eases into
   // its own over 1.4 s, and a slow drift runs under all of it
-  const tr = stageTreatment(sb, t);
-  const drift = { x: 10 * Math.sin(t / 4.7), y: 6 * Math.sin(t / 6.3 + 1) };
+  const tr = lerpT(now0.tr, first.tr, home);
+  const drift = { x: lerpN(now0.drift.x, first.drift.x), y: lerpN(now0.drift.y, first.drift.y), z: lerpN(now0.drift.z, first.drift.z) };
   const raw = drawProgress(sb, t);
   const progress = buildProgress(sb, raw, t);
   // the loop: the first text comes back in the last 0.6 s (the drawing draws back to the hook: buildProgress)
@@ -392,7 +410,10 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
   const LEAD = 0.45;
   const ahead = shotAt(sb, t + LEAD);
   const changing = ahead !== shot && layerOf(ahead) !== layerOf(shot);
-  const lead = changing ? ease((t - (ahead.start - LEAD)) / 0.3) : 0;
+  const lead = changing ? clamp01((t - (ahead.start - LEAD)) / 0.4) : 0;
+  // 28 Nov («messy cross-dissolve, double exposure»): the old text fades out over the first half, the new one in over the second
+  const leadOut = ease(lead * 2);
+  const leadIn = ease(lead * 2 - 1);
   const fadeIn = 1;
   const textLayer = (s: typeof shot, op: number, tt: number = t) => {
     if (op <= 0.01) return null;
@@ -438,7 +459,7 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
             </div>
           </div>
         ) : null}
-        <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: STAGE_H, transformOrigin: `${GRID.colX}px ${STAGE_H / 2}px`, transform: `translate(${(tr.dx + drift.x).toFixed(2)}px, ${(tr.dy + drift.y).toFixed(2)}px) scale(${tr.zoom.toFixed(4)})` }}>
+        <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: STAGE_H, transformOrigin: `${GRID.colX}px ${STAGE_H / 2}px`, transform: `translate(${(tr.dx + drift.x).toFixed(2)}px, ${(tr.dy + drift.y).toFixed(2)}px) scale(${(tr.zoom * drift.z).toFixed(4)})` }}>
           <div style={{ position: "absolute", left: 0, top: 0, width: 1080, height: STAGE_H, transformOrigin: "0 0", transform: `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) scale(${z.toFixed(4)})` }}>
             <EmeraldLineArt art={art} progress={progress} height={STAGE_H} uid={sb.video_id.replace(/[^a-z0-9]/gi, "")} flicker={flicker} />
           </div>
@@ -454,8 +475,8 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
         </div>
       </div>
       {/* the text under the anchor */}
-      {changing && !end ? textLayer(ahead, lead) : null}
-      {textLayer(shot, end ? 1 - clamp01((t - (sb.badge!.from - 0.4)) / 0.3) : changing ? 1 - lead : fadeIn)}
+      {changing && !end ? textLayer(ahead, leadIn) : null}
+      {textLayer(shot, end ? 1 - clamp01((t - (sb.badge!.from - 0.4)) / 0.3) : changing ? 1 - leadOut : fadeIn)}
       {loopIn > 0 ? textLayer(sb.shots[0]!, loopIn, 0) : null}
       {/* the close: the sources (one line), the badge */}
       {end ? (
