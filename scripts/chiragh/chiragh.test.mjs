@@ -137,3 +137,39 @@ test("a verse read by the narrator (no recitation) is shown piece by piece acros
   assert.ok(v.chunks.length >= 3);
   for (const c of v.chunks) assert.ok(c.to - c.from > 2, `piece ${c.from}-${c.to}`);
 });
+
+test("meaning: each text gets the motif of its own key image, a checked passage is enforced, else a fallback", async () => {
+  const { chooseMotif, FALLBACK } = await import("./meaning.mjs");
+  const { cueIn } = await import("../../src/chiragh/art.ts");
+  const withSurah = (surah, translation) => {
+    const m = material({ ayahs: 3 });
+    m.verses.forEach((v, i) => Object.assign(v, { surah, key: `${surah}:${i + 1}`, translation: translation[i] ?? v.translation }));
+    m.lines = [];
+    return m;
+  };
+  // checked passages (by surah number; the placeholder words do not matter)
+  assert.equal(chooseMotif(withSurah(105, [])).art, "stones");
+  assert.equal(chooseMotif(withSurah(114, [])).art, "refuge");
+  assert.equal(chooseMotif(withSurah(101, [])).sure, true);
+  // the key image the words name (made-up sentences, not a translation)
+  const rain = chooseMotif(withSurah(999, ["the rain came down", "water on the dead earth", "and the rain again"]));
+  assert.equal(rain.art, "rain");
+  assert.equal(chooseMotif(withSurah(999, ["شب آرام شد و ماه برآمد", "خورشید رفت", "شب ماند"])).art, "sky");
+  // nothing the library can show: the lamp, said to be a fallback (never sure)
+  const none = chooseMotif(withSurah(999, ["placeholder one", "placeholder two", "placeholder three"]));
+  assert.deepEqual([none.art, none.sure, none.by], [FALLBACK, false, "fallback"]);
+  // a cue matches with or without the Arabic marks, and only whole English words
+  assert.ok(cueIn(ART.stones.groups.find((g) => g.id === "trails").cue, "swarms of flying things"));
+  assert.ok(!cueIn(ART.stones.groups.find((g) => g.id === "trails").cue, "placeholder"));
+  assert.ok(cueIn("الوسواس", "الْوَسْوَاسِ"));
+  // every motif is nature, sky, architecture or abstract: no figure, and every cue is a valid pattern
+  for (const id of ["light", "rain", "seed", "sky", "balance", "refuge", "stones"]) {
+    assert.equal(ART[id].figures, false, id);
+    for (const g of ART[id].groups) if (g.cue) assert.doesNotThrow(() => new RegExp(g.cue, "iu"), `${id}/${g.id}`);
+  }
+  // a concept with another drawing than a checked passage's motif is refused; the rule concepts take the motif
+  const m = withSurah(105, []);
+  const cs = ruleConcepts(m, []);
+  assert.ok(cs.every((c) => c.anchor.art === "stones"));
+  assert.ok(!validConcept({ ...cs[0], anchor: { art: "mihrab", regions: ["whole"], key_region: null } }, m).ok);
+});

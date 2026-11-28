@@ -8,7 +8,7 @@ import React, { useLayoutEffect, useRef, useState } from "react";
 import { AbsoluteFill, Audio, Sequence, continueRender, delayRender, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { fontsReady } from "../fonts";
 import { quoteHash } from "../lamp/zones";
-import { ART } from "./art";
+import { ART, cueIn } from "./art";
 import { EmeraldLineArt } from "./LineArt";
 import { cameraAt, drawProgress, ease, glowAmount, litAmount, shotAt, type Caption, type InlineArt, type Storyboard, type Verse } from "./storyboard";
 import { FONT, GRID, INK } from "./tokens";
@@ -53,17 +53,64 @@ function cameraTransform(art: InlineArt, region: string, scale: number) {
  * 1.2 s (the director's order and groups; only the times are spread).
  */
 const buildCache = new WeakMap<object, Array<{ g: string; at: number }>>();
-export function buildPlan(sb: Pick<Storyboard, "shots" | "total">): Array<{ g: string; at: number }> {
+export function buildPlan(sb: Pick<Storyboard, "shots" | "total"> & Partial<Pick<Storyboard, "verses">>): Array<{ g: string; at: number }> {
   const hit = buildCache.get(sb as object);
   if (hit) return hit;
   const first = new Map<string, number>();
   for (const s of sb.shots) s.picture.draw.forEach((g) => (first.has(g) ? null : first.set(g, s.start)));
   const order = [...first.entries()].sort((a, b) => a[1] - b[1]).map(([g]) => g);
+  // a stage with a cue draws on the (first) verse whose words or translation name it (art.ts: cue)
+  const art = "anchor" in sb ? artOf(sb as Storyboard) : null;
+  const cueAt = new Map<string, number>();
+  if (art && sb.verses) {
+    const firstShot = new Map<string, number>();
+    for (const s of sb.shots) if (s.text.layer === "verse" && s.text.ref && !firstShot.has(s.text.ref)) firstShot.set(s.text.ref, s.start);
+    for (const g of art.groups) {
+      if (!g.cue) continue;
+      const v = sb.verses.find((x) => x.ayah !== null && firstShot.has(x.id) && cueIn(g.cue!, `${x.chunks.map((c) => c.text).join(" ")} ${x.translation ?? ""}`));
+      if (v) cueAt.set(g.id, firstShot.get(v.id)!);
+    }
+  }
   const n = order.length;
-  const k0 = Math.max(1, Math.ceil(n * 0.34));
+  // the hook: the first third, never a stage that waits for its verse
+  const k0 = Math.max(1, Math.min(order.findIndex((g) => cueAt.has(g)) < 0 ? n : order.findIndex((g) => cueAt.has(g)), Math.ceil(n * 0.34)));
   const end = Math.max(4, sb.total * 0.85);
   const start = 1.2;
-  const plan = order.map((g, i) => ({ g, at: i < k0 ? -2.6 + (i * 1.0) / k0 : start + ((i - k0 + 1) / Math.max(1, n - k0)) * (end - start) }));
+  // in step with the text (owner, 28 Nov: «meaning»): the stages after the hook are shared out over the verses in
+  // order, each arriving as its verse comes on screen (and spread inside it); without verses, evenly in time
+  const seen = new Set<string>();
+  const uniq: number[] = [];
+  for (const s of sb.shots) {
+    if (s.text.layer !== "verse" || !s.text.ref || seen.has(s.text.ref) || s.start >= end) continue;
+    const v = (sb.verses ?? []).find((x) => x.id === s.text.ref);
+    if (!v || v.ayah === null) continue;
+    seen.add(s.text.ref);
+    if (s.start >= start - 0.5) uniq.push(s.start);
+  }
+  uniq.sort((p, q) => p - q);
+  const rest = n - k0;
+  // stages cued on the same verse follow each other 1.2 s apart
+  const cuedOn = new Map<number, number>();
+  const plan = order.map((g, i) => {
+    if (i < k0) return { g, at: -2.6 + (i * 1.0) / k0 };
+    if (cueAt.has(g)) {
+      const t0 = cueAt.get(g)!;
+      const k = cuedOn.get(t0) ?? 0;
+      cuedOn.set(t0, k + 1);
+      return { g, at: Math.max(start, Math.min(end, t0 + 0.4 + 1.2 * k)) };
+    }
+    const r = i - k0;
+    if (uniq.length >= 2) {
+      // stage r of rest goes to verse floor(r · V / rest); several stages in one verse follow each other 1.4 s apart
+      const vi = Math.min(uniq.length - 1, Math.floor((r * uniq.length) / Math.max(1, rest)));
+      const f0 = Math.ceil((vi * rest) / uniq.length); // the first stage that falls in this verse
+      const inVerse = Math.max(1, Math.ceil(((vi + 1) * rest) / uniq.length) - f0);
+      const nextAt = vi + 1 < uniq.length ? uniq[vi + 1]! : end;
+      const slot = Math.min(1.4, Math.max(0.6, (nextAt - uniq[vi]! - 0.3) / (inVerse + 0.5)));
+      return { g, at: Math.max(start, uniq[vi]! + 0.3 + (r - f0) * slot) };
+    }
+    return { g, at: start + ((r + 1) / Math.max(1, rest)) * (end - start) };
+  });
   buildCache.set(sb as object, plan);
   return plan;
 }
@@ -412,8 +459,9 @@ export const Chiragh: React.FC<ChiraghProps> = ({ storyboard: sb, still = null }
   const changing = ahead !== shot && layerOf(ahead) !== layerOf(shot);
   const lead = changing ? clamp01((t - (ahead.start - LEAD)) / 0.4) : 0;
   // 28 Nov («messy cross-dissolve, double exposure»): the old text fades out over the first half, the new one in over the second
-  const leadOut = ease(lead * 2);
-  const leadIn = ease(lead * 2 - 1);
+  // (v4: an even split left a near-blank text card for ~0.2 s: the old text now leaves in the first 40 %, the new one starts at 35 %)
+  const leadOut = ease(lead / 0.4);
+  const leadIn = ease((lead - 0.35) / 0.65);
   const fadeIn = 1;
   const textLayer = (s: typeof shot, op: number, tt: number = t) => {
     if (op <= 0.01) return null;

@@ -11,7 +11,7 @@ export type InlineArt = {
   id: string;
   tags: string[];
   figures: false;
-  groups: Array<{ id: string; paths: string[]; weight?: number; gold?: boolean; fill?: boolean }>;
+  groups: Array<{ id: string; paths: string[]; weight?: number; gold?: boolean; fill?: boolean; cue?: string }>;
   regions: Array<{ id: string; x: number; y: number; w: number; h: number }>;
   labels?: Labeled[];
 };
@@ -75,7 +75,7 @@ export type Storyboard = {
     by: string;
   };
   fingerprint: Fingerprint;
-  anchor: { art: string; inline: InlineArt | null; regions: string[] };
+  anchor: { art: string; inline: InlineArt | null; regions: string[]; meaning?: { art: string; why: string; by: string } | null };
   title: { main: string; sub: string };
   fps: number;
   total: number;
